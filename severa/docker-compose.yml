@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: severa_postgres
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: severa_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d severa_dev']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: severa_app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Dentro de la red de docker compose, "localhost" es el propio
+      # contenedor `app`, no `postgres` — DATABASE_URL en .env normalmente
+      # apunta a localhost:5432 para desarrollo fuera de Docker (npm run dev
+      # contra el Postgres publicado en el host). Se sobreescribe acá para
+      # que el contenedor `app` resuelva "postgres" por el nombre del
+      # servicio (DNS interno de Compose), no para que el .env del host
+      # tenga que saber que corre en Docker.
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/severa_dev
+    ports:
+      - '3000:3000'
+    # Corre las migraciones (idempotentes, ver scripts/migrate.js) antes de
+    # levantar el servidor. Se usa `command` en vez de un entrypoint.sh
+    # separado: es una sola línea, no necesita permisos de ejecución ni copiarse
+    # aparte en el Dockerfile.
+    command: sh -c "npm run migrate && npm start"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    name: severa_postgres_data

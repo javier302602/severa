@@ -1,0 +1,4183 @@
+﻿SDS — SEVERA
+Sistema de Priorización de Vulnerabilidades de Software
+Especificación de Requisitos del Sistema (SDS)
+UNIVERSIDAD NACIONAL AGRARIA DE LA SELVA
+FACULTAD DE INGENIERÍA EN INFORMÁTICA Y SISTEMAS
+ESCUELA ACADÉMICA PROFESIONAL DE INGENIERÍA EN INFORMÁTICA Y SISTEMAS
+PROYECTO BASE: Análisis Estadístico de Vulnerabilidades de Seguridad en Software
+Estudio de 150 Vulnerabilidades NIST/NVD, Período 2026-I, Tingo María, Huánuco, Perú
+INTEGRANTE:
+Javier Orneta, Ángel Paolo
+Tingo María – Perú
+2026
+ÍNDICE
+I. INTRODUCCIÓN
+El presente documento describe la especificación de requisitos del sistema SEVERA, desarrollado tomando como base el informe de Análisis Estadístico de Vulnerabilidades de Seguridad en Software, elaborado por Ángel Paolo Javier Orneta en el curso de Estadística y Probabilidades (UNAS, Ciclo V, 2026-I), bajo la asesoría del Ing. Wilmer Julio Bermúdez Pino.
+SEVERA es una plataforma digital orientada a la gestión, análisis estadístico y priorización de vulnerabilidades de software, permitiendo a analistas de seguridad importar datos de la Base de Datos Nacional de Vulnerabilidades (NVD) del NIST, calcular medidas estadísticas sobre el CVSS Score, generar visualizaciones y obtener un ranking de priorización de remediación sustentado en datos y no solo en intuición.
+El objetivo principal de este documento es identificar, estructurar, validar y priorizar los requisitos funcionales del sistema, siguiendo estándares reconocidos de ingeniería de software como IEEE 830 e ISO/IEC/IEEE 29148.
+Para garantizar la calidad de los requisitos, el proceso aplicado incluye las siguientes fases:
+Elicitación de requisitos a partir del análisis estadístico previo y de entrevistas con analistas de seguridad.
+Análisis y refinamiento de los requisitos identificados.
+Verificación y validación de los requisitos.
+Consolidación de requisitos en una línea base.
+Priorización y estimación de esfuerzo para su desarrollo.
+Asimismo, el documento incorpora mecanismos de trazabilidad, gestión de cambios y control de versiones, permitiendo mantener la consistencia entre los requisitos, los módulos del sistema y los objetivos del proyecto.
+1.1 Planteamiento del problema
+Las organizaciones enfrentan un volumen creciente de vulnerabilidades de software y recursos limitados para remediarlas. Sin un análisis estadístico riguroso, la decisión de qué vulnerabilidad atender primero suele basarse en intuición o percepciones aisladas, confundiendo con frecuencia "urgente" con "importante", lo que puede dejar expuestas vulnerabilidades realmente críticas mientras se atienden fallas de bajo impacto.
+Actualmente no existe una plataforma que integre, en un solo flujo, la carga de datos reales del NVD, el cálculo de medidas estadísticas descriptivas sobre el CVSS Score y la generación automática de un ranking de priorización de remediación. El sistema SEVERA busca cubrir esa necesidad, transformando el análisis estadístico desarrollado sobre 150 vulnerabilidades reales en una herramienta de software reutilizable para cualquier conjunto de vulnerabilidades.
+1.2 Objetivos
+Objetivo general:
+Desarrollar un sistema digital denominado SEVERA que permita registrar, analizar estadísticamente y priorizar vulnerabilidades de software a partir de datos reales del NVD, facilitando la toma de decisiones de remediación basada en evidencia cuantitativa.
+Objetivos específicos:
+Identificar y documentar los requisitos funcionales del sistema mediante técnicas de elicitación de requisitos.
+Diseñar una estructura organizada de requisitos que represente las funcionalidades estadísticas y de priorización del sistema.
+Validar y verificar los requisitos obtenidos para asegurar su claridad, consistencia y viabilidad.
+Priorizar los requisitos identificados considerando su importancia y el esfuerzo estimado de implementación.
+Establecer una línea base de requisitos que sirva como referencia para el desarrollo del sistema.
+1.3 Justificación
+El desarrollo de SEVERA se justifica en la misma pregunta que dio origen al informe estadístico que lo fundamenta: ¿por dónde empezar cuando todo parece urgente? La estadística descriptiva demostró ser la herramienta adecuada para responder esa pregunta con datos y no solo con percepciones; SEVERA busca llevar esa misma lógica a una herramienta de software que cualquier equipo de seguridad pueda usar de forma recurrente, sin tener que repetir manualmente el análisis estadístico cada vez que aparece un nuevo lote de vulnerabilidades.
+Para la Ingeniería de Sistemas, este proyecto tiene valor porque conecta dos disciplinas fundamentales: el análisis estadístico riguroso y la ingeniería de requisitos, mostrando cómo un estudio académico de datos puede convertirse en la base formal para el desarrollo de un producto de software real.
+II. PROCESO DE INGENIERÍA DE REQUISITOS
+2.1 Elicitación de requisitos
+La elicitación de requisitos corresponde a la fase inicial del proceso, cuyo objetivo es identificar y comprender las necesidades de los analistas de seguridad que usarían el sistema SEVERA.
+Para el desarrollo de SEVERA se aplicaron las siguientes técnicas de elicitación:
+Revisión documental del informe estadístico previo (Análisis Estadístico de Vulnerabilidades NVD), usado como fuente primaria de necesidades.
+Análisis de la estructura del dataset real de 150 vulnerabilidades y sus 12 variables.
+Revisión de la teoría de CVSS (FIRST/NIST) para definir reglas de clasificación de severidad.
+Análisis de plataformas similares de gestión de vulnerabilidades, con fines de benchmarking.
+Necesidades identificadas a partir de la elicitación
+ID
+Necesidad identificada
+Descripción
+N-01
+Carga de datos reales del NVD
+Los analistas necesitan importar el dataset de vulnerabilidades sin transcribir datos manualmente.
+N-02
+Cálculo estadístico automático
+Los analistas requieren que el sistema calcule media, mediana, moda, varianza y CV automáticamente.
+N-03
+Visualización de la distribución
+Los analistas necesitan ver histogramas, boxplots y gráficos comparativos sin usar R manualmente.
+N-04
+Priorización objetiva
+Los analistas necesitan un criterio cuantitativo para decidir qué vulnerabilidad remediar primero.
+N-05
+Comparación por categorías
+Los analistas desean comparar la severidad entre accesos remotos y locales.
+N-06
+Generación de reportes
+Los analistas necesitan exportar resultados en un informe presentable.
+N-07
+Alertas de vulnerabilidades críticas
+Los analistas requieren ser notificados ante vulnerabilidades de alto riesgo.
+N-08
+Trazabilidad del estado de remediación
+Los analistas necesitan registrar si una vulnerabilidad fue remediada.
+2.2 Verificación de requisitos
+La verificación de requisitos comprueba que los requisitos definidos cumplen criterios de calidad establecidos por ISO/IEC/IEEE 29148: claridad, consistencia, completitud, verificabilidad y trazabilidad.
+Tabla de verificación de requisitos (extracto)
+ID
+Requisito identificado
+Claro
+Consistente
+Verificable
+Resultado
+RF-01
+Registrar analista en la plataforma
+✓
+✓
+✓
+Validado
+RF-02
+Iniciar sesión en el sistema
+✓
+✓
+✓
+Validado
+RF-17
+Importar dataset NVD desde Excel
+✓
+✓
+✓
+Validado
+RF-33
+Generar tabla de frecuencias sin agrupar
+✓
+✓
+✓
+Validado
+RF-41
+Calcular la media del CVSS Score
+✓
+✓
+✓
+Validado
+RF-51
+Generar histograma de CVSS Score
+✓
+✓
+✓
+Validado
+RF-69
+Clasificar riesgo según CVSS
+✓
+✓
+✓
+Validado
+RF-77
+Generar informe estadístico en PDF
+✓
+✓
+✓
+Validado
+Nota: esta tabla corresponde a un extracto representativo; la verificación completa se aplicó a los 104 requisitos funcionales definidos.
+2.3 Validación de requisitos
+La validación confirma que los requisitos reflejan correctamente las necesidades de los analistas de seguridad. Se realizó mediante revisión conjunta del equipo, comparando cada requisito contra el problema planteado en la sección 1.1 y contra el contenido real del informe estadístico base.
+Revisión de que cada requisito represente una necesidad real del analista.
+Discusión y consenso sobre el alcance de cada requisito.
+Comparación de cada requisito contra los capítulos del informe estadístico original.
+Eliminación de requisitos redundantes o fuera de alcance.
+2.4 Refinamiento de requisitos
+El refinamiento transformó las necesidades iniciales en requisitos funcionales detallados y estructurados, organizados en 13 módulos y descompuestos en requisitos más específicos cuando fue necesario (ver capítulo VII).
+III. DESCRIPCIÓN GENERAL DEL SISTEMA
+3.1 Perspectiva del producto
+SEVERA es una plataforma digital orientada al análisis estadístico y priorización de vulnerabilidades de software. La aplicación permite a los analistas:
+Importar y validar datasets de vulnerabilidades provenientes del NVD.
+Calcular automáticamente medidas de tendencia central, dispersión y distribuciones de frecuencia del CVSS Score.
+Generar los gráficos estadísticos necesarios para interpretar la severidad de las vulnerabilidades.
+Obtener un ranking de priorización de remediación basado en criterios estadísticos.
+Generar informes y exportar resultados.
+El sistema será accesible mediante aplicación web, permitiendo la interacción entre los analistas y la base de datos de vulnerabilidades.
+3.2 Usuarios del sistema
+Usuario
+Descripción
+Visitante
+Persona que accede al sistema sin registrarse; solo puede ver información general del proyecto.
+Analista
+Usuario que carga datasets, ejecuta análisis estadísticos, genera gráficos, informes y prioriza vulnerabilidades.
+Administrador
+Responsable de gestionar usuarios, auditar el sistema y administrar la configuración general.
+3.3 Suposiciones y restricciones
+Suposiciones
+Los analistas contarán con acceso a internet para utilizar la plataforma.
+El dataset de vulnerabilidades sigue la estructura definida por el NVD (12 variables por registro).
+El CVSS Score utilizado corresponde a la versión de Métricas Base de CVSS documentada por FIRST/NIST.
+Restricciones
+Restricción
+Descripción
+Tecnológica
+El sistema será desarrollado utilizando tecnologías web modernas y base de datos relacional.
+Acceso a internet
+Algunas funcionalidades (sincronización con la API NVD) requieren conexión a internet.
+Fuente de datos
+El dataset inicial depende de la disponibilidad y formato de los archivos del NVD.
+Normativa
+El sistema debe cumplir con la Ley N.° 29733 de Protección de Datos Personales del Perú.
+3.4 Arquitectura general del sistema
+SEVERA se basa en una arquitectura cliente-servidor de tres capas:
+Capa
+Descripción
+Capa de presentación
+Interfaz de usuario web donde el analista interactúa con el catálogo, los gráficos y los reportes.
+Capa lógica
+Procesa las solicitudes, ejecuta los cálculos estadísticos y aplica las reglas de priorización.
+Capa de datos
+Base de datos relacional que almacena usuarios, datasets de vulnerabilidades y resultados de análisis.
+Esta arquitectura permite mantener una estructura organizada y facilita el mantenimiento y la escalabilidad del sistema.
+3.5 Comparación con plataformas existentes (Benchmarking)
+Se realizó un benchmarking de plataformas relacionadas con la gestión de vulnerabilidades, con el objetivo de identificar funcionalidades útiles como referencia para SEVERA.
+Plataformas analizadas
+NVD (nvd.nist.gov): buscador y API oficial del NIST; fuente primaria de datos, sin capacidades propias de análisis estadístico o priorización.
+CVE Details: portal de terceros que reorganiza información del NVD con fines de consulta rápida, sin análisis estadístico propio.
+Tenable / Rapid7 InsightVM: plataformas comerciales de gestión de vulnerabilidades orientadas a escaneo activo de redes, con priorización basada en scoring propietario.
+Greenbone / OpenVAS: escáner de vulnerabilidades de código abierto, orientado a detección más que a análisis estadístico descriptivo.
+Tabla comparativa de plataformas
+Característica
+NVD
+CVE Details
+Tenable/Rapid7
+SEVERA
+Consulta de vulnerabilidades
+✓
+✓
+✓
+✓
+Cálculo estadístico descriptivo (media, CV, etc.)
+X
+X
+Parcial
+✓
+Distribución de frecuencias agrupadas
+X
+X
+X
+✓
+Gráficos comparativos por categoría
+X
+X
+Parcial
+✓
+Ranking de priorización basado en estadística propia
+X
+X
+Propietario
+✓
+Informes con interpretación automática
+X
+X
+Parcial
+✓
+Conclusiones del benchmarking: la NVD aportó la estructura de datos y la definición oficial de CVSS; las plataformas comerciales inspiraron la idea de un ranking de priorización, pero ninguna analizada ofrece de forma abierta el nivel de detalle estadístico descriptivo (distribución de frecuencias, medidas de dispersión, coeficiente de variación) que SEVERA incorpora como núcleo del sistema.
+IV. ESCENARIOS DEL SISTEMA
+Los escenarios del sistema describen situaciones representativas de interacción entre los analistas y el sistema SEVERA, y sirven como base para la definición de requisitos funcionales, casos de uso e historias de usuario.
+ID
+Escenario
+Actor
+Descripción
+E-01
+Registro de analista
+Visitante
+Un visitante crea una cuenta para poder acceder a las funcionalidades del sistema.
+E-02
+Carga del dataset NVD
+Analista
+El analista importa el archivo de 150 vulnerabilidades para iniciar el análisis.
+E-03
+Consulta del catálogo de vulnerabilidades
+Analista
+El analista navega por el catálogo para conocer características y CVSS de cada CVE.
+E-04
+Generación de distribución de frecuencias
+Analista
+El analista genera las tablas de frecuencias sin agrupar y agrupadas del CVSS Score.
+E-05
+Cálculo de medidas estadísticas
+Analista
+El analista obtiene media, mediana, moda, varianza, desviación estándar y CV.
+E-06
+Visualización gráfica
+Analista
+El analista genera histogramas, boxplots y gráficos comparativos.
+E-07
+Comparación por categorías
+Analista
+El analista compara la severidad entre vulnerabilidades remotas y locales.
+E-08
+Priorización de vulnerabilidades
+Sistema / Analista
+El sistema clasifica el riesgo y genera un ranking de urgencia de remediación.
+E-09
+Generación de reportes
+Analista
+El analista genera un informe estadístico completo o un resumen ejecutivo.
+E-10
+Búsqueda avanzada
+Analista
+El analista combina filtros para encontrar vulnerabilidades específicas.
+E-11
+Auditoría del sistema
+Administrador
+El administrador revisa el historial de operaciones realizadas sobre el dataset.
+E-12
+Gestión de seguridad del sistema
+Sistema
+El sistema valida credenciales y protege la información mediante cifrado y HTTPS.
+E-13
+Recepción de notificaciones
+Analista
+El analista recibe alertas sobre vulnerabilidades críticas y plazos de remediación.
+V. SPRINT POR MÓDULO PARA LA GESTIÓN DEL PROYECTO
+Sprint 01 – Gestión de Usuarios y Acceso
+Sprint Planning
+Elemento
+Descripción
+Sprint
+Sprint 01
+Módulo
+M-01 Gestión de Usuarios y Acceso
+Objetivo
+Implementar registro, autenticación y control de acceso de analistas.
+Duración
+1 semana
+Participantes
+Equipo de desarrollo, analista de requisitos
+Inicio
+Semana 1
+Fin
+Semana 2
+Sprint Backlog
+ID
+Tarea
+Descripción
+Responsable
+SB-01
+Diseño de formulario de registro
+Crear interfaz de registro de analista
+Frontend
+SB-02
+Validación de datos
+Verificar correo y contraseña
+Backend
+SB-03
+Autenticación
+Implementar login del analista
+Backend
+SB-04
+Recuperación de contraseña
+Sistema de restablecimiento vía correo
+Backend
+Historias de Usuario
+HU-01 — Registro de analista
+Como visitante, quiero registrarme en la plataforma, para poder acceder a las funcionalidades del sistema.
+Criterios de aceptación:
+El usuario debe ingresar un correo válido.
+La contraseña debe tener mínimo 8 caracteres.
+El sistema debe confirmar el registro correctamente.
+HU-02 — Inicio de sesión
+Como analista registrado, quiero iniciar sesión en la plataforma, para acceder a mi cuenta.
+Criterios de aceptación:
+El sistema debe validar las credenciales.
+Debe mostrar error si son incorrectas.
+Debe permitir el acceso si son correctas.
+Caso de Uso
+CU-01 Registro de Analista
+Actor: Visitante
+Flujo principal:
+1. El visitante accede al formulario de registro.
+2. Ingresa nombre, correo y contraseña.
+3. El sistema valida los datos.
+4. El sistema crea la cuenta.
+5. El analista recibe confirmación.
+Sprint Review
+Requisito
+Descripción
+Estado
+RF-01
+Registro de analista
+Completado
+RF-02
+Inicio de sesión
+Completado
+RF-03
+Recuperar contraseña
+Completado
+Avance del sprint: 100%
+Sprint Retrospectiva
+Aspectos positivos
+Requisitos claros
+Desarrollo dentro del tiempo estimado
+Aspectos a mejorar
+Mejor organización del backlog
+Acciones futuras
+Mejor planificación de pruebas
+Sprint 02 – Perfil del Analista
+Sprint Planning
+Elemento
+Descripción
+Sprint
+Sprint 02
+Módulo
+M-02 Perfil del Analista
+Objetivo
+Implementar la gestión del perfil del analista, permitiendo visualizar y editar información personal.
+Duración
+1 semana
+Participantes
+Equipo de desarrollo, analista de requisitos
+Inicio
+Semana 3
+Fin
+Semana 4
+Sprint Backlog
+ID
+Tarea
+Descripción
+Responsable
+SB-05
+Diseño interfaz de perfil
+Crear interfaz para visualizar el perfil
+Frontend
+SB-06
+Edición de perfil
+Implementar actualización de datos personales
+Backend
+SB-07
+Historial de análisis
+Mostrar análisis previos del analista
+Backend
+Historias de Usuario
+HU-03 — Visualización de perfil
+Como analista registrado, quiero visualizar mi perfil, para conocer mis datos registrados en la plataforma.
+Criterios de aceptación:
+El sistema muestra nombre, correo y rol.
+La información se obtiene desde la base de datos.
+La interfaz muestra los datos correctamente.
+HU-04 — Edición de perfil
+Como analista registrado, quiero editar mis datos personales, para mantener actualizada mi información.
+Criterios de aceptación:
+El analista puede modificar nombre y datos de contacto.
+Los cambios se guardan en la base de datos.
+El sistema confirma la actualización exitosa.
+Caso de Uso
+CU-02 Editar Perfil de Analista
+Actor: Analista registrado
+Flujo principal:
+1. El analista accede a la sección de perfil.
+2. El sistema muestra su información actual.
+3. El analista modifica sus datos.
+4. El sistema valida la información ingresada.
+5. El sistema guarda los cambios.
+6. El sistema confirma la actualización.
+Sprint Review
+Requisito
+Descripción
+Estado
+RF-09
+Visualización de perfil
+Completado
+RF-10
+Edición de perfil
+Completado
+RF-11
+Historial de análisis
+Completado
+Avance del sprint: 100%
+Sprint Retrospectiva
+Aspectos positivos
+Buena colaboración del equipo
+Aspectos a mejorar
+Cobertura de pruebas de edición
+Acciones futuras
+Automatizar pruebas de perfil
+Sprint 03 – Carga y Gestión del Dataset NVD
+Sprint Planning
+Elemento
+Descripción
+Sprint
+Sprint 03
+Módulo
+M-03 Carga y Gestión del Dataset NVD
+Objetivo
+Implementar la importación, validación y versionado del dataset de 150 vulnerabilidades.
+Duración
+1 semana
+Participantes
+Equipo de desarrollo, analista de requisitos
+Inicio
+Semana 5
+Fin
+Semana 6
+Sprint Backlog
+ID
+Tarea
+Descripción
+Responsable
+SB-08
+Importador de Excel
+Leer el archivo vulnerabilidades_nvd_150_registros.xlsx
+Backend
+SB-09
+Validación de columnas
+Verificar las 12 variables esperadas
+Backend
+SB-10
+Detección de NA
+Reportar valores faltantes
+Backend
+SB-11
+Conexión a API NVD 2.0
+Sincronizar datos desde la API oficial
+Backend
+Historias de Usuario
+HU-05 — Importación del dataset
+Como analista, quiero importar el archivo de vulnerabilidades, para iniciar el análisis estadístico.
+Criterios de aceptación:
+El sistema lee el archivo Excel.
+Reconoce las 12 columnas esperadas.
+Confirma la cantidad de registros cargados.
+HU-06 — Validación de calidad de datos
+Como analista, quiero que el sistema detecte datos faltantes, para evaluar la calidad del dataset.
+Criterios de aceptación:
+El sistema reporta la cantidad de valores NA.
+El reporte se muestra por variable.
+Caso de Uso
+CU-03 Importar Dataset NVD
+Actor: Analista
+Flujo principal:
+1. El analista selecciona el archivo Excel.
+2. El sistema valida su estructura.
+3. El sistema carga los 150 registros.
+4. El sistema reporta datos faltantes si existen.
+5. El sistema confirma la carga exitosa.
+Sprint Review
+Requisito
+Descripción
+Estado
+RF-17
+Importación del dataset
+Completado
+RF-18
+Validación de estructura
+Completado
+RF-19
+Detección de datos faltantes
+Completado
+Avance del sprint: 100%
+Sprint Retrospectiva
+Aspectos positivos
+Dataset real facilitó las pruebas
+Aspectos a mejorar
+Manejo de archivos corruptos
+Acciones futuras
+Agregar validación adicional de tipos de dato
+Sprint 04 – Catálogo y Consulta de Vulnerabilidades
+Sprint Planning
+Elemento
+Descripción
+Sprint
+Sprint 04
+Módulo
+M-04 Catálogo y Consulta de Vulnerabilidades
+Objetivo
+Implementar la consulta detallada de cada vulnerabilidad del catálogo.
+Duración
+1 semana
+Participantes
+Equipo de desarrollo, analista de requisitos
+Inicio
+Semana 7
+Fin
+Semana 8
+Sprint Backlog
+ID
+Tarea
+Descripción
+Responsable
+SB-12
+Ficha de vulnerabilidad
+Diseñar vista detallada por CVE
+Frontend
+SB-13
+Buscador por CVE
+Implementar búsqueda exacta
+Backend
+SB-14
+Filtros de severidad
+Implementar filtro por rango de CVSS
+Backend
+Historias de Usuario
+HU-07 — Consulta de ficha de vulnerabilidad
+Como analista, quiero ver la ficha completa de una vulnerabilidad, para conocer todos sus atributos.
+Criterios de aceptación:
+Se muestra el CVE, CVSS Score y componente afectado.
+Se muestra el vector de ataque (remoto/local).
+HU-08 — Búsqueda por CVE
+Como analista, quiero buscar una vulnerabilidad por su código CVE.
+Criterios de aceptación:
+El sistema encuentra el registro exacto.
+Muestra mensaje si el CVE no existe.
+Caso de Uso
+CU-04 Consultar Vulnerabilidad por CVE
+Actor: Analista
+Flujo principal:
+1. El analista ingresa el código CVE.
+2. El sistema busca el registro correspondiente.
+3. El sistema muestra la ficha completa.
+Sprint Review
+Requisito
+Descripción
+Estado
+RF-25
+Ficha de vulnerabilidad
+Completado
+RF-26
+Búsqueda por CVE
+Completado
+RF-27
+Filtro por CVSS
+Completado
+Avance del sprint: 100%
+Sprint Retrospectiva
+Aspectos positivos
+Buen rendimiento en búsquedas
+Aspectos a mejorar
+Mensajes de error poco descriptivos
+Acciones futuras
+Mejorar textos de validación
+Sprint 05 – Distribución de Frecuencias
+Sprint Planning
+Elemento
+Descripción
+Sprint
+Sprint 05
+Módulo
+M-05 Distribución de Frecuencias
+Objetivo
+Implementar la construcción de tablas de frecuencias agrupadas y sin agrupar del CVSS Score.
+Duración
+1 semana
+Participantes
+Equipo de desarrollo, analista de requisitos
+Inicio
+Semana 9
+Fin
+Semana 10
+Sprint Backlog
+ID
+Tarea
+Descripción
+Responsable
+SB-15
+Tabla sin agrupar
+Calcular frecuencias por valor único
+Backend
+SB-16
+Tabla agrupada
+Calcular intervalos [0-2)...[8-10]
+Backend
+SB-17
+Frecuencia acumulada
+Calcular Fi absoluta y relativa
+Backend
+Historias de Usuario
+HU-09 — Tabla sin agrupar
+Como analista, quiero generar la tabla de frecuencias sin agrupar, para observar la distribución exacta de valores.
+Criterios de aceptación:
+Se listan los valores únicos de CVSS.
+Se muestra frecuencia absoluta y relativa.
+HU-10 — Tabla agrupada en intervalos
+Como analista, quiero generar la tabla agrupada en intervalos, para un análisis por rangos de severidad.
+Criterios de aceptación:
+Se generan los 5 intervalos oficiales de CVSS.
+Se calcula la marca de clase de cada intervalo.
+Caso de Uso
+CU-05 Generar Distribución de Frecuencias
+Actor: Analista
+Flujo principal:
+1. El analista solicita la tabla de frecuencias.
+2. El sistema calcula frecuencias sin agrupar.
+3. El sistema calcula frecuencias agrupadas por intervalos.
+4. El sistema muestra ambas tablas.
+Sprint Review
+Requisito
+Descripción
+Estado
+RF-33
+Tabla sin agrupar
+Completado
+RF-34
+Tabla agrupada
+Completado
+RF-37
+Frecuencia acumulada
+Completado
+Avance del sprint: 100%
+Sprint Retrospectiva
+Aspectos positivos
+Cálculos verificados contra R
+Aspectos a mejorar
+Redondeo de decimales
+Acciones futuras
+Estandarizar número de decimales mostrados
+Sprint 06 – Medidas de Tendencia Central y Dispersión
+Sprint Planning
+Elemento
+Descripción
+Sprint
+Sprint 06
+Módulo
+M-06 Medidas de Tendencia Central y Dispersión
+Objetivo
+Implementar el cálculo de media, mediana, moda, cuartiles, varianza, desviación estándar y CV.
+Duración
+1 semana
+Participantes
+Equipo de desarrollo, analista de requisitos
+Inicio
+Semana 11
+Fin
+Semana 12
+Sprint Backlog
+ID
+Tarea
+Descripción
+Responsable
+SB-18
+Medidas de tendencia central
+Calcular media, mediana y moda
+Backend
+SB-19
+Medidas de dispersión
+Calcular rango, varianza, desviación estándar y CV
+Backend
+SB-20
+Panel resumen estadístico
+Consolidar todas las medidas en un solo panel
+Frontend
+Historias de Usuario
+HU-11 — Cálculo de medidas de tendencia central
+Como analista, quiero calcular media, mediana y moda del CVSS Score, para conocer la severidad típica del conjunto.
+Criterios de aceptación:
+Los resultados coinciden con mean(), median() y la moda calculada en R.
+Se muestran con 4 decimales.
+HU-12 — Cálculo de medidas de dispersión
+Como analista, quiero calcular varianza, desviación estándar y coeficiente de variación, para conocer la dispersión de la severidad.
+Criterios de aceptación:
+Los resultados coinciden con var() y sd() de R.
+El CV se expresa en porcentaje.
+Caso de Uso
+CU-06 Calcular Medidas Estadísticas
+Actor: Analista
+Flujo principal:
+1. El analista solicita el resumen estadístico.
+2. El sistema calcula las medidas de tendencia central.
+3. El sistema calcula las medidas de dispersión.
+4. El sistema muestra el panel consolidado.
+Sprint Review
+Requisito
+Descripción
+Estado
+RF-41
+Cálculo de la media
+Completado
+RF-47
+Desviación estándar
+Completado
+RF-48
+Coeficiente de variación
+Completado
+Avance del sprint: 100%
+Sprint Retrospectiva
+Aspectos positivos
+Alta precisión numérica
+Aspectos a mejorar
+Documentación de fórmulas usadas
+Acciones futuras
+Agregar tooltips explicativos por medida
+Sprint 07 – Visualización Gráfica
+Sprint Planning
+Elemento
+Descripción
+Sprint
+Sprint 07
+Módulo
+M-07 Visualización Gráfica
+Objetivo
+Implementar los 10 gráficos estadísticos del análisis de vulnerabilidades.
+Duración
+2 semanas
+Participantes
+Equipo de desarrollo, analista de requisitos
+Inicio
+Semana 13
+Fin
+Semana 14
+Sprint Backlog
+ID
+Tarea
+Descripción
+Responsable
+SB-21
+Histograma y boxplot
+Generar histograma y boxplot del CVSS Score
+Backend
+SB-22
+Gráficos por severidad
+Generar barras y pastel por severidad
+Backend
+SB-23
+Gráficos comparativos
+Generar gráfico por tipo de acceso y scatter CVSS vs días de parche
+Backend
+SB-24
+Top 10 gráficos
+Generar top 10 tipos de vulnerabilidad y software afectado
+Backend
+Historias de Usuario
+HU-13 — Generación de histograma
+Como analista, quiero generar un histograma del CVSS Score, para visualizar la forma de la distribución.
+Criterios de aceptación:
+El histograma incluye líneas de media y mediana.
+Se puede descargar en PNG.
+HU-14 — Generación de boxplot
+Como analista, quiero generar un boxplot, para identificar valores atípicos de severidad.
+Criterios de aceptación:
+Se muestran los cuartiles Q1 y Q3.
+Se identifican visualmente los outliers.
+Caso de Uso
+CU-07 Generar Gráficos Estadísticos
+Actor: Analista
+Flujo principal:
+1. El analista selecciona el tipo de gráfico.
+2. El sistema procesa los datos del dataset.
+3. El sistema genera el gráfico correspondiente.
+4. El analista puede descargarlo.
+Sprint Review
+Requisito
+Descripción
+Estado
+RF-51
+Histograma CVSS
+Completado
+RF-54
+Boxplot
+Completado
+RF-59
+Top 10 tipos
+Completado
+Avance del sprint: 100%
+Sprint Retrospectiva
+Aspectos positivos
+Gráficos consistentes con el informe original en R
+Aspectos a mejorar
+Tiempo de renderizado de gráficos complejos
+Acciones futuras
+Optimizar la generación de gráficos en el servidor
+Sprint 08 – Comparación por Categorías
+Sprint Planning
+Elemento
+Descripción
+Sprint
+Sprint 08
+Módulo
+M-08 Comparación por Categorías
+Objetivo
+Implementar la comparación estadística entre grupos (acceso remoto/local, tipo, software).
+Duración
+1 semana
+Participantes
+Equipo de desarrollo, analista de requisitos
+Inicio
+Semana 15
+Fin
+Semana 16
+Sprint Backlog
+ID
+Tarea
+Descripción
+Responsable
+SB-25
+Comparación remoto vs local
+Calcular medias y desviaciones por tipo de acceso
+Backend
+SB-26
+Agrupación por tipo y software
+Clasificar registros por categoría
+Backend
+SB-27
+Tabla comparativa
+Generar tabla resumen por categoría
+Frontend
+Historias de Usuario
+HU-15 — Comparación remoto vs local
+Como analista, quiero comparar la severidad promedio entre vulnerabilidades remotas y locales, para priorizar según el vector de ataque.
+Criterios de aceptación:
+Se muestra la media de cada grupo.
+Se muestra la diferencia entre ambas medias.
+HU-16 — Tabla comparativa por categoría
+Como analista, quiero una tabla que resuma las medidas estadísticas por categoría.
+Criterios de aceptación:
+La tabla incluye media, desviación estándar y cantidad de registros.
+Se resalta la categoría de mayor severidad.
+Caso de Uso
+CU-08 Comparar Categorías de Vulnerabilidades
+Actor: Analista
+Flujo principal:
+1. El analista selecciona la variable de agrupación.
+2. El sistema calcula las medidas por grupo.
+3. El sistema presenta la tabla y el gráfico comparativo.
+Sprint Review
+Requisito
+Descripción
+Estado
+RF-62
+Comparación CVSS remoto/local
+Completado
+RF-64
+Agrupación por tipo
+Completado
+RF-67
+Tabla comparativa
+Completado
+Avance del sprint: 100%
+Sprint Retrospectiva
+Aspectos positivos
+Resultados consistentes con el capítulo 6 del informe original
+Aspectos a mejorar
+Cantidad de categorías con pocos registros
+Acciones futuras
+Agregar advertencia cuando el grupo es muy pequeño
+Sprint 09 – Priorización y Framework de Remediación
+Sprint Planning
+Elemento
+Descripción
+Sprint
+Sprint 09
+Módulo
+M-09 Priorización y Framework de Remediación
+Objetivo
+Implementar la clasificación de riesgo y el ranking de urgencia de remediación.
+Duración
+2 semanas
+Participantes
+Equipo de desarrollo, analista de requisitos
+Inicio
+Semana 17
+Fin
+Semana 18
+Sprint Backlog
+ID
+Tarea
+Descripción
+Responsable
+SB-28
+Clasificación de riesgo
+Clasificar por rangos oficiales de CVSS
+Backend
+SB-29
+Ranking de urgencia
+Ordenar vulnerabilidades combinando CVSS y días de parche
+Backend
+SB-30
+Estados de remediación
+Gestionar estados pendiente/en proceso/remediada
+Backend
+SB-31
+Alertas de plazo excedido
+Generar alerta automática
+Backend
+Historias de Usuario
+HU-17 — Clasificación automática de riesgo
+Como analista, quiero que el sistema clasifique automáticamente cada vulnerabilidad según su CVSS Score.
+Criterios de aceptación:
+Se respetan los rangos oficiales (0.1-3.9, 4.0-6.9, 7.0-8.9, 9.0-10.0).
+La clasificación se muestra en la ficha de la vulnerabilidad.
+HU-18 — Ranking de urgencia
+Como analista, quiero un ranking de vulnerabilidades por urgencia, para decidir el orden de remediación.
+Criterios de aceptación:
+El ranking combina severidad y tiempo transcurrido.
+El ranking se actualiza al cargar nuevos datos.
+Caso de Uso
+CU-09 Priorizar Vulnerabilidades
+Actor: Analista
+Flujo principal:
+1. El sistema clasifica automáticamente cada vulnerabilidad.
+2. El sistema calcula el ranking de urgencia.
+3. El analista revisa el orden propuesto.
+4. El analista marca el estado de remediación.
+Sprint Review
+Requisito
+Descripción
+Estado
+RF-69
+Clasificación de riesgo
+Completado
+RF-70
+Ranking de urgencia
+Completado
+RF-76
+Alerta de plazo excedido
+Completado
+Avance del sprint: 100%
+Sprint Retrospectiva
+Aspectos positivos
+El framework de priorización responde directamente al problema planteado en la justificación del proyecto
+Aspectos a mejorar
+Ajustar pesos del ranking con retroalimentación de analistas reales
+Acciones futuras
+Planificar una validación con expertos en seguridad
+Sprint 10 – Reportes y Exportación
+Sprint Planning
+Elemento
+Descripción
+Sprint
+Sprint 10
+Módulo
+M-10 Reportes y Exportación
+Objetivo
+Implementar la generación de informes estadísticos y exportación de resultados.
+Duración
+1 semana
+Participantes
+Equipo de desarrollo, analista de requisitos
+Inicio
+Semana 19
+Fin
+Semana 20
+Sprint Backlog
+ID
+Tarea
+Descripción
+Responsable
+SB-32
+Generador de informe PDF
+Consolidar tablas, gráficos y conclusiones
+Backend
+SB-33
+Generador de informe Word
+Exportar el mismo contenido en .docx
+Backend
+SB-34
+Interpretación automática
+Generar texto interpretativo por resultado
+Backend
+Historias de Usuario
+HU-19 — Generación de informe PDF
+Como analista, quiero generar un informe PDF con todos los resultados, para compartirlo con mi equipo.
+Criterios de aceptación:
+El informe incluye tablas, medidas y gráficos.
+El informe incluye conclusiones interpretativas.
+HU-20 — Informe resumido ejecutivo
+Como analista, quiero un resumen ejecutivo de una página, para presentarlo a jefaturas no técnicas.
+Criterios de aceptación:
+El resumen no excede una página.
+Incluye únicamente las conclusiones principales.
+Caso de Uso
+CU-10 Generar Informe Estadístico
+Actor: Analista
+Flujo principal:
+1. El analista solicita el informe.
+2. El sistema consolida tablas, gráficos y medidas.
+3. El sistema genera el texto interpretativo.
+4. El sistema entrega el archivo PDF o Word.
+Sprint Review
+Requisito
+Descripción
+Estado
+RF-77
+Informe en PDF
+Completado
+RF-81
+Interpretación automática
+Completado
+RF-82
+Informe resumido
+Completado
+Avance del sprint: 100%
+Sprint Retrospectiva
+Aspectos positivos
+Informe generado equivalente al documento Quarto original
+Aspectos a mejorar
+Tiempo de generación con datasets grandes
+Acciones futuras
+Optimizar el motor de generación de PDF
+Sprint 11 – Búsqueda y Filtros Avanzados
+Sprint Planning
+Elemento
+Descripción
+Sprint
+Sprint 11
+Módulo
+M-11 Búsqueda y Filtros Avanzados
+Objetivo
+Implementar la búsqueda combinada de vulnerabilidades bajo múltiples criterios.
+Duración
+1 semana
+Participantes
+Equipo de desarrollo, analista de requisitos
+Inicio
+Semana 21
+Fin
+Semana 22
+Sprint Backlog
+ID
+Tarea
+Descripción
+Responsable
+SB-35
+Buscador combinado
+Permitir combinar CVSS, fecha, severidad y estado
+Backend
+SB-36
+Filtros favoritos
+Guardar combinaciones de filtros
+Backend
+SB-37
+Exportación filtrada
+Exportar solo el subconjunto filtrado
+Backend
+Historias de Usuario
+HU-21 — Combinación de filtros
+Como analista, quiero combinar varios filtros a la vez, para búsquedas más precisas.
+Criterios de aceptación:
+Se pueden aplicar filtros de CVSS, fecha, severidad y estado simultáneamente.
+Los resultados se actualizan en tiempo real.
+HU-22 — Exportación de resultados filtrados
+Como analista, quiero exportar únicamente los resultados de mi búsqueda filtrada.
+Criterios de aceptación:
+El archivo exportado contiene solo los registros filtrados.
+Se conserva el formato original de columnas.
+Caso de Uso
+CU-11 Filtrar Vulnerabilidades
+Actor: Analista
+Flujo principal:
+1. El analista define los criterios de búsqueda.
+2. El sistema aplica los filtros combinados.
+3. El sistema muestra los resultados.
+4. El analista puede exportar el subconjunto resultante.
+Sprint Review
+Requisito
+Descripción
+Estado
+RF-84
+Búsqueda por CVE
+Completado
+RF-88
+Combinación de filtros
+Completado
+RF-90
+Exportación filtrada
+Completado
+Avance del sprint: 100%
+Sprint Retrospectiva
+Aspectos positivos
+Búsquedas rápidas incluso combinando varios criterios
+Aspectos a mejorar
+Persistencia de filtros entre sesiones
+Acciones futuras
+Guardar el último filtro usado por analista
+Sprint 12 – Seguridad y Auditoría del Sistema
+Sprint Planning
+Elemento
+Descripción
+Sprint
+Sprint 12
+Módulo
+M-12 Seguridad y Auditoría del Sistema
+Objetivo
+Implementar el control de acceso, cifrado y trazabilidad de operaciones del sistema.
+Duración
+1 semana
+Participantes
+Equipo de desarrollo, analista de requisitos
+Inicio
+Semana 23
+Fin
+Semana 24
+Sprint Backlog
+ID
+Tarea
+Descripción
+Responsable
+SB-38
+Cifrado de contraseñas
+Implementar bcrypt para almacenamiento de contraseñas
+Backend
+SB-39
+HTTPS obligatorio
+Forzar conexión segura en todo el sistema
+Backend
+SB-40
+Auditoría de cambios
+Registrar modificaciones sobre el dataset y los informes
+Backend
+SB-41
+Backups automáticos
+Configurar respaldo diario de la base de datos
+Backend
+Historias de Usuario
+HU-23 — Cifrado de contraseñas
+Como sistema, quiero cifrar las contraseñas de los analistas, para proteger sus cuentas.
+Criterios de aceptación:
+Las contraseñas se almacenan cifradas con bcrypt.
+No es posible recuperar la contraseña en texto plano.
+HU-24 — Auditoría de cambios en el dataset
+Como administrador, quiero ver quién modificó el dataset y cuándo, para mantener la trazabilidad.
+Criterios de aceptación:
+Cada modificación queda registrada con fecha, hora y autor.
+El historial de auditoría es consultable por el administrador.
+Caso de Uso
+CU-12 Auditar Operaciones del Sistema
+Actor: Administrador
+Flujo principal:
+1. El administrador accede al panel de auditoría.
+2. El sistema muestra el historial de operaciones.
+3. El administrador filtra por usuario o fecha.
+4. El sistema exporta el historial si se solicita.
+Sprint Review
+Requisito
+Descripción
+Estado
+RF-92
+Cifrado de contraseñas
+Completado
+RF-94
+Auditoría de cambios
+Completado
+RF-96
+Respaldo automático
+Completado
+Avance del sprint: 100%
+Sprint Retrospectiva
+Aspectos positivos
+Sin incidentes de seguridad durante las pruebas
+Aspectos a mejorar
+Cobertura de pruebas de penetración
+Acciones futuras
+Programar una revisión de seguridad externa antes del despliegue
+Sprint 13 – Notificaciones y Alertas
+Sprint Planning
+Elemento
+Descripción
+Sprint
+Sprint 13
+Módulo
+M-13 Notificaciones y Alertas
+Objetivo
+Implementar las alertas sobre vulnerabilidades críticas y plazos de remediación.
+Duración
+1 semana
+Participantes
+Equipo de desarrollo, analista de requisitos
+Inicio
+Semana 25
+Fin
+Semana 26
+Sprint Backlog
+ID
+Tarea
+Descripción
+Responsable
+SB-42
+Alertas de vulnerabilidad crítica
+Notificar cuando se cargue un CVSS Score ≥ 9.0
+Backend
+SB-43
+Alertas de plazo
+Notificar vencimiento del plazo recomendado de parcheo
+Backend
+SB-44
+Centro de notificaciones
+Consolidar todas las notificaciones del analista
+Frontend
+Historias de Usuario
+HU-25 — Alerta de vulnerabilidad crítica nueva
+Como analista, quiero ser notificado cuando se detecte una nueva vulnerabilidad crítica.
+Criterios de aceptación:
+La alerta se dispara con CVSS Score ≥ 9.0.
+La notificación indica el CVE correspondiente.
+HU-26 — Centro de notificaciones
+Como analista, quiero ver todas mis notificaciones en un solo lugar.
+Criterios de aceptación:
+Las notificaciones se muestran ordenadas por fecha.
+El analista puede marcarlas como leídas.
+Caso de Uso
+CU-13 Gestionar Notificaciones
+Actor: Analista
+Flujo principal:
+1. El sistema detecta un evento relevante (vulnerabilidad crítica o plazo próximo a vencer).
+2. El sistema genera la notificación.
+3. El analista consulta su centro de notificaciones.
+4. El analista marca la notificación como leída.
+Sprint Review
+Requisito
+Descripción
+Estado
+RF-99
+Alerta de vulnerabilidad crítica
+Completado
+RF-100
+Alerta de vencimiento de plazo
+Completado
+RF-103
+Centro de notificaciones
+Completado
+Avance del sprint: 100%
+Sprint Retrospectiva
+Aspectos positivos
+Cierre exitoso de los 13 sprints planificados
+Aspectos a mejorar
+Volumen de notificaciones en datasets grandes
+Acciones futuras
+Agregar agrupación de notificaciones similares
+VI. REQUISITOS DEL SISTEMA
+6.1 Requisitos funcionales
+6.1.1 Estructura del requisito funcional
+Cada requisito funcional del sistema SEVERA se documenta bajo el estándar IEEE 830, incluyendo identificador único, historia de usuario, descripción formal, módulo, actor, prioridad MoSCoW, esfuerzo estimado en Story Points, sprint asociado, requisitos relacionados, criterios de aprobación y aceptación, estado y fuente de origen. Los primeros requisitos de cada módulo se documentan con la ficha completa; el resto, derivado por descomposición (capítulo VIII), utiliza una ficha abreviada de ocho campos.
+6.1.2 Módulos del sistema
+Módulo
+Nombre
+Descripción
+M-01
+Gestión de Usuarios y Acceso
+Registro, autenticación y control de acceso de analistas y administradores.
+M-02
+Perfil del Analista
+Gestión y personalización de la información del analista de seguridad.
+M-03
+Carga y Gestión del Dataset NVD
+Importación, validación y versionado del dataset de vulnerabilidades NIST/NVD.
+M-04
+Catálogo y Consulta de Vulnerabilidades
+Consulta detallada de cada vulnerabilidad (CVE, CVSS, componente afectado).
+M-05
+Distribución de Frecuencias
+Construcción de tablas de frecuencias agrupadas y sin agrupar del CVSS Score.
+M-06
+Medidas de Tendencia Central y Dispersión
+Cálculo de media, mediana, moda, cuartiles, varianza, desviación estándar y CV.
+M-07
+Visualización Gráfica
+Generación de los 10 gráficos estadísticos del análisis de vulnerabilidades.
+M-08
+Comparación por Categorías
+Comparación estadística entre grupos (acceso remoto/local, tipo, software).
+M-09
+Priorización y Framework de Remediación
+Clasificación de riesgo y generación de un ranking de urgencia de parcheo.
+M-10
+Reportes y Exportación
+Generación de informes estadísticos y exportación de resultados.
+M-11
+Búsqueda y Filtros Avanzados
+Búsqueda combinada de vulnerabilidades bajo múltiples criterios.
+M-12
+Seguridad y Auditoría del Sistema
+Protección de datos, control de acceso y trazabilidad de operaciones.
+M-13
+Notificaciones y Alertas
+Alertas sobre vulnerabilidades críticas y plazos de remediación.
+6.2 Especificación de requisitos funcionales
+M-01 Gestión de Usuarios y Acceso
+RF-01 — Registro de Analista de Seguridad
+ID
+RF-01
+Nombre
+Registro de Analista de Seguridad
+Historia de Usuario
+Como visitante, quiero registrarme como analista de seguridad, para poder acceder a las funcionalidades del sistema SEVERA.
+Descripción Formal
+El sistema deberá permitir el registro de un nuevo analista mediante nombre completo, correo institucional y contraseña.
+Módulo
+M-01 Gestión de Usuarios y Acceso
+Actor / Rol
+Visitante
+Prioridad MoSCoW
+Must
+Esfuerzo (Story Pts)
+2 SP
+Sprint Asociado
+Sprint 01
+RF Relacionados
+RF-02, RF-06
+Valoración (1–5)
+5/5
+Criterio de Aprobación
+NECESARIO para permitir el acceso controlado al sistema.
+Criterio de Aceptación
+1. El visitante ingresa correo y contraseña válidos. 2. El sistema crea la cuenta y confirma el registro.
+Estado
+Refinado
+Fase de Validación
+Rev. técnica ✓
+Atomicidad
+RF atómico — una sola responsabilidad.
+Fuente / Origen
+Elicitación Sprint 01
+
+RF-02 — Inicio de Sesión
+ID
+RF-02
+Nombre
+Inicio de Sesión
+Historia de Usuario
+Como analista registrado, quiero iniciar sesión en la plataforma, para acceder a mi cuenta y mis análisis previos.
+Descripción Formal
+El sistema deberá validar las credenciales del analista y otorgar acceso a su panel de trabajo.
+Módulo
+M-01 Gestión de Usuarios y Acceso
+Actor / Rol
+Analista
+Prioridad MoSCoW
+Must
+Esfuerzo (Story Pts)
+2 SP
+Sprint Asociado
+Sprint 01
+RF Relacionados
+RF-01, RF-06
+Valoración (1–5)
+5/5
+Criterio de Aprobación
+NECESARIO para el uso básico del sistema.
+Criterio de Aceptación
+1. El sistema valida las credenciales. 2. Muestra error si son incorrectas. 3. Permite el acceso si son correctas.
+Estado
+Refinado
+Fase de Validación
+Rev. técnica ✓
+Atomicidad
+RF atómico — una sola responsabilidad.
+Fuente / Origen
+Elicitación Sprint 01
+
+M-03 Carga y Gestión del Dataset NVD
+RF-17 — Importación del Dataset NVD
+ID
+RF-17
+Nombre
+Importación del Dataset NVD
+Historia de Usuario
+Como analista, quiero importar el archivo de vulnerabilidades desde Excel, para iniciar el análisis estadístico sobre datos reales.
+Descripción Formal
+El sistema deberá permitir cargar el archivo vulnerabilidades_nvd_150_registros.xlsx, reconociendo sus 12 variables y 150 registros.
+Módulo
+M-03 Carga y Gestión del Dataset NVD
+Actor / Rol
+Analista
+Prioridad MoSCoW
+Must
+Esfuerzo (Story Pts)
+3 SP
+Sprint Asociado
+Sprint 03
+RF Relacionados
+RF-18, RF-19
+Valoración (1–5)
+5/5
+Criterio de Aprobación
+NECESARIO: sin la carga de datos no existe análisis posible.
+Criterio de Aceptación
+1. El sistema lee el archivo Excel. 2. Reconoce las 12 columnas esperadas. 3. Confirma la cantidad de registros cargados.
+Estado
+Refinado
+Fase de Validación
+Rev. técnica ✓
+Atomicidad
+RF atómico — una sola responsabilidad.
+Fuente / Origen
+Revisión documental Sprint 03
+
+M-05 Distribución de Frecuencias
+RF-33 — Generación de Tabla de Frecuencias Sin Agrupar
+ID
+RF-33
+Nombre
+Generación de Tabla de Frecuencias Sin Agrupar
+Historia de Usuario
+Como analista, quiero generar la tabla de frecuencias sin agrupar del CVSS Score, para observar la distribución exacta de valores únicos.
+Descripción Formal
+El sistema deberá calcular, para cada valor único de CVSS Score, su frecuencia absoluta y relativa.
+Módulo
+M-05 Distribución de Frecuencias
+Actor / Rol
+Analista
+Prioridad MoSCoW
+Must
+Esfuerzo (Story Pts)
+3 SP
+Sprint Asociado
+Sprint 05
+RF Relacionados
+RF-34, RF-36
+Valoración (1–5)
+5/5
+Criterio de Aprobación
+NECESARIO para el análisis descriptivo base del proyecto.
+Criterio de Aceptación
+1. El sistema lista los valores únicos de CVSS Score. 2. Muestra frecuencia absoluta y relativa de cada uno.
+Estado
+Refinado
+Fase de Validación
+Rev. técnica ✓
+Atomicidad
+RF atómico — una sola responsabilidad.
+Fuente / Origen
+Observación Sprint 05
+
+M-06 Medidas de Tendencia Central y Dispersión
+RF-41 — Cálculo de la Media Aritmética
+ID
+RF-41
+Nombre
+Cálculo de la Media Aritmética
+Historia de Usuario
+Como analista, quiero calcular la media del CVSS Score, para conocer la severidad promedio de las vulnerabilidades registradas.
+Descripción Formal
+El sistema deberá calcular la media aritmética del CVSS Score sobre los 150 registros cargados.
+Módulo
+M-06 Medidas de Tendencia Central y Dispersión
+Actor / Rol
+Analista
+Prioridad MoSCoW
+Must
+Esfuerzo (Story Pts)
+1 SP
+Sprint Asociado
+Sprint 06
+RF Relacionados
+RF-42, RF-47
+Valoración (1–5)
+5/5
+Criterio de Aprobación
+NECESARIO como medida central básica del análisis.
+Criterio de Aceptación
+1. El sistema calcula la media. 2. El resultado coincide con el cálculo de referencia en R (mean()).
+Estado
+Refinado
+Fase de Validación
+Rev. técnica ✓
+Atomicidad
+RF atómico — una sola responsabilidad.
+Fuente / Origen
+Elicitación Sprint 06
+
+M-07 Visualización Gráfica
+RF-51 — Generación de Histograma de CVSS Score
+ID
+RF-51
+Nombre
+Generación de Histograma de CVSS Score
+Historia de Usuario
+Como analista, quiero generar un histograma del CVSS Score sin agrupar, para visualizar la forma de la distribución.
+Descripción Formal
+El sistema deberá generar un histograma de frecuencias del CVSS Score con anotaciones de media y mediana.
+Módulo
+M-07 Visualización Gráfica
+Actor / Rol
+Analista
+Prioridad MoSCoW
+Must
+Esfuerzo (Story Pts)
+3 SP
+Sprint Asociado
+Sprint 07
+RF Relacionados
+RF-55, RF-61
+Valoración (1–5)
+5/5
+Criterio de Aprobación
+NECESARIO para la interpretación visual de la severidad.
+Criterio de Aceptación
+1. El sistema genera el histograma. 2. Incluye líneas de referencia de media y mediana.
+Estado
+Refinado
+Fase de Validación
+Rev. técnica ✓
+Atomicidad
+RF atómico — una sola responsabilidad.
+Fuente / Origen
+Benchmarking Sprint 07
+
+M-09 Priorización y Framework de Remediación
+RF-69 — Clasificación de Riesgo por CVSS
+ID
+RF-69
+Nombre
+Clasificación de Riesgo por CVSS
+Historia de Usuario
+Como analista, quiero que el sistema clasifique automáticamente cada vulnerabilidad según su nivel de riesgo, para orientar la remediación.
+Descripción Formal
+El sistema deberá clasificar cada registro en Bajo (0.1-3.9), Moderado (4.0-6.9), Alto (7.0-8.9) o Crítico (9.0-10.0) según su CVSS Score.
+Módulo
+M-09 Priorización y Framework de Remediación
+Actor / Rol
+Sistema
+Prioridad MoSCoW
+Must
+Esfuerzo (Story Pts)
+2 SP
+Sprint Asociado
+Sprint 09
+RF Relacionados
+RF-70, RF-73
+Valoración (1–5)
+5/5
+Criterio de Aprobación
+NECESARIO para transformar el análisis estadístico en decisiones de priorización.
+Criterio de Aceptación
+1. El sistema asigna una categoría de riesgo a cada vulnerabilidad. 2. La clasificación respeta los rangos oficiales de CVSS.
+Estado
+Refinado
+Fase de Validación
+Rev. técnica ✓
+Atomicidad
+RF atómico — una sola responsabilidad.
+Fuente / Origen
+Revisión documental Sprint 09
+
+M-10 Reportes y Exportación
+RF-77 — Generación de Informe Estadístico en PDF
+ID
+RF-77
+Nombre
+Generación de Informe Estadístico en PDF
+Historia de Usuario
+Como analista, quiero generar un informe en PDF con todos los resultados estadísticos, para compartirlo con mi equipo o jefatura.
+Descripción Formal
+El sistema deberá generar un documento PDF que incluya tablas, medidas estadísticas, gráficos y conclusiones del análisis.
+Módulo
+M-10 Reportes y Exportación
+Actor / Rol
+Analista
+Prioridad MoSCoW
+Must
+Esfuerzo (Story Pts)
+3 SP
+Sprint Asociado
+Sprint 10
+RF Relacionados
+RF-78, RF-81
+Valoración (1–5)
+5/5
+Criterio de Aprobación
+NECESARIO para comunicar resultados fuera del sistema.
+Criterio de Aceptación
+1. El sistema genera el PDF. 2. El documento incluye tablas, gráficos y conclusiones.
+Estado
+Refinado
+Fase de Validación
+Rev. técnica ✓
+Atomicidad
+RF atómico — una sola responsabilidad.
+Fuente / Origen
+Encuestas Sprint 10
+
+6.3 Requisitos No Funcionales
+El sistema SEVERA contempla un total de 150 requisitos no funcionales identificados durante el proceso de ingeniería de requisitos (número que coincide, de forma intencional, con el tamaño del dataset de vulnerabilidades que dio origen al proyecto). Debido a su extensión, se presenta un resumen de los más relevantes.
+ID
+Requisito
+Categoría
+Métrica
+RNF-01
+El sistema debe cargar el dataset de 150 vulnerabilidades rápidamente
+Rendimiento
+Tiempo de carga menor a 3 segundos
+RNF-02
+El sistema debe estar disponible continuamente
+Disponibilidad
+99% de disponibilidad mensual
+RNF-03
+Las contraseñas deben almacenarse de forma segura
+Seguridad
+Cifrado mediante bcrypt
+RNF-04
+El sistema debe utilizar conexión segura
+Seguridad
+Uso obligatorio de HTTPS
+RNF-05
+La interfaz debe ser fácil de usar para analistas no expertos en estadística
+Usabilidad
+Puntaje SUS mayor a 70
+RNF-06
+El sistema debe adaptarse a diferentes dispositivos
+Usabilidad
+Interfaz responsive
+RNF-07
+El sistema debe funcionar en múltiples navegadores
+Compatibilidad
+Chrome, Firefox, Edge
+RNF-08
+El sistema debe permitir crecimiento del volumen de vulnerabilidades
+Escalabilidad
+Soportar más de 10,000 registros sin degradar el rendimiento
+RNF-09
+El sistema debe registrar eventos importantes
+Auditoría
+Registro de logs del sistema
+RNF-10
+El sistema debe realizar copias de seguridad
+Mantenibilidad
+Backup diario automático
+RNF-11
+El sistema debe proteger datos personales de los analistas
+Privacidad
+Cumplimiento Ley 29733
+RNF-12
+El sistema debe manejar errores correctamente
+Confiabilidad
+Registro y control de errores
+RNF-13
+El sistema debe permitir mantenimiento sencillo
+Mantenibilidad
+Código documentado y modular
+RNF-14
+El sistema debe responder rápidamente a consultas de filtrado
+Rendimiento
+Respuesta menor a 2 segundos
+RNF-15
+El sistema debe garantizar la integridad de los datos importados
+Seguridad
+Validación de estructura y tipo de dato
+RNF-16
+Los cálculos estadísticos deben coincidir exactamente con los de R
+Precisión Estadística
+Coincidencia hasta 4 decimales con funciones base de R (mean, sd, var)
+RNF-17
+Los resultados del sistema deben ser reproducibles
+Reproducibilidad
+Mismo dataset produce siempre el mismo resultado
+RNF-18
+El sistema debe poder sincronizarse con la API pública del NVD
+Interoperabilidad
+Compatibilidad con API NVD 2.0
+RNF-19
+El sistema debe permitir uso mediante lectura de pantalla
+Accesibilidad
+Compatibilidad con estándares WCAG 2.1 nivel AA
+RNF-20
+El sistema debe generar informes en un tiempo razonable
+Rendimiento
+Generación de informe PDF en menos de 15 segundos
+Nota: el listado completo de 150 requisitos no funcionales se mantiene documentado en el repositorio interno del proyecto.
+VII. DESCOMPOSICIÓN Y AMPLIACIÓN DE REQUISITOS FUNCIONALES
+Durante el refinamiento se identificó que varios requisitos base podían descomponerse en funcionalidades más específicas y atómicas, siguiendo la misma lógica capitular del informe estadístico original (frecuencias, medidas de tendencia central y dispersión, gráficos, comparación por categorías, priorización y reportes).
+Requisito base
+Requisitos derivados
+Descripción
+RF-01 Registro de analista
+RF-03 – RF-08
+Funciones específicas de acceso y seguridad de cuenta
+RF-02 Perfil del analista
+RF-09 – RF-16
+Gestión y personalización del perfil
+RF-17 Carga del dataset
+RF-18 – RF-24
+Validación, versionado y exportación del dataset
+RF-25 Catálogo de vulnerabilidades
+RF-26 – RF-32
+Consulta y filtros sobre el catálogo
+RF-33 Distribución de frecuencias
+RF-34 – RF-40
+Tablas agrupadas, marca de clase y frecuencias acumuladas
+RF-41 Medidas estadísticas
+RF-42 – RF-50
+Medidas de tendencia central y dispersión adicionales
+RF-51 Visualización gráfica
+RF-52 – RF-61
+Los 10 gráficos del análisis estadístico
+RF-62 Comparación por categorías
+RF-63 – RF-68
+Comparaciones adicionales entre grupos
+RF-69 Priorización
+RF-70 – RF-76
+Ranking, plazos y estados de remediación
+RF-77 Reportes
+RF-78 – RF-83
+Formatos adicionales de exportación de informes
+RF-84 Búsqueda
+RF-85 – RF-90
+Filtros combinados y exportación de resultados filtrados
+RF-91 Seguridad
+RF-92 – RF-98
+Cifrado, auditoría y cumplimiento normativo
+RF-99 Notificaciones
+RF-100 – RF-104
+Alertas y centro de notificaciones
+VIII. REQUISITOS FUNCIONALES DERIVADOS
+M-01 Gestión de Usuarios y Acceso
+RF-03 — Recuperación de Contraseña
+ID
+RF-03
+Nombre
+Recuperación de Contraseña
+Historia
+Como analista, quiero recuperar mi contraseña mediante un enlace enviado a mi correo.
+Descripción
+El sistema deberá enviar un enlace temporal de restablecimiento de contraseña.
+Módulo
+M-01
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-04 — Asignación de Rol
+ID
+RF-04
+Nombre
+Asignación de Rol
+Historia
+Como administrador, quiero asignar el rol de analista o administrador a un usuario.
+Descripción
+El sistema deberá permitir asignar y modificar roles de usuario.
+Módulo
+M-01
+Actor
+Administrador
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-05 — Cierre de Sesión
+ID
+RF-05
+Nombre
+Cierre de Sesión
+Historia
+Como analista, quiero cerrar mi sesión, para proteger el acceso en equipos compartidos.
+Descripción
+El sistema deberá permitir finalizar la sesión activa del usuario.
+Módulo
+M-01
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-06 — Bloqueo por Intentos Fallidos
+ID
+RF-06
+Nombre
+Bloqueo por Intentos Fallidos
+Historia
+Como sistema, quiero bloquear temporalmente una cuenta tras 5 intentos fallidos, para prevenir accesos no autorizados.
+Descripción
+El sistema deberá bloquear la cuenta durante 15 minutos tras 5 intentos fallidos consecutivos.
+Módulo
+M-01
+Actor
+Sistema
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-07 — Verificación de Correo Institucional
+ID
+RF-07
+Nombre
+Verificación de Correo Institucional
+Historia
+Como sistema, quiero validar el dominio del correo ingresado, para restringir el registro a usuarios autorizados.
+Descripción
+El sistema deberá verificar que el correo pertenezca a un dominio permitido.
+Módulo
+M-01
+Actor
+Sistema
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-08 — Registro de Auditoría de Acceso
+ID
+RF-08
+Nombre
+Registro de Auditoría de Acceso
+Historia
+Como sistema, quiero registrar cada inicio de sesión, para fines de trazabilidad y seguridad.
+Descripción
+El sistema deberá registrar fecha, hora e IP de cada inicio de sesión.
+Módulo
+M-01
+Actor
+Sistema
+Prioridad
+Should
+Estado
+Propuesto
+
+M-02 Perfil del Analista
+RF-09 — Visualización de Perfil
+ID
+RF-09
+Nombre
+Visualización de Perfil
+Historia
+Como analista, quiero visualizar mi perfil, para conocer mis datos registrados.
+Descripción
+El sistema deberá mostrar nombre, correo y rol del analista.
+Módulo
+M-02
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-10 — Edición de Datos Personales
+ID
+RF-10
+Nombre
+Edición de Datos Personales
+Historia
+Como analista, quiero editar mis datos personales, para mantenerlos actualizados.
+Descripción
+El sistema deberá permitir modificar nombre y datos de contacto.
+Módulo
+M-02
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-11 — Historial de Análisis Realizados
+ID
+RF-11
+Nombre
+Historial de Análisis Realizados
+Historia
+Como analista, quiero ver el historial de análisis que he generado, para retomar trabajos anteriores.
+Descripción
+El sistema deberá listar los análisis previos asociados al analista.
+Módulo
+M-02
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-12 — Guardado de Plantillas de Análisis
+ID
+RF-12
+Nombre
+Guardado de Plantillas de Análisis
+Historia
+Como analista, quiero guardar configuraciones de análisis frecuentes, para reutilizarlas.
+Descripción
+El sistema deberá permitir guardar plantillas de filtros y parámetros de análisis.
+Módulo
+M-02
+Actor
+Analista
+Prioridad
+Could
+Estado
+Propuesto
+
+RF-13 — Preferencias de Visualización
+ID
+RF-13
+Nombre
+Preferencias de Visualización
+Historia
+Como analista, quiero configurar el tema (claro/oscuro) de la interfaz, para mayor comodidad visual.
+Descripción
+El sistema deberá permitir alternar entre modo claro y modo oscuro.
+Módulo
+M-02
+Actor
+Analista
+Prioridad
+Could
+Estado
+Propuesto
+
+RF-14 — Exportación del Historial Personal
+ID
+RF-14
+Nombre
+Exportación del Historial Personal
+Historia
+Como analista, quiero exportar mi historial de análisis, para conservar un respaldo personal.
+Descripción
+El sistema deberá exportar el historial en formato Excel.
+Módulo
+M-02
+Actor
+Analista
+Prioridad
+Could
+Estado
+Propuesto
+
+RF-15 — Eliminación de Cuenta
+ID
+RF-15
+Nombre
+Eliminación de Cuenta
+Historia
+Como analista, quiero eliminar mi cuenta del sistema, si ya no la voy a utilizar.
+Descripción
+El sistema deberá permitir la eliminación definitiva de la cuenta previa confirmación.
+Módulo
+M-02
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-16 — Notificación de Cambios de Perfil
+ID
+RF-16
+Nombre
+Notificación de Cambios de Perfil
+Historia
+Como analista, quiero recibir una notificación cuando se modifiquen mis datos, para detectar cambios no autorizados.
+Descripción
+El sistema deberá notificar por correo cualquier cambio en los datos del perfil.
+Módulo
+M-02
+Actor
+Sistema
+Prioridad
+Should
+Estado
+Propuesto
+
+M-03 Carga y Gestión del Dataset NVD
+RF-18 — Validación de Estructura del Archivo
+ID
+RF-18
+Nombre
+Validación de Estructura del Archivo
+Historia
+Como sistema, quiero validar que el archivo importado tenga las 12 columnas esperadas.
+Descripción
+El sistema deberá verificar la presencia de las columnas requeridas antes de cargar los datos.
+Módulo
+M-03
+Actor
+Sistema
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-19 — Detección de Datos Faltantes
+ID
+RF-19
+Nombre
+Detección de Datos Faltantes
+Historia
+Como analista, quiero que el sistema detecte valores faltantes en el dataset, para evaluar la calidad de los datos.
+Descripción
+El sistema deberá reportar la cantidad de valores NA por variable.
+Módulo
+M-03
+Actor
+Sistema
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-20 — Actualización mediante API NVD 2.0
+ID
+RF-20
+Nombre
+Actualización mediante API NVD 2.0
+Historia
+Como analista, quiero consultar la API de vulnerabilidades del NIST, para actualizar registros existentes.
+Descripción
+El sistema deberá permitir sincronizar datos mediante la API NVD 2.0 (nvd.nist.gov/developers/vulnerabilities).
+Módulo
+M-03
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-21 — Registro de Fecha y Fuente de Carga
+ID
+RF-21
+Nombre
+Registro de Fecha y Fuente de Carga
+Historia
+Como sistema, quiero registrar cuándo y desde qué fuente se cargó el dataset, para trazabilidad.
+Descripción
+El sistema deberá almacenar metadatos de cada carga de datos.
+Módulo
+M-03
+Actor
+Sistema
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-22 — Versionado de Datasets Cargados
+ID
+RF-22
+Nombre
+Versionado de Datasets Cargados
+Historia
+Como analista, quiero conservar versiones anteriores del dataset, para comparar cambios en el tiempo.
+Descripción
+El sistema deberá mantener un historial de versiones del dataset cargado.
+Módulo
+M-03
+Actor
+Analista
+Prioridad
+Could
+Estado
+Propuesto
+
+RF-23 — Eliminación de Registros Duplicados
+ID
+RF-23
+Nombre
+Eliminación de Registros Duplicados
+Historia
+Como sistema, quiero identificar registros duplicados por CVE, para mantener la integridad del dataset.
+Descripción
+El sistema deberá detectar y marcar CVE duplicados dentro del mismo dataset.
+Módulo
+M-03
+Actor
+Sistema
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-24 — Exportación del Dataset Validado
+ID
+RF-24
+Nombre
+Exportación del Dataset Validado
+Historia
+Como analista, quiero exportar el dataset ya validado, para utilizarlo en otras herramientas.
+Descripción
+El sistema deberá exportar el dataset validado en formato Excel o CSV.
+Módulo
+M-03
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+M-04 Catálogo y Consulta de Vulnerabilidades
+RF-25 — Visualización de Ficha de Vulnerabilidad
+ID
+RF-25
+Nombre
+Visualización de Ficha de Vulnerabilidad
+Historia
+Como analista, quiero ver la ficha completa de una vulnerabilidad, para conocer todos sus atributos.
+Descripción
+El sistema deberá mostrar CVE, descripción, CVSS Score, componente afectado y fecha de publicación.
+Módulo
+M-04
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-26 — Búsqueda por Identificador CVE
+ID
+RF-26
+Nombre
+Búsqueda por Identificador CVE
+Historia
+Como analista, quiero buscar una vulnerabilidad ingresando su código CVE.
+Descripción
+El sistema deberá permitir la búsqueda exacta por identificador CVE-AAAA-NNNNN.
+Módulo
+M-04
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-27 — Filtro por Rango de CVSS Score
+ID
+RF-27
+Nombre
+Filtro por Rango de CVSS Score
+Historia
+Como analista, quiero filtrar vulnerabilidades dentro de un rango de CVSS Score.
+Descripción
+El sistema deberá permitir definir un valor mínimo y máximo de CVSS Score para filtrar.
+Módulo
+M-04
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-28 — Filtro por Nivel de Severidad
+ID
+RF-28
+Nombre
+Filtro por Nivel de Severidad
+Historia
+Como analista, quiero filtrar vulnerabilidades por severidad (bajo, moderado, alto, crítico).
+Descripción
+El sistema deberá filtrar registros según la clasificación oficial de severidad CVSS.
+Módulo
+M-04
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-29 — Visualización del Componente Afectado
+ID
+RF-29
+Nombre
+Visualización del Componente Afectado
+Historia
+Como analista, quiero conocer qué software o componente es afectado por la vulnerabilidad.
+Descripción
+El sistema deberá mostrar el nombre del software o componente vulnerable.
+Módulo
+M-04
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-30 — Visualización del Vector de Ataque
+ID
+RF-30
+Nombre
+Visualización del Vector de Ataque
+Historia
+Como analista, quiero saber si la vulnerabilidad es explotable de forma remota o local.
+Descripción
+El sistema deberá mostrar el tipo de acceso (remoto/local) de cada vulnerabilidad.
+Módulo
+M-04
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-31 — Visualización de Fechas de Publicación
+ID
+RF-31
+Nombre
+Visualización de Fechas de Publicación
+Historia
+Como analista, quiero conocer la fecha de publicación y última modificación de la vulnerabilidad.
+Descripción
+El sistema deberá mostrar ambas fechas obtenidas del NVD.
+Módulo
+M-04
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-32 — Comparación de Dos Vulnerabilidades
+ID
+RF-32
+Nombre
+Comparación de Dos Vulnerabilidades
+Historia
+Como analista, quiero comparar dos vulnerabilidades lado a lado, para evaluar diferencias de severidad.
+Descripción
+El sistema deberá mostrar una vista comparativa de dos fichas de vulnerabilidad seleccionadas.
+Módulo
+M-04
+Actor
+Analista
+Prioridad
+Could
+Estado
+Propuesto
+
+M-05 Distribución de Frecuencias
+RF-34 — Generación de Tabla Agrupada en Intervalos
+ID
+RF-34
+Nombre
+Generación de Tabla Agrupada en Intervalos
+Historia
+Como analista, quiero generar la tabla de frecuencias agrupada en los intervalos [0-2), [2-4), [4-6), [6-8), [8-10].
+Descripción
+El sistema deberá construir la tabla agrupada según los intervalos definidos por severidad CVSS.
+Módulo
+M-05
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-35 — Cálculo de Marca de Clase
+ID
+RF-35
+Nombre
+Cálculo de Marca de Clase
+Historia
+Como sistema, quiero calcular la marca de clase de cada intervalo, para los cálculos derivados.
+Descripción
+El sistema deberá calcular el punto medio de cada intervalo de la tabla agrupada.
+Módulo
+M-05
+Actor
+Sistema
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-36 — Cálculo de Frecuencia Relativa
+ID
+RF-36
+Nombre
+Cálculo de Frecuencia Relativa
+Historia
+Como analista, quiero ver la frecuencia relativa (hi) de cada intervalo o valor.
+Descripción
+El sistema deberá calcular la proporción de cada frecuencia respecto al total de registros.
+Módulo
+M-05
+Actor
+Sistema
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-37 — Cálculo de Frecuencia Acumulada
+ID
+RF-37
+Nombre
+Cálculo de Frecuencia Acumulada
+Historia
+Como analista, quiero ver la frecuencia acumulada (Fi), para interpretar percentiles y cuartiles.
+Descripción
+El sistema deberá calcular la frecuencia acumulada absoluta y relativa por intervalo.
+Módulo
+M-05
+Actor
+Sistema
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-38 — Exportación de Tabla de Frecuencias
+ID
+RF-38
+Nombre
+Exportación de Tabla de Frecuencias
+Historia
+Como analista, quiero exportar las tablas de frecuencias a Excel, para incluirlas en otros documentos.
+Descripción
+El sistema deberá exportar las tablas generadas en formato .xlsx.
+Módulo
+M-05
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-39 — Configuración del Número de Intervalos
+ID
+RF-39
+Nombre
+Configuración del Número de Intervalos
+Historia
+Como analista, quiero definir manualmente el número de intervalos, en lugar de usar el valor por defecto.
+Descripción
+El sistema deberá permitir modificar la cantidad de intervalos de la tabla agrupada.
+Módulo
+M-05
+Actor
+Analista
+Prioridad
+Could
+Estado
+Propuesto
+
+RF-40 — Visualización de Frecuencia Porcentual
+ID
+RF-40
+Nombre
+Visualización de Frecuencia Porcentual
+Historia
+Como analista, quiero ver la frecuencia relativa expresada en porcentaje.
+Descripción
+El sistema deberá mostrar la frecuencia relativa multiplicada por 100 junto al valor decimal.
+Módulo
+M-05
+Actor
+Sistema
+Prioridad
+Should
+Estado
+Propuesto
+
+M-06 Medidas de Tendencia Central y Dispersión
+RF-42 — Cálculo de la Mediana
+ID
+RF-42
+Nombre
+Cálculo de la Mediana
+Historia
+Como analista, quiero calcular la mediana del CVSS Score, para conocer el valor central de la distribución.
+Descripción
+El sistema deberá calcular la mediana de los 150 registros de CVSS Score.
+Módulo
+M-06
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-43 — Cálculo de la Moda
+ID
+RF-43
+Nombre
+Cálculo de la Moda
+Historia
+Como analista, quiero calcular la moda del CVSS Score, para identificar el valor más frecuente.
+Descripción
+El sistema deberá calcular la moda mediante una implementación propia, sin depender de librerías con errores de versión.
+Módulo
+M-06
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-44 — Cálculo de Cuartiles Q1 y Q3
+ID
+RF-44
+Nombre
+Cálculo de Cuartiles Q1 y Q3
+Historia
+Como analista, quiero calcular los cuartiles Q1 y Q3, para construir el boxplot y analizar dispersión.
+Descripción
+El sistema deberá calcular los percentiles 25 y 75 del CVSS Score.
+Módulo
+M-06
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-45 — Cálculo del Rango
+ID
+RF-45
+Nombre
+Cálculo del Rango
+Historia
+Como analista, quiero calcular el rango del CVSS Score, para conocer la amplitud total de la variable.
+Descripción
+El sistema deberá calcular la diferencia entre el valor máximo y mínimo.
+Módulo
+M-06
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-46 — Cálculo de la Varianza
+ID
+RF-46
+Nombre
+Cálculo de la Varianza
+Historia
+Como analista, quiero calcular la varianza del CVSS Score, para conocer su variabilidad cuadrática.
+Descripción
+El sistema deberá calcular la varianza muestral del CVSS Score.
+Módulo
+M-06
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-47 — Cálculo de la Desviación Estándar
+ID
+RF-47
+Nombre
+Cálculo de la Desviación Estándar
+Historia
+Como analista, quiero calcular la desviación estándar del CVSS Score, para conocer la dispersión respecto a la media.
+Descripción
+El sistema deberá calcular la desviación estándar muestral del CVSS Score.
+Módulo
+M-06
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-48 — Cálculo del Coeficiente de Variación
+ID
+RF-48
+Nombre
+Cálculo del Coeficiente de Variación
+Historia
+Como analista, quiero calcular el coeficiente de variación, para evaluar si la dispersión es alta o baja en términos relativos.
+Descripción
+El sistema deberá calcular el CV como (desviación estándar / media) × 100.
+Módulo
+M-06
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-49 — Resumen Estadístico Consolidado
+ID
+RF-49
+Nombre
+Resumen Estadístico Consolidado
+Historia
+Como analista, quiero ver un panel único con todas las medidas estadísticas calculadas.
+Descripción
+El sistema deberá mostrar en un solo panel la media, mediana, moda, cuartiles, rango, varianza, desviación estándar y CV.
+Módulo
+M-06
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-50 — Cálculo de Media Geométrica y Armónica
+ID
+RF-50
+Nombre
+Cálculo de Media Geométrica y Armónica
+Historia
+Como analista, quiero calcular la media geométrica y armónica del CVSS Score con fórmulas manuales.
+Descripción
+El sistema deberá calcular la media geométrica mediante exp(mean(log(x))) y la armónica mediante 1/mean(1/x), evitando dependencias con errores de versión.
+Módulo
+M-06
+Actor
+Sistema
+Prioridad
+Should
+Estado
+Propuesto
+
+M-07 Visualización Gráfica
+RF-52 — Gráfico de Barras por Severidad
+ID
+RF-52
+Nombre
+Gráfico de Barras por Severidad
+Historia
+Como analista, quiero ver un gráfico de barras con la cantidad de vulnerabilidades por nivel de severidad.
+Descripción
+El sistema deberá generar un gráfico de barras agrupando los registros según severidad CVSS.
+Módulo
+M-07
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-53 — Gráfico de Pastel por Severidad
+ID
+RF-53
+Nombre
+Gráfico de Pastel por Severidad
+Historia
+Como analista, quiero ver la composición porcentual de severidades en un gráfico circular.
+Descripción
+El sistema deberá generar un gráfico de pastel con la proporción de cada nivel de severidad.
+Módulo
+M-07
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-54 — Generación de Boxplot
+ID
+RF-54
+Nombre
+Generación de Boxplot
+Historia
+Como analista, quiero ver un boxplot del CVSS Score, para identificar valores atípicos.
+Descripción
+El sistema deberá generar un diagrama de caja y bigotes con cuartiles y posibles outliers.
+Módulo
+M-07
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-55 — Histograma con Intervalos Agrupados
+ID
+RF-55
+Nombre
+Histograma con Intervalos Agrupados
+Historia
+Como analista, quiero ver el histograma construido a partir de la tabla agrupada.
+Descripción
+El sistema deberá generar un histograma basado en los intervalos de la tabla agrupada.
+Módulo
+M-07
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-56 — Gráfico CVSS por Tipo de Acceso
+ID
+RF-56
+Nombre
+Gráfico CVSS por Tipo de Acceso
+Historia
+Como analista, quiero comparar visualmente el CVSS Score entre acceso remoto y local.
+Descripción
+El sistema deberá generar un gráfico comparativo (boxplot o barras) por tipo de acceso.
+Módulo
+M-07
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-57 — Diagrama de Dispersión CVSS vs Días para Parche
+ID
+RF-57
+Nombre
+Diagrama de Dispersión CVSS vs Días para Parche
+Historia
+Como analista, quiero ver la relación entre CVSS Score y días para parche.
+Descripción
+El sistema deberá generar un scatter plot de CVSS Score contra días para parche.
+Módulo
+M-07
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-58 — Histograma de Días para Parche
+ID
+RF-58
+Nombre
+Histograma de Días para Parche
+Historia
+Como analista, quiero ver la distribución de los días que tomó parchear las vulnerabilidades.
+Descripción
+El sistema deberá generar un histograma de la variable días para parche.
+Módulo
+M-07
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-59 — Gráfico Top 10 Tipos de Vulnerabilidad
+ID
+RF-59
+Nombre
+Gráfico Top 10 Tipos de Vulnerabilidad
+Historia
+Como analista, quiero ver los 10 tipos de vulnerabilidad más frecuentes en el dataset.
+Descripción
+El sistema deberá generar un gráfico de barras horizontales con el top 10 de tipos de vulnerabilidad.
+Módulo
+M-07
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-60 — Gráfico Top 10 Software Más Afectado
+ID
+RF-60
+Nombre
+Gráfico Top 10 Software Más Afectado
+Historia
+Como analista, quiero ver los 10 software o componentes más afectados por vulnerabilidades.
+Descripción
+El sistema deberá generar un gráfico de barras horizontales con el top 10 de software afectado.
+Módulo
+M-07
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-61 — Descarga de Gráficos
+ID
+RF-61
+Nombre
+Descarga de Gráficos
+Historia
+Como analista, quiero descargar los gráficos generados en PNG o PDF, para usarlos en presentaciones.
+Descripción
+El sistema deberá permitir exportar cualquier gráfico en formato PNG o PDF de alta resolución (300 dpi).
+Módulo
+M-07
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+M-08 Comparación por Categorías
+RF-62 — Comparación de CVSS Promedio por Tipo de Acceso
+ID
+RF-62
+Nombre
+Comparación de CVSS Promedio por Tipo de Acceso
+Historia
+Como analista, quiero comparar el CVSS promedio entre vulnerabilidades de acceso remoto y local.
+Descripción
+El sistema deberá calcular y comparar la media de CVSS Score entre ambos grupos.
+Módulo
+M-08
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-63 — Comparación de Dispersión por Tipo de Acceso
+ID
+RF-63
+Nombre
+Comparación de Dispersión por Tipo de Acceso
+Historia
+Como analista, quiero comparar la desviación estándar del CVSS Score entre acceso remoto y local.
+Descripción
+El sistema deberá calcular y comparar la desviación estándar entre ambos grupos.
+Módulo
+M-08
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-64 — Agrupación por Tipo de Vulnerabilidad
+ID
+RF-64
+Nombre
+Agrupación por Tipo de Vulnerabilidad
+Historia
+Como analista, quiero agrupar las vulnerabilidades por tipo (inyección, XSS, desbordamiento de buffer, etc.).
+Descripción
+El sistema deberá clasificar los registros según la categoría de tipo de vulnerabilidad.
+Módulo
+M-08
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-65 — Agrupación por Software o Proveedor
+ID
+RF-65
+Nombre
+Agrupación por Software o Proveedor
+Historia
+Como analista, quiero agrupar las vulnerabilidades por el software o proveedor afectado.
+Descripción
+El sistema deberá clasificar los registros según el componente de software afectado.
+Módulo
+M-08
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-66 — Visualización de Diferencia de Medias
+ID
+RF-66
+Nombre
+Visualización de Diferencia de Medias
+Historia
+Como analista, quiero ver la diferencia numérica de medias entre dos categorías comparadas.
+Descripción
+El sistema deberá calcular y mostrar la diferencia de medias entre los grupos seleccionados.
+Módulo
+M-08
+Actor
+Sistema
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-67 — Tabla Comparativa por Categoría
+ID
+RF-67
+Nombre
+Tabla Comparativa por Categoría
+Historia
+Como analista, quiero ver una tabla resumen comparando medidas estadísticas entre categorías.
+Descripción
+El sistema deberá generar una tabla con media, desviación estándar y cantidad de registros por categoría.
+Módulo
+M-08
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-68 — Resaltado de Categorías de Mayor Severidad
+ID
+RF-68
+Nombre
+Resaltado de Categorías de Mayor Severidad
+Historia
+Como analista, quiero que el sistema resalte automáticamente la categoría con mayor severidad promedio.
+Descripción
+El sistema deberá destacar visualmente la categoría con el CVSS promedio más alto.
+Módulo
+M-08
+Actor
+Sistema
+Prioridad
+Could
+Estado
+Propuesto
+
+M-09 Priorización y Framework de Remediación
+RF-70 — Ranking de Urgencia de Remediación
+ID
+RF-70
+Nombre
+Ranking de Urgencia de Remediación
+Historia
+Como analista, quiero un ranking de vulnerabilidades ordenado por urgencia de remediación.
+Descripción
+El sistema deberá ordenar las vulnerabilidades combinando CVSS Score y días para parche.
+Módulo
+M-09
+Actor
+Sistema
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-71 — Estimación de Plazo Recomendado de Parcheo
+ID
+RF-71
+Nombre
+Estimación de Plazo Recomendado de Parcheo
+Historia
+Como analista, quiero conocer el plazo recomendado de parcheo según el nivel de severidad.
+Descripción
+El sistema deberá sugerir un plazo (ej. 7, 30, 90 días) según la clasificación de riesgo.
+Módulo
+M-09
+Actor
+Sistema
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-72 — Relación entre CVSS y Días Reales de Parche
+ID
+RF-72
+Nombre
+Relación entre CVSS y Días Reales de Parche
+Historia
+Como analista, quiero comparar el plazo recomendado con el tiempo real que tomó remediar una vulnerabilidad.
+Descripción
+El sistema deberá mostrar la diferencia entre el plazo recomendado y el tiempo real registrado.
+Módulo
+M-09
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-73 — Propuesta de Priorización Basada en Estadística
+ID
+RF-73
+Nombre
+Propuesta de Priorización Basada en Estadística
+Historia
+Como analista, quiero que el sistema proponga un orden de atención basado en criterios estadísticos y no solo en intuición.
+Descripción
+El sistema deberá generar una propuesta de priorización combinando severidad, dispersión y urgencia.
+Módulo
+M-09
+Actor
+Sistema
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-74 — Marcado de Vulnerabilidad en Proceso de Remediación
+ID
+RF-74
+Nombre
+Marcado de Vulnerabilidad en Proceso de Remediación
+Historia
+Como analista, quiero marcar una vulnerabilidad como 'en proceso de remediación'.
+Descripción
+El sistema deberá permitir cambiar el estado de una vulnerabilidad a 'en proceso'.
+Módulo
+M-09
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-75 — Marcado de Vulnerabilidad como Remediada
+ID
+RF-75
+Nombre
+Marcado de Vulnerabilidad como Remediada
+Historia
+Como analista, quiero marcar una vulnerabilidad como remediada, para actualizar el estado del catálogo.
+Descripción
+El sistema deberá permitir cambiar el estado de una vulnerabilidad a 'remediada' registrando la fecha.
+Módulo
+M-09
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-76 — Alerta de Plazo de Remediación Excedido
+ID
+RF-76
+Nombre
+Alerta de Plazo de Remediación Excedido
+Historia
+Como analista, quiero recibir una alerta cuando una vulnerabilidad crítica exceda el plazo recomendado sin remediar.
+Descripción
+El sistema deberá generar una alerta automática cuando se supere el plazo recomendado.
+Módulo
+M-09
+Actor
+Sistema
+Prioridad
+Must
+Estado
+Propuesto
+
+M-10 Reportes y Exportación
+RF-78 — Generación de Informe en Word
+ID
+RF-78
+Nombre
+Generación de Informe en Word
+Historia
+Como analista, quiero generar el informe estadístico en formato Word, para poder editarlo posteriormente.
+Descripción
+El sistema deberá generar un documento .docx con el mismo contenido del informe PDF.
+Módulo
+M-10
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-79 — Exportación de Tablas a Excel
+ID
+RF-79
+Nombre
+Exportación de Tablas a Excel
+Historia
+Como analista, quiero exportar las tablas de resultados a Excel, para análisis adicionales.
+Descripción
+El sistema deberá exportar cualquier tabla generada en formato .xlsx.
+Módulo
+M-10
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-80 — Exportación de Gráficos del Informe
+ID
+RF-80
+Nombre
+Exportación de Gráficos del Informe
+Historia
+Como analista, quiero exportar todos los gráficos generados junto con el informe.
+Descripción
+El sistema deberá incluir los gráficos como archivos independientes junto al informe generado.
+Módulo
+M-10
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-81 — Interpretación Automática en el Informe
+ID
+RF-81
+Nombre
+Interpretación Automática en el Informe
+Historia
+Como analista, quiero que el informe incluya una interpretación textual automática de cada resultado.
+Descripción
+El sistema deberá generar párrafos de interpretación basados en los valores estadísticos calculados.
+Módulo
+M-10
+Actor
+Sistema
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-82 — Informe Resumido Ejecutivo
+ID
+RF-82
+Nombre
+Informe Resumido Ejecutivo
+Historia
+Como analista, quiero generar una versión resumida del informe, para presentarla a jefaturas no técnicas.
+Descripción
+El sistema deberá generar un resumen ejecutivo de una página con las conclusiones principales.
+Módulo
+M-10
+Actor
+Analista
+Prioridad
+Could
+Estado
+Propuesto
+
+RF-83 — Programación de Informes Periódicos
+ID
+RF-83
+Nombre
+Programación de Informes Periódicos
+Historia
+Como analista, quiero programar la generación automática de informes cada cierto período.
+Descripción
+El sistema deberá permitir configurar la generación periódica (semanal/mensual) de informes.
+Módulo
+M-10
+Actor
+Analista
+Prioridad
+Could
+Estado
+Propuesto
+
+M-11 Búsqueda y Filtros Avanzados
+RF-84 — Búsqueda por Identificador CVE
+ID
+RF-84
+Nombre
+Búsqueda por Identificador CVE
+Historia
+Como analista, quiero buscar rápidamente una vulnerabilidad por su código CVE exacto.
+Descripción
+El sistema deberá implementar un buscador rápido por CVE.
+Módulo
+M-11
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-85 — Filtro por Rango de Fechas
+ID
+RF-85
+Nombre
+Filtro por Rango de Fechas
+Historia
+Como analista, quiero filtrar vulnerabilidades publicadas dentro de un rango de fechas.
+Descripción
+El sistema deberá permitir definir fecha de inicio y fin para filtrar registros.
+Módulo
+M-11
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-86 — Filtro por Componente o Proveedor
+ID
+RF-86
+Nombre
+Filtro por Componente o Proveedor
+Historia
+Como analista, quiero filtrar vulnerabilidades por proveedor o componente específico.
+Descripción
+El sistema deberá permitir filtrar por el nombre del software o proveedor.
+Módulo
+M-11
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-87 — Filtro por Estado de Remediación
+ID
+RF-87
+Nombre
+Filtro por Estado de Remediación
+Historia
+Como analista, quiero filtrar vulnerabilidades según su estado (pendiente, en proceso, remediada).
+Descripción
+El sistema deberá permitir filtrar por el estado de remediación de cada registro.
+Módulo
+M-11
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-88 — Combinación de Múltiples Filtros
+ID
+RF-88
+Nombre
+Combinación de Múltiples Filtros
+Historia
+Como analista, quiero combinar varios filtros a la vez, para búsquedas más precisas.
+Descripción
+El sistema deberá permitir aplicar de forma simultánea filtros de CVSS, fecha, severidad y estado.
+Módulo
+M-11
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-89 — Guardado de Filtros Favoritos
+ID
+RF-89
+Nombre
+Guardado de Filtros Favoritos
+Historia
+Como analista, quiero guardar combinaciones de filtros frecuentes, para reutilizarlas.
+Descripción
+El sistema deberá permitir guardar y nombrar configuraciones de filtros.
+Módulo
+M-11
+Actor
+Analista
+Prioridad
+Could
+Estado
+Propuesto
+
+RF-90 — Exportación de Resultados Filtrados
+ID
+RF-90
+Nombre
+Exportación de Resultados Filtrados
+Historia
+Como analista, quiero exportar únicamente los resultados de mi búsqueda filtrada.
+Descripción
+El sistema deberá exportar el subconjunto de datos resultante de los filtros aplicados.
+Módulo
+M-11
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+M-12 Seguridad y Auditoría del Sistema
+RF-91 — Control de Acceso Basado en Roles
+ID
+RF-91
+Nombre
+Control de Acceso Basado en Roles
+Historia
+Como sistema, quiero restringir funcionalidades según el rol del usuario.
+Descripción
+El sistema deberá aplicar permisos diferenciados para analistas y administradores.
+Módulo
+M-12
+Actor
+Sistema
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-92 — Cifrado de Contraseñas
+ID
+RF-92
+Nombre
+Cifrado de Contraseñas
+Historia
+Como sistema, quiero almacenar las contraseñas de forma cifrada, para proteger las cuentas de los usuarios.
+Descripción
+El sistema deberá cifrar las contraseñas mediante el algoritmo bcrypt.
+Módulo
+M-12
+Actor
+Sistema
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-93 — Conexión Segura Obligatoria
+ID
+RF-93
+Nombre
+Conexión Segura Obligatoria
+Historia
+Como sistema, quiero forzar el uso de conexión cifrada, para proteger la información transmitida.
+Descripción
+El sistema deberá exigir el uso de HTTPS en todas sus comunicaciones.
+Módulo
+M-12
+Actor
+Sistema
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-94 — Auditoría de Cambios en el Dataset
+ID
+RF-94
+Nombre
+Auditoría de Cambios en el Dataset
+Historia
+Como administrador, quiero ver quién modificó el dataset y cuándo.
+Descripción
+El sistema deberá registrar cada modificación realizada sobre los datos cargados.
+Módulo
+M-12
+Actor
+Administrador
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-95 — Auditoría de Generación de Informes
+ID
+RF-95
+Nombre
+Auditoría de Generación de Informes
+Historia
+Como administrador, quiero ver un historial de los informes generados por cada analista.
+Descripción
+El sistema deberá registrar fecha, autor y tipo de cada informe generado.
+Módulo
+M-12
+Actor
+Administrador
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-96 — Respaldo Automático de la Base de Datos
+ID
+RF-96
+Nombre
+Respaldo Automático de la Base de Datos
+Historia
+Como sistema, quiero respaldar automáticamente la base de datos, para prevenir pérdida de información.
+Descripción
+El sistema deberá ejecutar un respaldo (backup) automático diario.
+Módulo
+M-12
+Actor
+Sistema
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-97 — Verificación de Integridad de Datos Importados
+ID
+RF-97
+Nombre
+Verificación de Integridad de Datos Importados
+Historia
+Como sistema, quiero verificar que los datos importados no hayan sido alterados ni corrompidos.
+Descripción
+El sistema deberá validar la integridad estructural del archivo antes de aceptarlo.
+Módulo
+M-12
+Actor
+Sistema
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-98 — Cumplimiento de Protección de Datos Personales
+ID
+RF-98
+Nombre
+Cumplimiento de Protección de Datos Personales
+Historia
+Como sistema, quiero cumplir con la normativa peruana de protección de datos personales.
+Descripción
+El sistema deberá cumplir con lo establecido en la Ley N.° 29733 respecto a los datos de los analistas registrados.
+Módulo
+M-12
+Actor
+Sistema
+Prioridad
+Must
+Estado
+Propuesto
+
+M-13 Notificaciones y Alertas
+RF-99 — Notificación de Vulnerabilidad Crítica Nueva
+ID
+RF-99
+Nombre
+Notificación de Vulnerabilidad Crítica Nueva
+Historia
+Como analista, quiero ser notificado cuando se detecte una nueva vulnerabilidad crítica en el dataset.
+Descripción
+El sistema deberá enviar una notificación cuando se cargue un registro con CVSS Score igual o mayor a 9.0.
+Módulo
+M-13
+Actor
+Sistema
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-100 — Notificación de Vencimiento de Plazo
+ID
+RF-100
+Nombre
+Notificación de Vencimiento de Plazo
+Historia
+Como analista, quiero ser notificado cuando se acerque el vencimiento del plazo recomendado de parcheo.
+Descripción
+El sistema deberá enviar una notificación 48 horas antes del vencimiento del plazo recomendado.
+Módulo
+M-13
+Actor
+Sistema
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-101 — Notificación de Informe Generado
+ID
+RF-101
+Nombre
+Notificación de Informe Generado
+Historia
+Como analista, quiero ser notificado cuando finalice la generación de un informe extenso.
+Descripción
+El sistema deberá notificar al analista cuando el informe solicitado esté listo para descargar.
+Módulo
+M-13
+Actor
+Sistema
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-102 — Notificación de Actualización desde la API NVD
+ID
+RF-102
+Nombre
+Notificación de Actualización desde la API NVD
+Historia
+Como analista, quiero ser notificado cuando existan actualizaciones disponibles desde la API del NVD.
+Descripción
+El sistema deberá notificar cuando existan nuevos registros disponibles para sincronizar.
+Módulo
+M-13
+Actor
+Sistema
+Prioridad
+Should
+Estado
+Propuesto
+
+RF-103 — Centro de Notificaciones del Analista
+ID
+RF-103
+Nombre
+Centro de Notificaciones del Analista
+Historia
+Como analista, quiero ver todas mis notificaciones en un solo lugar.
+Descripción
+El sistema deberá mostrar una sección centralizada con todas las notificaciones recibidas.
+Módulo
+M-13
+Actor
+Analista
+Prioridad
+Must
+Estado
+Propuesto
+
+RF-104 — Marcado de Notificaciones como Leídas
+ID
+RF-104
+Nombre
+Marcado de Notificaciones como Leídas
+Historia
+Como analista, quiero marcar notificaciones como leídas, para mantener organizado mi centro de notificaciones.
+Descripción
+El sistema deberá permitir marcar una o varias notificaciones como leídas.
+Módulo
+M-13
+Actor
+Analista
+Prioridad
+Should
+Estado
+Propuesto
+
+IX. PRIORIZACIÓN Y ESFUERZO
+9.1 Metodología de priorización (MoSCoW)
+Para priorizar los requisitos del sistema SEVERA se utilizó la técnica MoSCoW, que permite clasificar los requisitos según su importancia dentro del sistema.
+Categoría
+Descripción
+Must
+Funcionalidades obligatorias para que el sistema funcione correctamente.
+Should
+Funcionalidades importantes que mejoran el sistema, pero no son críticas.
+Could
+Funcionalidades opcionales que aportan valor adicional.
+Won't
+Funcionalidades consideradas para versiones futuras (p. ej. app móvil nativa, IA generativa para redacción de informes).
+9.2 Priorización por módulo
+Módulo
+Cantidad de RF
+Must
+Should
+Could
+M-01 Gestión de usuarios y acceso
+8
+5
+2
+1
+M-02 Perfil del analista
+8
+3
+2
+3
+M-03 Carga y gestión del dataset NVD
+8
+5
+2
+1
+M-04 Catálogo y consulta de vulnerabilidades
+8
+6
+1
+1
+M-05 Distribución de frecuencias
+8
+4
+3
+1
+M-06 Medidas de tendencia central y dispersión
+10
+8
+1
+1
+M-07 Visualización gráfica
+11
+5
+6
+0
+M-08 Comparación por categorías
+7
+3
+3
+1
+M-09 Priorización y framework de remediación
+8
+6
+2
+0
+M-10 Reportes y exportación
+7
+2
+3
+2
+M-11 Búsqueda y filtros avanzados
+7
+3
+3
+1
+M-12 Seguridad y auditoría del sistema
+8
+7
+1
+0
+M-13 Notificaciones y alertas
+6
+3
+3
+0
+9.3 Estimación de esfuerzo (Story Points)
+Story Points
+Nivel de esfuerzo
+Descripción
+1 SP
+Muy bajo
+Cambios simples o ajustes menores (p. ej. cálculo directo de una medida estadística)
+2 SP
+Bajo
+Funcionalidad sencilla de implementar
+3 SP
+Medio
+Funcionalidad con lógica moderada (p. ej. generación de un gráfico)
+5 SP
+Alto
+Funcionalidad compleja que requiere mayor desarrollo (p. ej. motor de priorización)
+9.4 Matriz Valor vs. Esfuerzo
+Valor / Esfuerzo
+Bajo esfuerzo
+Alto esfuerzo
+Alto valor
+Prioridad alta
+Planificar
+Bajo valor
+Opcional
+Evitar
+X. CONSOLIDACIÓN Y LÍNEA BASE
+10.1 Consolidación de requisitos
+La consolidación integró y organizó los requisitos identificados durante las fases de elicitación, validación, verificación y refinamiento, eliminando redundancias y agrupando funcionalidades relacionadas dentro de los 13 módulos del sistema SEVERA.
+El sistema SEVERA cuenta con un total de 104 requisitos funcionales, distribuidos en 13 módulos del sistema.
+10.2 Resultado de consolidación por módulos
+Módulo
+Nombre del módulo
+Cantidad de RF
+Descripción
+M-01
+Gestión de Usuarios y Acceso
+8
+Registro, autenticación y control de acceso de analistas
+M-02
+Perfil del Analista
+8
+Gestión y personalización del perfil
+M-03
+Carga y Gestión del Dataset NVD
+8
+Importación, validación y versionado del dataset
+M-04
+Catálogo y Consulta de Vulnerabilidades
+8
+Consulta detallada de cada vulnerabilidad
+M-05
+Distribución de Frecuencias
+8
+Tablas de frecuencias agrupadas y sin agrupar
+M-06
+Medidas de Tendencia Central y Dispersión
+10
+Media, mediana, moda, varianza, desviación estándar, CV
+M-07
+Visualización Gráfica
+11
+Los 10 gráficos estadísticos del análisis
+M-08
+Comparación por Categorías
+7
+Comparación entre acceso remoto/local, tipo y software
+M-09
+Priorización y Framework de Remediación
+8
+Clasificación de riesgo y ranking de urgencia
+M-10
+Reportes y Exportación
+7
+Generación de informes estadísticos
+M-11
+Búsqueda y Filtros Avanzados
+7
+Búsqueda combinada bajo múltiples criterios
+M-12
+Seguridad y Auditoría del Sistema
+8
+Protección de datos y trazabilidad de operaciones
+M-13
+Notificaciones y Alertas
+6
+Alertas de vulnerabilidades críticas y plazos
+Total de requisitos funcionales: 104
+10.3 Línea base de requisitos
+La línea base representa el conjunto de requisitos analizados, validados y aprobados para formar parte del alcance inicial del sistema SEVERA, sirviendo como referencia para etapas posteriores del desarrollo.
+10.4 Control de línea base
+Versión
+Fecha
+Descripción
+Baseline 1.0
+2026
+Primera consolidación de requisitos del sistema
+Baseline 1.1
+2026
+Ajustes menores después de revisión técnica
+Baseline 1.2
+2026
+Inclusión de requisitos derivados y refinamiento del documento SDS
+XI. FASE DE VALIDACIÓN DE REQUISITOS
+11.1 Niveles de revisión
+Nivel
+Revisor
+Criterio de Validación
+Rev. Técnica (Equipo)
+Equipo del proyecto
+Completitud de campos, atomicidad, criterios de aceptación verificables
+Rev. Usuario (Analista)
+Analistas de seguridad
+¿El RF refleja la necesidad real del analista? ¿Es comprensible?
+Rev. Estadística
+Docente del curso de Estadística y Probabilidades
+Coherencia entre los cálculos del sistema y los métodos estadísticos del informe original
+Rev. Docente (Ingeniería)
+Docente del curso de Ingeniería de Requisitos
+Cumplimiento IEEE 830, ISO 29148, atomicidad, trazabilidad
+11.2 Resultado del proceso de validación
+Criterio de validación
+Cumple
+Los requisitos son claros
+✓
+Los requisitos no presentan ambigüedad
+✓
+Los requisitos son consistentes
+✓
+Los requisitos son verificables
+✓
+Los requisitos están alineados con los objetivos del sistema
+✓
+Los requisitos son necesarios para el sistema
+✓
+Los requisitos son factibles de implementar
+✓
+Los cálculos estadísticos son coherentes con el informe original
+✓
+11.3 Conclusión de la validación
+El proceso de validación confirmó que los requisitos funcionales definidos para SEVERA cumplen con los criterios de calidad de los estándares de ingeniería de requisitos, y que los requisitos de cálculo estadístico son fieles al método utilizado en el informe de Análisis Estadístico de Vulnerabilidades que sirvió de base al proyecto.
+XII. TRAZABILIDAD BIDIRECCIONAL
+12.1 Trazabilidad hacia adelante
+Significa: Requisito → qué produce.
+RF
+Módulo
+Caso de Uso
+Sprint
+Estado
+RF-01
+Gestión de Usuarios
+CU-01 Registro
+Sprint 01
+Completado
+RF-17
+Carga del Dataset NVD
+CU-03 Importar Dataset
+Sprint 03
+Completado
+RF-33
+Distribución de Frecuencias
+CU-05 Generar Distribución
+Sprint 05
+Completado
+RF-41
+Medidas Estadísticas
+CU-06 Calcular Medidas
+Sprint 06
+Completado
+RF-51
+Visualización Gráfica
+CU-07 Generar Gráficos
+Sprint 07
+Completado
+RF-69
+Priorización
+CU-09 Priorizar Vulnerabilidades
+Sprint 09
+Completado
+RF-77
+Reportes
+CU-10 Generar Informe
+Sprint 10
+Completado
+12.2 Trazabilidad hacia atrás
+Significa: Objetivo del sistema → requisitos que lo satisfacen.
+ID Objetivo
+Objetivo
+RF Relacionados
+O1
+Gestionar el acceso de analistas al sistema
+RF-01 – RF-08
+O2
+Gestionar el perfil del analista
+RF-09 – RF-16
+O3
+Cargar y validar el dataset de vulnerabilidades NVD
+RF-17 – RF-24
+O4
+Consultar el catálogo de vulnerabilidades
+RF-25 – RF-32
+O5
+Generar distribuciones de frecuencia del CVSS Score
+RF-33 – RF-40
+O6
+Calcular medidas de tendencia central y dispersión
+RF-41 – RF-50
+O7
+Visualizar gráficamente la severidad de las vulnerabilidades
+RF-51 – RF-61
+O8
+Comparar la severidad entre categorías
+RF-62 – RF-68
+O9
+Priorizar la remediación de vulnerabilidades
+RF-69 – RF-76
+O10
+Generar reportes de los resultados
+RF-77 – RF-83
+O11
+Permitir búsquedas avanzadas
+RF-84 – RF-90
+O12
+Garantizar la seguridad del sistema
+RF-91 – RF-98
+O13
+Gestionar notificaciones del sistema
+RF-99 – RF-104
+La trazabilidad hacia adelante permite identificar cómo cada requisito se implementa dentro del sistema; la trazabilidad hacia atrás permite verificar que cada funcionalidad responde a un objetivo definido en el proceso de ingeniería de requisitos.
+XIII. GESTIÓN DE CAMBIOS (ISO/IEC/IEEE 29148)
+Todo cambio realizado al documento SDS del sistema SEVERA debe seguir un proceso formal de gestión de cambios basado en el estándar ISO/IEC/IEEE 29148, garantizando trazabilidad, consistencia y control de versiones.
+13.1 Proceso Formal de Gestión de Cambios
+Paso
+Actividad
+Responsable
+Salida / Criterio de éxito
+01
+Solicitud de cambio
+Stakeholder / Equipo
+Formulario CC-XX registrado con ID único
+02
+Análisis de impacto
+Equipo técnico
+RF afectados, esfuerzo estimado y riesgos identificados
+03
+Evaluación y decisión
+Docente + Equipo
+Aprobado / Rechazado / En análisis
+04
+Planificación
+Responsable asignado
+Sprint y tareas asignadas
+05
+Implementación
+Desarrollador asignado
+RF actualizado en el SDS
+06
+Versionamiento
+Equipo completo
+Nueva versión del SDS registrada
+13.2 Registro de Cambios
+ID
+RF Afectado
+Descripción
+Tipo
+Estado
+CC-01
+RF-41
+Ajuste en la fórmula de cálculo de la media para manejar datos faltantes
+Mejora
+Aprobado
+CC-02
+RF-50
+Sustitución de la librería psych por fórmulas manuales de media geométrica/armónica
+Corrección
+Aprobado
+CC-03
+RF-69
+Ajuste de los rangos de clasificación de riesgo según la escala oficial de CVSS
+Mejora
+Aprobado
+CC-04
+RF-77
+Inclusión de interpretación automática en el informe generado
+Ampliación
+Aprobado
+CC-05
+RF-20
+Incorporación de sincronización con la API NVD 2.0
+Nueva función
+En análisis
+13.3 Criterios de Aprobación de Cambios
+El cambio mejora la funcionalidad del sistema.
+El cambio no introduce inconsistencias en los requisitos existentes.
+El impacto técnico es aceptable para el equipo de desarrollo.
+El cambio contribuye a mejorar la calidad del análisis estadístico o de la priorización.
+13.4 Criterios de Rechazo de Cambios
+Contradice requisitos previamente aprobados.
+Genera riesgos significativos para la integridad de los cálculos estadísticos.
+Requiere un esfuerzo de implementación desproporcionado.
+No aporta valor al analista de seguridad.
+13.5 Niveles de Aprobación
+Nivel
+Responsable
+Tipo de cambio
+Nivel 1
+Equipo de desarrollo
+Cambios menores en requisitos
+Nivel 2
+Docente del curso
+Cambios moderados que afectan varios RF
+Nivel 3
+Equipo + Docente
+Cambios estructurales en el sistema
+XIV. CUADRO DE VERSIONES DEL DOCUMENTO SDS
+El control de versiones registra todas las modificaciones realizadas al documento SDS del sistema SEVERA, garantizando la trazabilidad de los cambios durante el desarrollo del proyecto.
+Versión
+Etapa
+Descripción de cambios
+Estado
+v1.0
+Inicio del proyecto
+Creación inicial del documento SDS a partir del informe estadístico base
+Aprobado
+v1.1
+Elicitación de requisitos
+Inclusión de requisitos funcionales iniciales
+Aprobado
+v1.2
+Análisis de requisitos
+Ampliación de requisitos funcionales y estructura de módulos
+Aprobado
+v1.3
+Diseño del sistema
+Incorporación de clases UML y descripción de módulos
+Aprobado
+v1.4
+Desarrollo de sprints
+Inclusión de planificación de sprints y backlog del sistema
+Aprobado
+v1.5
+Validación
+Ajustes en trazabilidad de requisitos y validación del documento
+Aprobado
+14.1 Política de Versionamiento
+Cada versión mayor (X.0) corresponde a un cambio estructural del documento; cada versión menor (X.Y) corresponde a ajustes, correcciones o ampliaciones puntuales que no alteran la estructura general del SDS.
+XV. DIAGRAMAS UML
+15.1 Clases principales por módulo
+A continuación se presenta la clase principal asociada a cada módulo del sistema, con sus atributos y métodos más relevantes, como base para el diseño detallado del sistema.
+M-01 Gestión de Usuarios y Acceso — Clase Usuario
+Atributos:
+idUsuario: int
+nombre: string
+correo: string
+contrasenaHash: string
+rol: enum{Analista, Administrador}
+Métodos:
+registrar()
+iniciarSesion()
+recuperarContrasena()
+M-02 Perfil del Analista — Clase Perfil
+Atributos:
+idPerfil: int
+idUsuario: int
+preferencias: JSON
+fechaActualizacion: date
+Métodos:
+visualizar()
+editar()
+exportarHistorial()
+M-03 Carga y Gestión del Dataset NVD — Clase DatasetNVD
+Atributos:
+idDataset: int
+fechaCarga: date
+fuente: string
+totalRegistros: int
+Métodos:
+importar()
+validarEstructura()
+detectarFaltantes()
+sincronizarConAPI()
+M-04 Catálogo y Consulta de Vulnerabilidades — Clase Vulnerabilidad
+Atributos:
+cve: string
+cvssScore: float
+descripcion: string
+componenteAfectado: string
+tipoAcceso: enum{Remoto, Local}
+fechaPublicacion: date
+Métodos:
+consultar()
+buscarPorCVE()
+filtrarPorSeveridad()
+M-05 Distribución de Frecuencias — Clase TablaFrecuencias
+Atributos:
+tipo: enum{SinAgrupar, Agrupada}
+intervalos: array
+frecuenciaAbsoluta: array
+frecuenciaRelativa: array
+Métodos:
+generar()
+calcularMarcaClase()
+calcularAcumulada()
+M-06 Medidas de Tendencia Central y Dispersión — Clase ResumenEstadistico
+Atributos:
+media: float
+mediana: float
+moda: float
+q1: float
+q3: float
+varianza: float
+desviacionEstandar: float
+coeficienteVariacion: float
+Métodos:
+calcularTendenciaCentral()
+calcularDispersion()
+M-07 Visualización Gráfica — Clase GraficoEstadistico
+Atributos:
+tipo: enum{Histograma, Boxplot, Barras, Pastel, Dispersión}
+titulo: string
+formatoExportacion: enum{PNG, PDF}
+Métodos:
+generar()
+descargar()
+M-08 Comparación por Categorías — Clase ComparacionCategoria
+Atributos:
+categoria: string
+mediaGrupo: float
+desviacionGrupo: float
+cantidadRegistros: int
+Métodos:
+compararGrupos()
+calcularDiferenciaMedias()
+M-09 Priorización y Framework de Remediación — Clase Priorizacion
+Atributos:
+cve: string
+nivelRiesgo: enum{Bajo, Moderado, Alto, Crítico}
+rankingUrgencia: int
+estadoRemediacion: enum{Pendiente, EnProceso, Remediada}
+Métodos:
+clasificarRiesgo()
+generarRanking()
+actualizarEstado()
+M-10 Reportes y Exportación — Clase Informe
+Atributos:
+idInforme: int
+tipo: enum{Completo, Ejecutivo}
+formato: enum{PDF, Word}
+fechaGeneracion: date
+Métodos:
+generar()
+incluirInterpretacion()
+programarPeriodico()
+M-11 Búsqueda y Filtros Avanzados — Clase FiltroBusqueda
+Atributos:
+criterios: JSON
+nombreGuardado: string
+Métodos:
+aplicarFiltros()
+guardarFavorito()
+exportarResultado()
+M-12 Seguridad y Auditoría del Sistema — Clase RegistroAuditoria
+Atributos:
+idEvento: int
+usuario: string
+accion: string
+fechaHora: datetime
+Métodos:
+registrarEvento()
+consultarHistorial()
+M-13 Notificaciones y Alertas — Clase Notificacion
+Atributos:
+idNotificacion: int
+tipo: enum{VulnerabilidadCritica, PlazoVencido, InformeListo}
+leida: boolean
+fecha: datetime
+Métodos:
+generar()
+marcarLeida()
+XVI. FINANCIAMIENTO DEL PROYECTO
+El proyecto SEVERA se desarrolla como una extensión práctica del curso de Estadística y Probabilidades de la Universidad Nacional Agraria de la Selva, y su financiamiento se basa principalmente en el trabajo académico del autor y el uso de herramientas tecnológicas gratuitas o de código abierto.
+16.1 Costos estimados del proyecto
+N°
+Componente
+Descripción
+Fuente
+Costo (S/.)
+1
+Desarrollo del sistema
+Implementación de los 13 módulos del sistema
+Equipo del proyecto
+0.00
+2
+Hosting web
+Servidor para despliegue del sistema
+Autofinanciado
+200.00
+3
+Base de datos
+Servicio PostgreSQL en la nube
+Plan académico
+0.00
+4
+Dominio web
+Registro de dominio web anual
+Autofinanciado
+80.00
+5
+Diseño de interfaz
+Prototipos en Figma
+Plan educativo
+0.00
+6
+Documentación
+Impresión del documento SDS
+Autofinanciado
+45.00
+7
+Material de investigación
+Acceso y consulta de la API NVD/CVE
+Recurso gratuito
+0.00
+8
+Capacitación
+Cursos online sobre CVSS, R y desarrollo web
+Recursos gratuitos
+0.00
+16.2 Costo total estimado del proyecto
+Total estimado del proyecto: S/. 325.00
+El costo del proyecto se mantiene bajo debido al uso de herramientas open source y recursos educativos disponibles.
+Entre las tecnologías consideradas para el desarrollo del sistema se encuentran:
+React (frontend)
+Django o Node.js (backend)
+PostgreSQL (base de datos)
+R / Python (motor de cálculo estadístico)
+Figma (prototipado)
+XVII. CONCLUSIONES
+El desarrollo del presente documento de Especificación de Requisitos del Sistema (SDS) para el proyecto SEVERA permitió transformar los resultados de un análisis estadístico riguroso de 150 vulnerabilidades reales del NVD en una especificación formal de software, identificando, analizando y documentando de manera estructurada los requisitos necesarios para su implementación.
+Durante el proceso de ingeniería de requisitos se definieron 104 requisitos funcionales, organizados en 13 módulos del sistema, y 150 requisitos no funcionales relacionados con rendimiento, seguridad, disponibilidad, usabilidad, precisión estadística y mantenibilidad.
+El documento incluye procesos de verificación y validación de requisitos, garantizando que cada uno cumpla con criterios de claridad, consistencia, verificabilidad y trazabilidad, así como coherencia con los métodos estadísticos empleados en el informe original.
+La aplicación de metodologías ágiles mediante 13 sprints de desarrollo permitió organizar las funcionalidades del sistema de manera progresiva, replicando en software cada etapa del análisis estadístico original: carga de datos, distribución de frecuencias, medidas de tendencia central y dispersión, visualización gráfica, comparación por categorías y, finalmente, priorización de remediación.
+Finalmente, este documento demuestra que un trabajo estadístico académico puede convertirse en la base formal para el desarrollo de un producto de software real, aplicando buenas prácticas de ingeniería de requisitos y estándares internacionales (IEEE 830, ISO/IEC/IEEE 29148).
+XVIII. RECOMENDACIONES
+Priorizar la implementación de los requisitos funcionales clasificados como Must, por representar las funcionalidades esenciales del sistema.
+Mantener activo el proceso de gestión de cambios, garantizando que cualquier modificación en los requisitos sea evaluada, documentada y aprobada antes de ser implementada.
+Realizar pruebas continuas de los cálculos estadísticos del sistema contra los resultados de referencia obtenidos en R, para garantizar precisión numérica.
+Ampliar el dataset inicial más allá de las 150 vulnerabilidades, incorporando actualizaciones periódicas desde la API NVD 2.0.
+Considerar en futuras versiones la incorporación de un módulo de aprendizaje automático para predecir el riesgo de nuevas vulnerabilidades antes de su clasificación oficial.
+Validar el framework de priorización con analistas de seguridad reales antes de su despliegue en producción.
+XIX. REFERENCIAS
+Las siguientes fuentes fueron utilizadas como base teórica y técnica para el desarrollo del documento SDS del sistema SEVERA.
+IEEE Computer Society. (1998). IEEE Std 830-1998: Recommended Practice for Software Requirements Specifications.
+ISO/IEC/IEEE. (2018). ISO/IEC/IEEE 29148: Systems and Software Engineering — Requirements Engineering.
+Pressman, R. S. (2010). Ingeniería del Software: Un Enfoque Práctico (7ma edición). McGraw-Hill.
+Cohn, M. (2004). User Stories Applied: For Agile Software Development. Addison-Wesley.
+FIRST (Forum of Incident Response and Security Teams). Common Vulnerability Scoring System (CVSS).
+NIST. National Vulnerability Database (NVD) — nvd.nist.gov/vuln/search; API 2.0 — nvd.nist.gov/developers/vulnerabilities.
+Bermúdez Pino, W. J. (2024). Estadística Aplicada con RStudio.
+Walpole, R. E. y Myers, R. H. (2012). Probabilidad y Estadística para Ingenieros y Ciencias (9ª ed.). Pearson Prentice Hall.
+OWASP Foundation. (2021). OWASP Top Ten — Web Application Security Risks.
+Javier Orneta, Á. P. (2026). Análisis Estadístico de Vulnerabilidades de Seguridad en Software. UNAS.
+XX. GLOSARIO DE TÉRMINOS
+Término
+Definición
+Vulnerabilidad
+Debilidad o falla en un sistema que puede ser explotada por un atacante.
+CVE
+Common Vulnerabilities and Exposures; identificador único de una vulnerabilidad.
+CVSS
+Common Vulnerability Scoring System; estándar para calificar la severidad de una vulnerabilidad (0.0 a 10.0).
+NVD
+National Vulnerability Database; base de datos oficial del NIST.
+Stakeholder
+Persona interesada en el proyecto.
+Sprint
+Iteración de desarrollo en metodología Scrum.
+Story Point
+Unidad de estimación de esfuerzo de un requisito.
+API REST
+Interfaz para comunicación entre sistemas.
+MoSCoW
+Técnica de priorización: Must, Should, Could, Won't.
+Percentil
+Valor que divide un conjunto de datos ordenado en 100 partes iguales.
+Desviación estándar
+Medida de dispersión respecto a la media de un conjunto de datos.
+Coeficiente de variación
+Medida relativa de dispersión, expresada como porcentaje de la media.
+Requisito atómico
+Requisito que describe una sola responsabilidad funcional, sin ambigüedad.
+

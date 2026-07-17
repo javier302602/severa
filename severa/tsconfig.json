@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "sourceMap": true,
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "isolatedModules": false,
+    // "node" (alias de "node10") está deprecado y se elimina en TS 7.0. El
+    // reemplazo real, "node16", exige además "module": "node16", lo cual
+    // cambia el formato de salida y las reglas de resolución (tsc lo rechaza:
+    // "Option 'module' must be set to 'Node16' when option
+    // 'moduleResolution' is set to 'Node16'") — no es un cambio cosmético
+    // para un proyecto 100% CommonJS como este. Se opta por silenciar el
+    // warning en vez de forzarlo.
+    //
+    // El propio mensaje de deprecación de tsc sugiere `"ignoreDeprecations":
+    // "6.0"`, pero el compilador instalado (TypeScript 5.9.3, ver
+    // package.json) lo rechaza en la práctica con TS5103 "Invalid value for
+    // '--ignoreDeprecations'" — probado directamente. "5.0" sí es aceptado y
+    // silencia la advertencia sin tocar el comportamiento real. Revisar de
+    // nuevo (y probablemente pasar a "6.0" o migrar a node16) cuando se
+    // actualice la versión de TypeScript del proyecto.
+    "ignoreDeprecations": "5.0"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

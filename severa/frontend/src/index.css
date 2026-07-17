@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+body {
+  @apply bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100;
+}
+
+@layer components {
+  /* Bug reportado: los <input>/<select>/<textarea> nativos no heredan color
+     de texto/fondo del tema — cada uno necesita bg/text explícitos, no solo
+     el contenedor. Antes cada página definía su propio className ad hoc (o,
+     en algunos casos, solo dark:bg- sin dark:text-, dejando texto oscuro
+     sobre fondo oscuro). Una sola clase acá para que un campo nuevo no
+     repita el bug por omisión. `py-2`/`text-sm` quedan de base porque las
+     utilities de Tailwind (ej. "py-1.5" en un className puntual) siempre
+     ganan sobre las clases de este layer, sin depender del orden en el JSX. */
+  .campo-formulario {
+    @apply rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500;
+  }
+}

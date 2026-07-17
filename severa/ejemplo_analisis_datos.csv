@@ -1,0 +1,15 @@
+Producto,Categoria,Precio,Cantidad,Descuento,FechaVenta
+Laptop,Electronica,1200,5,10,2024-01-15
+Mouse,Electronica,25,50,5,2024-01-20
+Teclado,Electronica,45,30,5,2024-02-01
+Monitor,Electronica,300,12,15,2024-02-10
+Silla,Muebles,150,8,0,2024-02-15
+Mesa,Muebles,400,4,20,2024-03-01
+Lampara,Muebles,60,15,0,2024-03-05
+Estante,Muebles,180,6,10,2024-03-12
+Auriculares,Electronica,80,25,5,2024-03-20
+Impresora,Electronica,220,7,15,2024-04-01
+Camara,Electronica,9500,1,0,2024-04-10
+Sofa,Muebles,700,3,25,2024-04-15
+Cargador,Electronica,20,60,0,
+Router,Electronica,90,18,10,2024-05-05
