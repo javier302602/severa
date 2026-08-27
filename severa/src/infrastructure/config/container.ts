@@ -30,6 +30,7 @@ import { SvgGraficosAdapter } from '../adapters/out/graphics/SvgGraficosAdapter'
 import { CompararPorTipoAcceso } from '../../application/usecases/CompararPorTipoAcceso';
 import { CompararPorTipoDeVulnerabilidad } from '../../application/usecases/CompararPorTipoDeVulnerabilidad';
 import { CompararPorSoftware } from '../../application/usecases/CompararPorSoftware';
+import { ListarSoftwareDisponible } from '../../application/usecases/ListarSoftwareDisponible';
 import { ClasificarRiesgo } from '../../application/usecases/ClasificarRiesgo';
 import { GenerarRankingUrgencia } from '../../application/usecases/GenerarRankingUrgencia';
 import { MarcarEnProcesoDeRemediacion } from '../../application/usecases/MarcarEnProcesoDeRemediacion';
@@ -47,6 +48,8 @@ import { ExportarBusquedaFiltrada } from '../../application/usecases/ExportarBus
 import { ConsultarAuditoria } from '../../application/usecases/ConsultarAuditoria';
 import { ObtenerNotificaciones } from '../../application/usecases/ObtenerNotificaciones';
 import { MarcarNotificacionLeida } from '../../application/usecases/MarcarNotificacionLeida';
+import { MarcarTodasLasNotificacionesLeidas } from '../../application/usecases/MarcarTodasLasNotificacionesLeidas';
+import { EliminarNotificaciones } from '../../application/usecases/EliminarNotificaciones';
 import { IniciarSesionConAuditoria } from '../../application/usecases/auditoria/IniciarSesionConAuditoria';
 import { ImportarDatasetConAuditoria } from '../../application/usecases/auditoria/ImportarDatasetConAuditoria';
 import { MarcarEnProcesoDeRemediacionConAuditoria } from '../../application/usecases/auditoria/MarcarEnProcesoDeRemediacionConAuditoria';
@@ -61,6 +64,9 @@ import { AnalizarColumnaUnivariadoGenerico } from '../../application/usecases/An
 import { CalcularMatrizCorrelacionGenerico } from '../../application/usecases/CalcularMatrizCorrelacionGenerico';
 import { DetectarOutliersGenerico } from '../../application/usecases/DetectarOutliersGenerico';
 import { GenerarInformeDataset } from '../../application/usecases/GenerarInformeDataset';
+import { ReiniciarDataset } from '../../application/usecases/ReiniciarDataset';
+import { ReiniciarDatasetConAuditoria } from '../../application/usecases/auditoria/ReiniciarDatasetConAuditoria';
+import { ConvertirUrlAExcel } from '../../application/usecases/ConvertirUrlAExcel';
 
 const pool = new Pool({ connectionString: config.databaseUrl });
 const analistaRepository = new PostgresAnalistaRepository(pool);
@@ -100,7 +106,6 @@ const importarDatasetConAuditoria = new ImportarDatasetConAuditoria(
 // de duplicar auditoría/notificación).
 const sincronizarConApiNvdUseCase = new SincronizarConApiNvd(
   nvdApiClient,
-  lectorExcelDataset,
   importarDatasetConAuditoria,
   servicioDeNotificaciones
 );
@@ -109,7 +114,7 @@ const descargadorDeArchivos = new DescargadorDeArchivosHttp();
 // para que un informe generado automáticamente por el cron quede auditado
 // (RF-95) y notificado (RF-101) igual que uno pedido a mano.
 const generarInformeConAuditoria = new GenerarInformeConAuditoria(
-  new GenerarInforme(vulnerabilidadRepository, geradorDeInformes, auditoriaRepository),
+  new GenerarInforme(vulnerabilidadRepository, geradorDeInformes, auditoriaRepository, analistaRepository),
   auditoriaRepository,
   servicioDeNotificaciones
 );
@@ -148,7 +153,8 @@ export const container = {
     descargadorDeArchivos,
     lectorExcelDataset,
     importarDatasetConAuditoria,
-    sincronizarConApiNvdUseCase
+    sincronizarConApiNvdUseCase,
+    vulnerabilidadRepository
   ),
   // RF-24: primera ruta HTTP para exportar el dataset validado (GET /dataset/exportar).
   exportarDatasetValidadoUseCase: new ExportarDatasetValidado(vulnerabilidadRepository),
@@ -158,6 +164,7 @@ export const container = {
   compararPorTipoAccesoUseCase: new CompararPorTipoAcceso(vulnerabilidadRepository),
   compararPorTipoDeVulnerabilidadUseCase: new CompararPorTipoDeVulnerabilidad(vulnerabilidadRepository),
   compararPorSoftwareUseCase: new CompararPorSoftware(vulnerabilidadRepository),
+  listarSoftwareDisponibleUseCase: new ListarSoftwareDisponible(vulnerabilidadRepository),
   clasificarRiesgoUseCase: new ClasificarRiesgo(vulnerabilidadRepository),
   generarRankingUrgenciaUseCase: new GenerarRankingUrgencia(vulnerabilidadRepository, servicioDeNotificaciones),
   // RF-94: cambios de estado de remediación quedan auditados (quién y cuándo).
@@ -173,7 +180,7 @@ export const container = {
   // RF-101: y de paso se notifica al analista que lo pidió que ya está listo.
   generarInformeUseCase: generarInformeConAuditoria,
   generarResumenEjecutivoUseCase: new GenerarResumenEjecutivoConAuditoria(
-    new GenerarResumenEjecutivo(vulnerabilidadRepository, geradorDeInformes, auditoriaRepository),
+    new GenerarResumenEjecutivo(vulnerabilidadRepository, geradorDeInformes, auditoriaRepository, analistaRepository),
     auditoriaRepository,
     servicioDeNotificaciones
   ),
@@ -187,6 +194,8 @@ export const container = {
   consultarAuditoriaUseCase: new ConsultarAuditoria(auditoriaRepository),
   obtenerNotificacionesUseCase: new ObtenerNotificaciones(notificacionRepository),
   marcarNotificacionLeidaUseCase: new MarcarNotificacionLeida(notificacionRepository),
+  marcarTodasLasNotificacionesLeidasUseCase: new MarcarTodasLasNotificacionesLeidas(notificacionRepository),
+  eliminarNotificacionesUseCase: new EliminarNotificaciones(notificacionRepository),
   // Mejora 4 (Análisis de Datos General) — Fase 2: módulo nuevo y separado,
   // sin ninguna dependencia de los repositorios/casos de uso de
   // vulnerabilidades de arriba.
@@ -202,5 +211,13 @@ export const container = {
   // Fase 5: mismo geradorDeInformes (GeneradorInformePDF) ya compartido con
   // generarInformeUseCase/generarResumenEjecutivoUseCase — un "documento de
   // datos" distinto (DatosInformeDataset), mismo generador PDF/Word.
-  generarInformeDatasetUseCase: new GenerarInformeDataset(sesionAnalisisStore, geradorDeInformes)
+  generarInformeDatasetUseCase: new GenerarInformeDataset(sesionAnalisisStore, geradorDeInformes, analistaRepository),
+  // "Restablecer datos": acción administrativa (requiereRol('administrador')
+  // en DatasetController.ts) — auditada igual que cualquier otro cambio de
+  // dataset (RF-94).
+  reiniciarDatasetUseCase: new ReiniciarDatasetConAuditoria(new ReiniciarDataset(vulnerabilidadRepository), auditoriaRepository),
+  // "Convertir link a Excel": reutiliza exactamente los mismos adaptadores de
+  // seguridad ya conectados arriba (descargadorDeArchivos, nvdApiClient) —
+  // no crea ninguna instancia nueva ni relaja ningún control de SSRF/allowlist.
+  convertirUrlAExcelUseCase: new ConvertirUrlAExcel(descargadorDeArchivos, nvdApiClient)
 };

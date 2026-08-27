@@ -16,7 +16,7 @@ export class GenerarInformeConAuditoria {
   ) {}
 
   async ejecutar(formato: 'pdf' | 'docx', analistaId: string): Promise<Buffer> {
-    const buffer = await this.usecase.ejecutar(formato);
+    const buffer = await this.usecase.ejecutar(formato, analistaId);
 
     await this.auditoriaRepository.registrar({
       usuario: analistaId,

@@ -15,7 +15,8 @@ function servicioDeNotificacionesFalso(): ServicioDeNotificaciones {
     notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
     notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
     notificarInformeListo: jest.fn().mockResolvedValue(undefined),
-    notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined)
+    notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
+  notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
   };
 }
 
@@ -30,6 +31,7 @@ describe('GenerarResumenEjecutivoConAuditoria', () => {
     const resultado = await decorator.ejecutar('analista-3');
 
     expect(resultado).toBe(buffer);
+    expect(usecase.ejecutar).toHaveBeenCalledWith('analista-3');
     expect(auditoriaRepository.registrar).toHaveBeenCalledWith(
       expect.objectContaining({ usuario: 'analista-3', accion: 'GenerarInforme', detalle: expect.stringContaining('Resumen ejecutivo') })
     );

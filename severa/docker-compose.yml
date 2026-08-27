@@ -35,6 +35,18 @@ services:
       # servicio (DNS interno de Compose), no para que el .env del host
       # tenga que saber que corre en Docker.
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/severa_dev
+      # Bug real reproducido en vivo (2026-07-20, cuenta real, no la
+      # sintética): subir mem_limit de 1.5g a 3g NO alcanzó por sí solo —
+      # V8 calcula su techo de heap por defecto como ~50% de la memoria del
+      # contenedor que ve (no del mem_limit real), así que sin esta
+      # variable el proceso seguía crasheando con "FATAL ERROR: Reached
+      # heap limit" a ~1535 MB (justo la mitad de 3g), aunque el contenedor
+      # tuviera 3 GB disponibles. --max-old-space-size fuerza el techo real
+      # a ~2.25 GB (75% de 3g), dejando margen para memoria fuera del heap
+      # de V8 (Buffers de exceljs/sharp, el pool de Postgres, etc.) antes de
+      # tocar el límite duro de 3g del contenedor (que si se alcanza, mata
+      # el proceso sin el mensaje de error de V8).
+      NODE_OPTIONS: --max-old-space-size=2560
     ports:
       - '3000:3000'
     # Corre las migraciones (idempotentes, ver scripts/migrate.js) antes de
@@ -43,6 +55,17 @@ services:
     # aparte en el Dockerfile.
     command: sh -c "npm run migrate && npm start"
     restart: unless-stopped
+    # 3g (2026-07-20, subido desde 1.5g — límite de "Análisis de Datos" a
+    # 100MB): medido en vivo, el lector de ese módulo (SheetJS, sin
+    # streaming — LectorDatasetGenerico.ts, deliberadamente separado del
+    # lector con streaming de importación de vulnerabilidades) usa ~1.8GB de
+    # heap real con un CSV de 100MB (896.219 filas). Con el límite viejo de
+    # 1.5g, un archivo de 100MB crasheaba el proceso entero — mismo patrón
+    # que ya rompió la exportación a Excel (ver ExportadorExcelAgrupado.ts).
+    # 3g da margen sobre ese pico medido sin dejar que un descontrol de
+    # memoria tumbe la máquina host entera: si se supera, Docker mata y
+    # reinicia el contenedor solo (restart: unless-stopped).
+    mem_limit: 3g
 
 volumes:
   postgres_data:

@@ -14,9 +14,15 @@ jest.mock('../../src/infrastructure/config/container', () => ({
       ejecutar: jest.fn().mockResolvedValue(['ID', 'CVE', 'Software', 'CVSS Score', 'Acceso Remoto'])
     },
     exportarDatasetValidadoUseCase: {
-      ejecutar: jest.fn().mockResolvedValue('CVE-2024-00001,9.8,Apache Log4j')
+      ejecutar: jest.fn().mockResolvedValue(Buffer.from('contenido-xlsx-falso'))
     },
     importarDatasetDesdeUrlUseCase: {
+      ejecutar: jest.fn()
+    },
+    reiniciarDatasetUseCase: {
+      ejecutar: jest.fn().mockResolvedValue({ eliminados: 0 })
+    },
+    convertirUrlAExcelUseCase: {
       ejecutar: jest.fn()
     }
   }
@@ -30,6 +36,10 @@ const app = createApp();
 
 function tokenPara(id: string): string {
   return jwt.sign({ sub: id, rol: 'analista' }, config.jwtSecret, { expiresIn: '1h' });
+}
+
+function tokenAdminPara(id: string): string {
+  return jwt.sign({ sub: id, rol: 'administrador' }, config.jwtSecret, { expiresIn: '1h' });
 }
 
 function conHttps(req: request.Test): request.Test {
@@ -165,12 +175,22 @@ describe('DatasetController — RF-17/RF-24 (Sprint 14)', () => {
     expect(res.status).toBe(400);
   });
 
-  test('GET /dataset/exportar devuelve el CSV del dataset validado', async () => {
-    const res = await conHttps(request(app).get('/dataset/exportar').set('Authorization', `Bearer ${token}`));
+  test('GET /dataset/exportar devuelve el .xlsx del dataset validado', async () => {
+    const res = await conHttps(
+      request(app)
+        .get('/dataset/exportar')
+        .set('Authorization', `Bearer ${token}`)
+        .buffer(true)
+        .parse((response, callback) => {
+          const chunks: Buffer[] = [];
+          response.on('data', (chunk: Buffer) => chunks.push(chunk));
+          response.on('end', () => callback(null, Buffer.concat(chunks)));
+        })
+    );
 
     expect(res.status).toBe(200);
-    expect(res.headers['content-type']).toContain('text/csv');
-    expect(res.text).toBe('CVE-2024-00001,9.8,Apache Log4j');
+    expect(res.headers['content-type']).toContain('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    expect(Buffer.compare(res.body, Buffer.from('contenido-xlsx-falso'))).toBe(0);
   });
 
   describe('POST /dataset/importar-url (Sprint 17)', () => {
@@ -196,7 +216,8 @@ describe('DatasetController — RF-17/RF-24 (Sprint 14)', () => {
       expect(res.body).toEqual({ importados: 5, rechazados: 0, errores: [] });
       expect(container.importarDatasetDesdeUrlUseCase.ejecutar).toHaveBeenCalledWith(
         'https://docs.google.com/spreadsheets/d/ID123/edit',
-        'analista-A'
+        'analista-A',
+        undefined
       );
     });
 
@@ -217,6 +238,101 @@ describe('DatasetController — RF-17/RF-24 (Sprint 14)', () => {
       const res = await conHttps(
         request(app)
           .post('/dataset/importar-url')
+          .set('Authorization', `Bearer ${token}`)
+          .send({ url: 'https://evil.example.com/malware.xlsx' })
+      );
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('Dominio no permitido: evil.example.com');
+    });
+  });
+
+  describe('DELETE /dataset/reiniciar ("Restablecer mis datos" — multi-tenancy, ya no requiere rol especial)', () => {
+    afterEach(() => {
+      (container.reiniciarDatasetUseCase.ejecutar as jest.Mock).mockClear();
+    });
+
+    test('cualquier analista autenticado (no solo administrador) puede restablecer SU propio catálogo', async () => {
+      (container.reiniciarDatasetUseCase.ejecutar as jest.Mock).mockResolvedValue({ eliminados: 12 });
+
+      const res = await conHttps(
+        request(app).delete('/dataset/reiniciar').set('Authorization', `Bearer ${token}`)
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ eliminados: 12 });
+      // 'analista-A' es el id embebido en `token` (ver tokenPara al inicio del archivo).
+      expect(container.reiniciarDatasetUseCase.ejecutar).toHaveBeenCalledWith('analista-A');
+    });
+
+    test('un administrador también puede restablecer el suyo (mismo camino, sin privilegio extra)', async () => {
+      (container.reiniciarDatasetUseCase.ejecutar as jest.Mock).mockResolvedValue({ eliminados: 150 });
+      const tokenAdmin = tokenAdminPara('admin-1');
+
+      const res = await conHttps(
+        request(app).delete('/dataset/reiniciar').set('Authorization', `Bearer ${tokenAdmin}`)
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ eliminados: 150 });
+      expect(container.reiniciarDatasetUseCase.ejecutar).toHaveBeenCalledWith('admin-1');
+    });
+
+    test('sin token, la ruta responde 401 sin invocar el caso de uso', async () => {
+      const res = await conHttps(request(app).delete('/dataset/reiniciar'));
+
+      expect(res.status).toBe(401);
+      expect(container.reiniciarDatasetUseCase.ejecutar).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /dataset/convertir-url-a-excel', () => {
+    afterEach(() => {
+      (container.convertirUrlAExcelUseCase.ejecutar as jest.Mock).mockReset();
+    });
+
+    test('con una url válida devuelve el .xlsx generado con el Content-Type correcto', async () => {
+      const bufferXlsx = Buffer.from('contenido-xlsx-falso');
+      (container.convertirUrlAExcelUseCase.ejecutar as jest.Mock).mockResolvedValue({ buffer: bufferXlsx, formato: 'xlsx' });
+
+      const res = await conHttps(
+        request(app)
+          .post('/dataset/convertir-url-a-excel')
+          .set('Authorization', `Bearer ${token}`)
+          .buffer(true)
+          .parse((response, callback) => {
+            const chunks: Buffer[] = [];
+            response.on('data', (chunk: Buffer) => chunks.push(chunk));
+            response.on('end', () => callback(null, Buffer.concat(chunks)));
+          })
+          .send({ url: 'https://docs.google.com/spreadsheets/d/ID123/edit' })
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      expect(Buffer.compare(res.body, bufferXlsx)).toBe(0);
+      expect(container.convertirUrlAExcelUseCase.ejecutar).toHaveBeenCalledWith(
+        'https://docs.google.com/spreadsheets/d/ID123/edit'
+      );
+    });
+
+    test('sin "url" en el body devuelve 400 sin invocar el caso de uso', async () => {
+      const res = await conHttps(
+        request(app).post('/dataset/convertir-url-a-excel').set('Authorization', `Bearer ${token}`).send({})
+      );
+
+      expect(res.status).toBe(400);
+      expect(container.convertirUrlAExcelUseCase.ejecutar).not.toHaveBeenCalled();
+    });
+
+    test('cuando el caso de uso rechaza (host/IP no permitido) responde 400 con el mensaje claro, no 500', async () => {
+      (container.convertirUrlAExcelUseCase.ejecutar as jest.Mock).mockRejectedValue(
+        new Error('Dominio no permitido: evil.example.com')
+      );
+
+      const res = await conHttps(
+        request(app)
+          .post('/dataset/convertir-url-a-excel')
           .set('Authorization', `Bearer ${token}`)
           .send({ url: 'https://evil.example.com/malware.xlsx' })
       );

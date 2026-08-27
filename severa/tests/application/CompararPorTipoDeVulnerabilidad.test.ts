@@ -16,6 +16,7 @@ describe('CompararPorTipoDeVulnerabilidad', () => {
 
     const repo: VulnerabilidadRepository = {
       guardar: jest.fn().mockResolvedValue(undefined),
+    guardarLote: jest.fn().mockResolvedValue(undefined),
       contar: jest.fn().mockResolvedValue(0),
       listar: jest.fn().mockResolvedValue(dataset),
       buscarPorCve: jest.fn().mockResolvedValue(null),
@@ -23,13 +24,15 @@ describe('CompararPorTipoDeVulnerabilidad', () => {
       filtrarPorSeveridad: jest.fn().mockResolvedValue([]),
       listarPorTipoAcceso: jest.fn().mockResolvedValue([]),
       listarPorTipoVulnerabilidad: jest.fn().mockImplementation(async (tipo) => dataset.filter((item) => item.tipoVulnerabilidad === tipo)),
+      listarSoftwareDisponible: jest.fn().mockResolvedValue([]),
       listarPorSoftware: jest.fn().mockResolvedValue([]),
       actualizarEstado: jest.fn().mockResolvedValue(undefined),
-      buscarConFiltros: jest.fn().mockResolvedValue([])
+      buscarConFiltros: jest.fn().mockResolvedValue([]),
+      eliminarTodas: jest.fn().mockResolvedValue(0)
     };
 
     const usecase = new CompararPorTipoDeVulnerabilidad(repo);
-    const resultado = await usecase.ejecutar('Log4Shell', 'RCE');
+    const resultado = await usecase.ejecutar('Log4Shell', 'RCE', 'analista-1');
 
     expect(resultado).toEqual({
       mediaA: 8.9,

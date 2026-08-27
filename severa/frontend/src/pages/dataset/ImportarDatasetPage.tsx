@@ -1,9 +1,23 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react';
-import { useDetectarColumnas, useImportarDataset, useImportarDatasetDesdeUrl } from '../../hooks/useDataset';
+import { useDetectarColumnas, useImportarDataset, useImportarDatasetDesdeUrl, useReiniciarDataset } from '../../hooks/useDataset';
 import { MensajeError } from '../../components/ui/MensajeError';
 import { Spinner } from '../../components/ui/Spinner';
+import { ConfirmModal } from '../../components/ui/ConfirmModal';
 import { mensajeDeError } from '../../utils/mensajeDeError';
+import { descargarArchivo } from '../../utils/descargarArchivo';
 import type { MapeoColumnas, ResumenImportacion } from '../../api/datasetService';
+import { TEXTO_AYUDA_LINK_DATASET } from '../../constants/textosImportacion';
+
+const MIME_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+function base64AArrayBuffer(base64: string): Uint8Array {
+  const binario = atob(base64);
+  const bytes = new Uint8Array(binario.length);
+  for (let i = 0; i < binario.length; i++) {
+    bytes[i] = binario.charCodeAt(i);
+  }
+  return bytes;
+}
 
 type Modo = 'archivo' | 'link';
 type CampoMapeable = keyof MapeoColumnas;
@@ -64,6 +78,15 @@ function ResumenDeImportacion({ resumen }: { resumen: ResumenImportacion }) {
             <li key={indice}>{error}</li>
           ))}
         </ul>
+      )}
+      {resumen.excelDescartadosBase64 && (
+        <button
+          type="button"
+          onClick={() => descargarArchivo(new Blob([base64AArrayBuffer(resumen.excelDescartadosBase64 as string)], { type: MIME_XLSX }), 'filas-descartadas.xlsx')}
+          className="mt-3 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-green-800 ring-1 ring-green-300 hover:bg-green-100 dark:bg-slate-800 dark:text-green-300 dark:ring-green-800 dark:hover:bg-slate-700"
+        >
+          Descargar filas rechazadas
+        </button>
       )}
     </div>
   );
@@ -132,6 +155,57 @@ function SelectorDeMapeo({
   );
 }
 
+// "Restablecer datos": solo visible para administradores — el chequeo real
+// es del backend (requiereRol('administrador'), DatasetController.ts); esto
+// es puramente cosmético, para no mostrarle a un analista normal un botón
+// que de todos modos le devolvería 403. Acción destructiva e irreversible:
+// exige un modal de confirmación explícito antes de ejecutar.
+function RestablecerDatosSection() {
+  const [mostrarModal, setMostrarModal] = useState(false);
+  const mutacionReiniciar = useReiniciarDataset();
+
+  const onConfirmar = () => {
+    mutacionReiniciar.mutate(undefined, {
+      onSuccess: () => setMostrarModal(false)
+    });
+  };
+
+  return (
+    <section className="space-y-3 rounded-lg border border-red-200 bg-red-50/50 p-6 shadow-sm dark:border-red-900/50 dark:bg-red-950/20">
+      <h2 className="text-base font-semibold text-red-900 dark:text-red-300">Restablecer mis datos</h2>
+      <p className="text-sm text-red-800 dark:text-red-400">
+        Elimina permanentemente todas TUS vulnerabilidades cargadas en SEVERA, para poder importar un dataset nuevo
+        sin arrastrar el anterior. Cada analista tiene su propio catálogo aislado — esto no afecta a otros usuarios.
+      </p>
+      <button
+        type="button"
+        onClick={() => setMostrarModal(true)}
+        className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+      >
+        Restablecer mis datos
+      </button>
+
+      {mutacionReiniciar.isError && <MensajeError mensaje={mensajeDeError(mutacionReiniciar.error)} />}
+      {mutacionReiniciar.isSuccess && (
+        <p className="rounded-md border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-800 dark:border-green-900/50 dark:bg-green-950/30 dark:text-green-300">
+          Se eliminaron {mutacionReiniciar.data.eliminados} vulnerabilidad(es) tuya(s). Tu catálogo quedó vacío.
+        </p>
+      )}
+
+      {mostrarModal && (
+        <ConfirmModal
+          titulo="¿Restablecer tus datos?"
+          mensaje="Esto eliminará permanentemente TUS vulnerabilidades cargadas. No afecta a otros usuarios. Esta acción no se puede deshacer. ¿Confirmás?"
+          textoConfirmar="Sí, eliminar todo lo mío"
+          confirmando={mutacionReiniciar.isPending}
+          onConfirmar={onConfirmar}
+          onCancelar={() => setMostrarModal(false)}
+        />
+      )}
+    </section>
+  );
+}
+
 // M-03 (RF-17). No maneja 401 acá: el interceptor global de httpClient
 // (ver AuthContext.tsx) fuerza logout + redirect a /login para cualquier
 // respuesta 401 de cualquier pantalla, sin necesidad de repetir esa lógica
@@ -189,7 +263,7 @@ export function ImportarDatasetPage() {
       <div>
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Importar dataset</h1>
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Subí un archivo .xlsx/.xls, o pegá un link de la API de NVD, Google Sheets o Dropbox (máx. 5 MB).
+          Subí un archivo .xlsx/.xls (máx. 5 MB), o pegá un link a un dataset público (máx. 1 GB).
         </p>
       </div>
 
@@ -248,10 +322,7 @@ export function ImportarDatasetPage() {
                 onChange={(evento) => setUrl(evento.target.value)}
                 className="campo-formulario mt-1 w-full"
               />
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Solo se aceptan links de nvd.nist.gov, Google Sheets (docs.google.com) o Dropbox — cualquier otro
-                dominio lo rechaza el backend.
-              </p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{TEXTO_AYUDA_LINK_DATASET}</p>
             </div>
             <button
               type="submit"
@@ -267,6 +338,8 @@ export function ImportarDatasetPage() {
           {mutacionUrl.isSuccess && <ResumenDeImportacion resumen={mutacionUrl.data} />}
         </>
       )}
+
+      <RestablecerDatosSection />
     </div>
   );
 }

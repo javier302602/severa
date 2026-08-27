@@ -11,7 +11,7 @@ export const vulnerabilidadRouter = express.Router();
 // devuelven vulnerabilidades (ver BusquedaController.ts), más los que solo
 // tiene sentido mostrar en el detalle de una.
 vulnerabilidadRouter.get('/:cve', async (req, res) => {
-  const vulnerabilidad = await container.consultarVulnerabilidadPorCveUseCase.ejecutar(req.params.cve);
+  const vulnerabilidad = await container.consultarVulnerabilidadPorCveUseCase.ejecutar(req.params.cve, req.analistaAutenticado!.id);
   if (!vulnerabilidad) {
     res.status(404).json({ error: 'Vulnerabilidad no encontrada' });
     return;
@@ -37,13 +37,13 @@ vulnerabilidadRouter.get('/', async (req, res) => {
   const severidad = typeof req.query.severidad === 'string' ? req.query.severidad : undefined;
 
   if (cvssMin !== undefined && cvssMax !== undefined) {
-    const resultados = await container.filtrarPorRangoCvssUseCase.ejecutar(cvssMin, cvssMax);
+    const resultados = await container.filtrarPorRangoCvssUseCase.ejecutar(cvssMin, cvssMax, req.analistaAutenticado!.id);
     res.json(resultados.map((item) => ({ cve: item.cve.valor, cvssScore: item.cvssScore.valor, software: item.descripcion })));
     return;
   }
 
   if (severidad) {
-    const resultados = await container.filtrarPorSeveridadUseCase.ejecutar(severidad);
+    const resultados = await container.filtrarPorSeveridadUseCase.ejecutar(severidad, req.analistaAutenticado!.id);
     res.json(resultados.map((item) => ({ cve: item.cve.valor, cvssScore: item.cvssScore.valor, software: item.descripcion })));
     return;
   }

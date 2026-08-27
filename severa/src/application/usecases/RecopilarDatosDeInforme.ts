@@ -1,6 +1,6 @@
 import { VulnerabilidadRepository } from '../ports/out/VulnerabilidadRepository';
 import { AuditoriaRepository } from '../ports/out/AuditoriaRepository';
-import { DatosInforme, ResumenEstadisticoInforme, FilaMuestraInforme } from '../ports/out/GeneradorDeInformes';
+import { DatosInforme, ResumenEstadisticoInforme, FilaMuestraInforme, AnexoDatasetInforme } from '../ports/out/GeneradorDeInformes';
 import {
   calcularMedia,
   calcularMediana,
@@ -10,7 +10,8 @@ import {
   calcularVarianzaMuestral,
   calcularDesviacionEstandarMuestral,
   calcularCoeficienteVariacion,
-  calcularResumenCincoNumeros
+  calcularResumenCincoNumeros,
+  ResumenCincoNumeros
 } from '../../domain/services/EstadisticaDescriptiva';
 import { generarTablaAgrupada, generarTablaSinAgrupar } from '../../domain/services/DistribucionFrecuencias';
 import { compararGrupos } from '../../domain/services/ComparadorDeCategorias';
@@ -36,6 +37,23 @@ const LIMITACIONES_CONOCIDAS: string[] = [
 ];
 
 const TAMANO_MUESTRA = 10;
+
+// Anexo A ("Dataset completo"): límite razonable para que el PDF/Word siga
+// siendo un documento manejable — más allá de esto, un dataset de miles de
+// filas generaría un anexo de cientos de páginas. Por debajo del límite se
+// listan TODAS las filas (dataset "completo" de verdad, no una muestra);
+// por encima, se recurre a la misma técnica de muestreo sistemático de
+// muestraRepresentativa (espaciado uniforme, no solo los primeros casos),
+// pero con este tamaño en vez de los 10 de MuestraDeRegistrosInforme.
+const LIMITE_ANEXO_DATASET_COMPLETO = 300;
+
+// Bug real (2026-07-19): calcularResumenCincoNumeros tira ValorEstadisticoError
+// sobre una lista vacía — un catálogo sin ninguna vulnerabilidad de un tipo de
+// acceso (ej. todo Remoto, cero Local) rompía TODO el informe/resumen. null
+// de ese lado en vez de tirar (mismo criterio que compararGrupos).
+function resumenCincoNumerosSeguro(scores: number[]): ResumenCincoNumeros | null {
+  return scores.length > 0 ? calcularResumenCincoNumeros(scores) : null;
+}
 
 function aFilaMuestra(vulnerabilidad: Vulnerabilidad): FilaMuestraInforme {
   return {
@@ -73,9 +91,11 @@ function muestraRepresentativa(vulnerabilidades: Vulnerabilidad[], tamano: numbe
 // informe).
 export async function recopilarDatosDeInforme(
   vulnerabilidadRepository: VulnerabilidadRepository,
-  auditoriaRepository: AuditoriaRepository
+  auditoriaRepository: AuditoriaRepository,
+  generadoPara: string,
+  analistaId: string
 ): Promise<DatosInforme> {
-  const vulnerabilidades = await vulnerabilidadRepository.listar();
+  const vulnerabilidades = await vulnerabilidadRepository.listar(analistaId);
   const scores = vulnerabilidades.map((item) => item.cvssScore.valor);
 
   const { q1, q3 } = calcularCuartiles(scores);
@@ -112,11 +132,30 @@ export async function recopilarDatosDeInforme(
     representativa: muestraRepresentativa(vulnerabilidades, TAMANO_MUESTRA).map(aFilaMuestra)
   };
 
+  const anexoDataset: AnexoDatasetInforme =
+    vulnerabilidades.length <= LIMITE_ANEXO_DATASET_COMPLETO
+      ? { filas: vulnerabilidades.map(aFilaMuestra), esMuestra: false, tamanoOriginal: vulnerabilidades.length }
+      : {
+          filas: muestraRepresentativa(vulnerabilidades, LIMITE_ANEXO_DATASET_COMPLETO).map(aFilaMuestra),
+          esMuestra: true,
+          tamanoOriginal: vulnerabilidades.length
+        };
+
   // Ver comentario en OrigenYCalidadDatosInforme (GeneradorDeInformes.ts):
   // es lo único que sobrevive de una importación más allá de su propia
   // respuesta HTTP — el conteo agregado, no el detalle por fila.
+  //
+  // registros_auditoria es GLOBAL por decisión de diseño (registro de
+  // sistema para que un administrador audite eventos de todos los
+  // analistas, no dato de negocio de uno solo — ver migración 006) — pero
+  // el informe SÍ es un documento del analista autenticado, así que acá se
+  // filtra por `usuario === analistaId` antes de elegir "el último import".
+  // Sin este filtro, el informe de un analista mostraría el último import
+  // de CUALQUIER analista del sistema — una fuga cross-tenant real, aunque
+  // la tabla subyacente sea intencionalmente global.
   const registrosAuditoria = await auditoriaRepository.listar();
-  const ultimoImport = registrosAuditoria.find((registro) => registro.accion === 'ImportarDataset') ?? null;
+  const ultimoImport =
+    registrosAuditoria.find((registro) => registro.accion === 'ImportarDataset' && registro.usuario === analistaId) ?? null;
   const origenYCalidad = {
     ultimoCambioRegistrado: ultimoImport
       ? { detalle: ultimoImport.detalle, fecha: ultimoImport.fechaHora, usuario: ultimoImport.usuario }
@@ -145,8 +184,8 @@ export async function recopilarDatosDeInforme(
     boxplotCvss: calcularResumenCincoNumeros(scores),
     histogramaAgrupado: generarDatosHistogramaAgrupado(scores),
     boxplotPorAcceso: {
-      remoto: calcularResumenCincoNumeros(remotos),
-      local: calcularResumenCincoNumeros(locales)
+      remoto: resumenCincoNumerosSeguro(remotos),
+      local: resumenCincoNumerosSeguro(locales)
     },
     dispersionCvssDias: {
       puntos: paresDispersión,
@@ -160,6 +199,7 @@ export async function recopilarDatosDeInforme(
 
   return {
     generadoEn: new Date(),
+    generadoPara,
     totalVulnerabilidades: vulnerabilidades.length,
     resumenEstadistico,
     distribucionFrecuencias,
@@ -170,6 +210,7 @@ export async function recopilarDatosDeInforme(
     muestraDeRegistros,
     origenYCalidad,
     limitacionesConocidas: LIMITACIONES_CONOCIDAS,
-    graficos
+    graficos,
+    anexoDataset
   };
 }

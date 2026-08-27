@@ -8,6 +8,7 @@ import { TipoAccesoValue } from '../../src/domain/value-objects/TipoAcceso';
 function repoFalso(vulnerabilidad: Vulnerabilidad | null): VulnerabilidadRepository {
   return {
     guardar: jest.fn().mockResolvedValue(undefined),
+    guardarLote: jest.fn().mockResolvedValue(undefined),
     contar: jest.fn().mockResolvedValue(0),
     listar: jest.fn().mockResolvedValue([]),
     buscarPorCve: jest.fn().mockResolvedValue(vulnerabilidad),
@@ -15,9 +16,11 @@ function repoFalso(vulnerabilidad: Vulnerabilidad | null): VulnerabilidadReposit
     filtrarPorSeveridad: jest.fn().mockResolvedValue([]),
     listarPorTipoAcceso: jest.fn().mockResolvedValue([]),
     listarPorTipoVulnerabilidad: jest.fn().mockResolvedValue([]),
+    listarSoftwareDisponible: jest.fn().mockResolvedValue([]),
     listarPorSoftware: jest.fn().mockResolvedValue([]),
     actualizarEstado: jest.fn().mockResolvedValue(undefined),
-    buscarConFiltros: jest.fn().mockResolvedValue([])
+    buscarConFiltros: jest.fn().mockResolvedValue([]),
+    eliminarTodas: jest.fn().mockResolvedValue(0)
   };
 }
 
@@ -27,17 +30,17 @@ describe('MarcarEnProcesoDeRemediacion', () => {
     const repo = repoFalso(vulnerabilidad);
     const usecase = new MarcarEnProcesoDeRemediacion(repo);
 
-    const resultado = await usecase.ejecutar('CVE-2021-44228');
+    const resultado = await usecase.ejecutar('CVE-2021-44228', 'analista-1');
 
     expect(resultado?.estadoRemediacion.valor).toBe('EnProceso');
-    expect(repo.actualizarEstado).toHaveBeenCalledWith('CVE-2021-44228', 'EnProceso', undefined);
+    expect(repo.actualizarEstado).toHaveBeenCalledWith('CVE-2021-44228', 'EnProceso', 'analista-1', undefined);
   });
 
   test('devuelve null si la vulnerabilidad no existe', async () => {
     const repo = repoFalso(null);
     const usecase = new MarcarEnProcesoDeRemediacion(repo);
 
-    const resultado = await usecase.ejecutar('CVE-9999-99999');
+    const resultado = await usecase.ejecutar('CVE-9999-99999', 'analista-1');
 
     expect(resultado).toBeNull();
     expect(repo.actualizarEstado).not.toHaveBeenCalled();

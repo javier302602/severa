@@ -16,6 +16,7 @@ describe('CompararPorTipoAcceso', () => {
 
     const repo: VulnerabilidadRepository = {
       guardar: jest.fn().mockResolvedValue(undefined),
+    guardarLote: jest.fn().mockResolvedValue(undefined),
       contar: jest.fn().mockResolvedValue(0),
       listar: jest.fn().mockResolvedValue(dataset),
       buscarPorCve: jest.fn().mockResolvedValue(null),
@@ -23,13 +24,15 @@ describe('CompararPorTipoAcceso', () => {
       filtrarPorSeveridad: jest.fn().mockResolvedValue([]),
       listarPorTipoAcceso: jest.fn().mockImplementation(async (tipoAcceso: 'Remoto' | 'Local') => dataset.filter((item) => item.tipoAcceso?.valor === tipoAcceso)),
       listarPorTipoVulnerabilidad: jest.fn().mockResolvedValue([]),
+      listarSoftwareDisponible: jest.fn().mockResolvedValue([]),
       listarPorSoftware: jest.fn().mockResolvedValue([]),
       actualizarEstado: jest.fn().mockResolvedValue(undefined),
-      buscarConFiltros: jest.fn().mockResolvedValue([])
+      buscarConFiltros: jest.fn().mockResolvedValue([]),
+      eliminarTodas: jest.fn().mockResolvedValue(0)
     };
 
     const usecase = new CompararPorTipoAcceso(repo);
-    const resultado = await usecase.ejecutar();
+    const resultado = await usecase.ejecutar('analista-1');
 
     expect(resultado).toEqual({
       mediaA: 8.9,

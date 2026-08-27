@@ -37,6 +37,7 @@ interface OpcionesPeticion {
   body?: unknown;
   esFormData?: boolean;
   query?: Record<string, string | number | undefined>;
+  signal?: AbortSignal;
 }
 
 function construirUrl(path: string, query?: Record<string, string | number | undefined>): string {
@@ -76,7 +77,7 @@ async function leerCuerpoDeRespuesta<T>(response: Response): Promise<T> {
 }
 
 async function peticion<T>(path: string, opciones: OpcionesPeticion = {}): Promise<T> {
-  const { method = 'GET', body, esFormData, query } = opciones;
+  const { method = 'GET', body, esFormData, query, signal } = opciones;
   const headers: Record<string, string> = {};
 
   const token = obtenerToken();
@@ -90,7 +91,8 @@ async function peticion<T>(path: string, opciones: OpcionesPeticion = {}): Promi
   const response = await fetch(construirUrl(path, query), {
     method,
     headers,
-    body: esFormData ? (body as FormData) : body !== undefined ? JSON.stringify(body) : undefined
+    body: esFormData ? (body as FormData) : body !== undefined ? JSON.stringify(body) : undefined,
+    signal
   });
 
   if (response.status === 401) {
@@ -107,11 +109,14 @@ async function peticion<T>(path: string, opciones: OpcionesPeticion = {}): Promi
 }
 
 export const httpClient = {
-  get: <T,>(path: string, query?: Record<string, string | number | undefined>) =>
-    peticion<T>(path, { method: 'GET', query }),
+  get: <T,>(path: string, query?: Record<string, string | number | undefined>, signal?: AbortSignal) =>
+    peticion<T>(path, { method: 'GET', query, signal }),
   post: <T,>(path: string, body?: unknown) => peticion<T>(path, { method: 'POST', body }),
   postForm: <T,>(path: string, formData: FormData) => peticion<T>(path, { method: 'POST', body: formData, esFormData: true }),
   put: <T,>(path: string, body?: unknown) => peticion<T>(path, { method: 'PUT', body }),
   patch: <T,>(path: string, body?: unknown) => peticion<T>(path, { method: 'PATCH', body }),
-  delete: <T,>(path: string) => peticion<T>(path, { method: 'DELETE' })
+  // body opcional (2026-07-20): "Eliminar seleccionadas" en notificaciones
+  // manda un array de ids en el body de un DELETE — hasta ahora ningún DELETE
+  // de la app lo necesitaba.
+  delete: <T,>(path: string, body?: unknown) => peticion<T>(path, { method: 'DELETE', body })
 };

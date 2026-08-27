@@ -1,3 +1,3 @@
 export interface ExportarDatasetValidadoUseCase {
-  ejecutar(): Promise<string>;
+  ejecutar(analistaId: string): Promise<Buffer>;
 }

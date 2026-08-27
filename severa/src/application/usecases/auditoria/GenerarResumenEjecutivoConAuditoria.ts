@@ -14,7 +14,7 @@ export class GenerarResumenEjecutivoConAuditoria {
   ) {}
 
   async ejecutar(analistaId: string): Promise<Buffer> {
-    const buffer = await this.usecase.ejecutar();
+    const buffer = await this.usecase.ejecutar(analistaId);
 
     await this.auditoriaRepository.registrar({
       usuario: analistaId,

@@ -67,7 +67,9 @@ export function CatalogoPage() {
     defaultValues: { cve: '', cvssMin: '', cvssMax: '', severidad: '', componente: '', estadoRemediacion: '' }
   });
 
-  const { data, isLoading, isError, error } = useBuscarVulnerabilidades(criteriosActivos);
+  const { data, isLoading, isError, error, hasNextPage, isFetchingNextPage, fetchNextPage } =
+    useBuscarVulnerabilidades(criteriosActivos);
+  const resultados = data?.pages.flat() ?? [];
 
   const onSubmit = (datos: DatosFiltro) => setCriteriosActivos(aCriterios(datos));
 
@@ -177,37 +179,52 @@ export function CatalogoPage() {
       {criteriosActivos === null && <EstadoVacio mensaje="Elegí al menos un filtro y presioná «Buscar» para ver resultados." />}
       {isLoading && <Spinner etiqueta="Buscando…" />}
       {isError && <MensajeError mensaje={mensajeDeError(error)} />}
-      {data && data.length === 0 && <EstadoVacio mensaje="No se encontraron vulnerabilidades con esos criterios." />}
+      {data && resultados.length === 0 && <EstadoVacio mensaje="No se encontraron vulnerabilidades con esos criterios." />}
 
-      {data && data.length > 0 && (
-        <table className="w-full overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm text-sm">
-          <thead className="bg-slate-50 dark:bg-slate-800/60 text-left text-slate-600 dark:text-slate-400">
-            <tr>
-              <th className="px-4 py-2">CVE</th>
-              <th className="px-4 py-2">Software</th>
-              <th className="px-4 py-2">CVSS</th>
-              <th className="px-4 py-2">Estado</th>
-              <th className="px-4 py-2">Fecha de carga</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((item) => (
-              <tr key={item.cve} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60">
-                <td className="px-4 py-2">
-                  <Link to={RUTAS.vulnerabilidadDetalle(item.cve)} className="font-medium text-slate-900 dark:text-slate-100 underline">
-                    {item.cve}
-                  </Link>
-                </td>
-                <td className="px-4 py-2">{item.software}</td>
-                <td className="px-4 py-2">{item.cvssScore.toFixed(1)}</td>
-                <td className="px-4 py-2">
-                  <BadgeEstadoRemediacion estado={item.estadoRemediacion} />
-                </td>
-                <td className="px-4 py-2 text-slate-600 dark:text-slate-400">{new Date(item.fechaCarga).toLocaleDateString()}</td>
+      {data && resultados.length > 0 && (
+        <>
+          <table className="w-full overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm text-sm">
+            <thead className="bg-slate-50 dark:bg-slate-800/60 text-left text-slate-600 dark:text-slate-400">
+              <tr>
+                <th className="px-4 py-2">CVE</th>
+                <th className="px-4 py-2">Software</th>
+                <th className="px-4 py-2">CVSS</th>
+                <th className="px-4 py-2">Estado</th>
+                <th className="px-4 py-2">Fecha de carga</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {resultados.map((item) => (
+                <tr key={item.cve} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60">
+                  <td className="px-4 py-2">
+                    <Link to={RUTAS.vulnerabilidadDetalle(item.cve)} className="font-medium text-slate-900 dark:text-slate-100 underline">
+                      {item.cve}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-2">{item.software}</td>
+                  <td className="px-4 py-2">{item.cvssScore.toFixed(1)}</td>
+                  <td className="px-4 py-2">
+                    <BadgeEstadoRemediacion estado={item.estadoRemediacion} />
+                  </td>
+                  <td className="px-4 py-2 text-slate-600 dark:text-slate-400">{new Date(item.fechaCarga).toLocaleDateString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {hasNextPage && (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="rounded-md border border-slate-300 dark:border-slate-600 px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50"
+              >
+                {isFetchingNextPage ? 'Cargando…' : `Cargar más (mostrando ${resultados.length})`}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -5,7 +5,7 @@ import { VulnerabilidadRepository } from '../ports/out/VulnerabilidadRepository'
 export class FiltrarPorRangoCvss implements FiltrarPorRangoCvssUseCase {
   constructor(private readonly vulnerabilidadRepository: VulnerabilidadRepository) {}
 
-  async ejecutar(cvssMin: number, cvssMax: number): Promise<Vulnerabilidad[]> {
-    return this.vulnerabilidadRepository.filtrarPorRangoCvss(cvssMin, cvssMax);
+  async ejecutar(cvssMin: number, cvssMax: number, analistaId: string): Promise<Vulnerabilidad[]> {
+    return this.vulnerabilidadRepository.filtrarPorRangoCvss(cvssMin, cvssMax, analistaId);
   }
 }

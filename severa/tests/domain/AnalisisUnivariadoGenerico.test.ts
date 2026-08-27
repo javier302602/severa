@@ -94,4 +94,18 @@ describe('AnalisisUnivariadoGenerico — Mejora 4 (Análisis de Datos General) F
     const bin15Enero = analisis.distribucion.find((fila) => fila.valor === '2024-01-15');
     expect(bin15Enero?.frecuenciaAbsoluta).toBe(2);
   });
+
+  // Bug real (mismo encontrado en GraficosEstadisticos/GeometriaDeGraficos,
+  // 2026-07-19): generarIntervalosAutomaticos usaba Math.min(...valores)/
+  // Math.max(...valores) — con una columna numérica de más de ~120k-130k
+  // filas (umbral real de argumentos por llamada de V8), esto lanzaba
+  // "RangeError: Maximum call stack size exceeded".
+  test('columna numérica con 200.000 filas no lanza (antes rompía por Math.min/max con spread)', () => {
+    const filas = Array.from({ length: 200_000 }, (_, i) => ({ valor: i % 1000 }));
+
+    expect(() => analizarColumnaUnivariado('valor', ['valor'], filas)).not.toThrow();
+
+    const analisis = analizarColumnaUnivariado('valor', ['valor'], filas) as AnalisisUnivariadoNumerico;
+    expect(analisis.valoresValidos).toBe(200_000);
+  });
 });

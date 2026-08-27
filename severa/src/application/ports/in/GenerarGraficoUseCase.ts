@@ -13,5 +13,10 @@ export type TipoGrafico =
   | 'topTipos';
 
 export interface GenerarGraficoUseCase {
-  ejecutar(tipo: TipoGrafico, opciones?: { limite?: number; formato?: 'svg' | 'json' | 'png' | 'pdf' }, vulnerabilidades?: Vulnerabilidad[]): Promise<unknown>;
+  ejecutar(
+    tipo: TipoGrafico,
+    analistaId: string,
+    opciones?: { limite?: number; formato?: 'svg' | 'json' | 'png' | 'pdf' },
+    vulnerabilidades?: Vulnerabilidad[]
+  ): Promise<unknown>;
 }

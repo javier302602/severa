@@ -5,6 +5,10 @@ export interface ResumenImportacion {
   importados: number;
   rechazados: number;
   errores: string[];
+  // .xlsx de las filas descartadas (columnas originales + "Motivo del
+  // rechazo"), en base64 — null si no hubo ninguna. Ver
+  // construirExcelDeRechazadas (backend, LectorExcelDataset.ts).
+  excelDescartadosBase64: string | null;
 }
 
 // Mapeo flexible de columnas: espejo de MapeoColumnas (LectorExcelDataset.ts,
@@ -45,6 +49,20 @@ export const datasetService = {
   // valida el dominio/IP (allowlist deny-by-default, ver DetectorDeTipoDeLink.ts
   // y DescargadorDeArchivosHttp.ts); el frontend no reimplementa nada de eso,
   // solo manda el string y muestra el error si el backend lo rechaza.
-  importarDesdeUrl: (url: string): Promise<ResumenImportacion> => httpClient.post('/dataset/importar-url', { url }),
-  exportar: (): Promise<string> => httpClient.get('/dataset/exportar')
+  importarDesdeUrl: (url: string, mapeoColumnas?: MapeoColumnas): Promise<ResumenImportacion> =>
+    httpClient.post('/dataset/importar-url', mapeoColumnas ? { url, mapeoColumnas } : { url }),
+  // Bug real reportado: la descarga era CSV plano — ahora es un .xlsx real
+  // agrupado por severidad, con color y celdas fusionadas por bloque.
+  exportar: (): Promise<Blob> => httpClient.get('/dataset/exportar'),
+  // "Restablecer datos": acción administrativa (el backend responde 403 si
+  // el analista no es administrador) — borra el catálogo completo de
+  // vulnerabilidades para poder cargar un dataset nuevo sin arrastrar el
+  // anterior. Irreversible.
+  reiniciar: (): Promise<{ eliminados: number }> => httpClient.delete('/dataset/reiniciar'),
+  // Sección Informes: convierte un link en un archivo descargable, sin
+  // importarlo al catálogo. Normalmente .xlsx — si el archivo origen excede
+  // el límite seguro de conversión (backend, ConvertirUrlAExcel.ts), se
+  // sirve el CSV original tal cual (httpClient devuelve texto, no Blob,
+  // para Content-Type text/csv — mismo criterio que exportar()).
+  convertirUrlAExcel: (url: string): Promise<Blob | string> => httpClient.post('/dataset/convertir-url-a-excel', { url })
 };

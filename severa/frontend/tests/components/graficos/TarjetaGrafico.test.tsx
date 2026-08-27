@@ -77,6 +77,6 @@ describe('TarjetaGrafico', () => {
     render(<TarjetaGrafico tipo="topSoftware" titulo="Top 10 software" limite={10} />, { wrapper: EnvoltorioQuery });
 
     expect(screen.getByText('Top 10 software')).toBeInTheDocument();
-    await waitFor(() => expect(graficoService.obtener).toHaveBeenCalledWith('topSoftware', 10));
+    await waitFor(() => expect(graficoService.obtener).toHaveBeenCalledWith('topSoftware', 10, expect.any(AbortSignal)));
   });
 });

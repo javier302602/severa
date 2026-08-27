@@ -20,7 +20,7 @@ graficoRouter.get('/:tipo', async (req, res) => {
   const limite = req.query.limite ? Number(req.query.limite) : undefined;
 
   try {
-    const resultado = await container.generarGraficoUseCase.ejecutar(tipo, { limite, formato });
+    const resultado = await container.generarGraficoUseCase.ejecutar(tipo, req.analistaAutenticado!.id, { limite, formato });
 
     // RF-61: la conversión real a PNG/PDF no está implementada (ver
     // SvgGraficosAdapter.generarSvgPendiente) — el Content-Type SIEMPRE

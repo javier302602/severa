@@ -222,10 +222,15 @@ export function dibujarBoxplot(doc: PDFKit.PDFDocument, resumen: ResumenCincoNum
   return offsetY + lienzo.alto + 10;
 }
 
+// resumen: null (2026-07-19, bug real): un catálogo sin ninguna vulnerabilidad
+// de un tipo de acceso (ej. todo Remoto, cero Local) ya no tiene un
+// ResumenCincoNumeros para ese lado — en vez de romper el informe entero
+// (ver RecopilarDatosDeInforme.resumenCincoNumerosSeguro), ese lado se
+// dibuja como un aviso de texto en vez de un boxplot.
 export function dibujarBoxplotDoble(
   doc: PDFKit.PDFDocument,
-  grupoA: { etiqueta: string; resumen: ResumenCincoNumeros },
-  grupoB: { etiqueta: string; resumen: ResumenCincoNumeros },
+  grupoA: { etiqueta: string; resumen: ResumenCincoNumeros | null },
+  grupoB: { etiqueta: string; resumen: ResumenCincoNumeros | null },
   opciones: OpcionesGrafico
 ): number {
   const y0 = dibujarTitulo(doc, doc.y, opciones.titulo);
@@ -236,10 +241,29 @@ export function dibujarBoxplotDoble(
   const lienzo: Lienzo = { ancho: anchoMitad, alto, margen };
   const offsetY = doc.y;
 
-  dibujarUnBoxplot(doc, grupoA.resumen, lienzo, 0, offsetY, opciones.etiquetaEjeY, grupoA.etiqueta);
-  dibujarUnBoxplot(doc, grupoB.resumen, lienzo, anchoMitad, offsetY, undefined, grupoB.etiqueta);
+  dibujarLadoDeBoxplotOAviso(doc, grupoA.resumen, lienzo, 0, offsetY, opciones.etiquetaEjeY, grupoA.etiqueta);
+  dibujarLadoDeBoxplotOAviso(doc, grupoB.resumen, lienzo, anchoMitad, offsetY, undefined, grupoB.etiqueta);
 
   return offsetY + lienzo.alto + 10;
+}
+
+function dibujarLadoDeBoxplotOAviso(
+  doc: PDFKit.PDFDocument,
+  resumen: ResumenCincoNumeros | null,
+  lienzo: Lienzo,
+  offsetX: number,
+  offsetY: number,
+  etiquetaEjeY: string | undefined,
+  etiquetaGrupo: string
+): void {
+  if (resumen === null) {
+    doc
+      .fontSize(9)
+      .fillColor(COLOR_TEXTO_SECUNDARIO)
+      .text(`${etiquetaGrupo}: sin datos`, doc.page.margins.left + offsetX, offsetY + lienzo.alto / 2, { width: lienzo.ancho, align: 'center' });
+    return;
+  }
+  dibujarUnBoxplot(doc, resumen, lienzo, offsetX, offsetY, etiquetaEjeY, etiquetaGrupo);
 }
 
 function dibujarUnBoxplot(

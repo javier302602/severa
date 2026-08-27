@@ -1,6 +1,6 @@
 import { CvssScore } from '../value-objects/CvssScore';
 import { clasificar } from './ClasificadorDeRiesgo';
-import { ComparacionGrupos } from './ComparadorDeCategorias';
+import { ComparacionGrupos, formatearEstadistico } from './ComparadorDeCategorias';
 import { EntradaRanking, estimarPlazoRecomendado } from './MotorDePriorizacion';
 
 // RF-81: genera texto, no un cálculo numérico puro, pero se deja en el
@@ -50,12 +50,25 @@ export function interpretarDispersion(coeficienteVariacion: number): string {
 }
 
 export function interpretarComparacionAcceso(comparacion: ComparacionGrupos): string {
-  const diferencia = Math.abs(comparacion.diferenciaMedias);
+  // Un lado sin datos (catálogo sin ninguna vulnerabilidad Remota o Local)
+  // ya no rompe todo el informe (ver comentario en ComparadorDeCategorias.
+  // compararGrupos) — se informa la ausencia en vez de comparar contra null.
+  if (comparacion.mediaA === null || comparacion.mediaB === null) {
+    const ladoConDatos = comparacion.mediaA !== null ? 'remoto' : comparacion.mediaB !== null ? 'local' : null;
+    if (ladoConDatos === null) {
+      return 'No hay vulnerabilidades de acceso remoto ni local registradas para comparar.';
+    }
+    return `Solo hay datos de severidad para el acceso ${ladoConDatos} (media ${formatearEstadistico(
+      ladoConDatos === 'remoto' ? comparacion.mediaA : comparacion.mediaB
+    )}); no hay vulnerabilidades del otro tipo de acceso para comparar.`;
+  }
+
+  const diferencia = Math.abs(comparacion.diferenciaMedias!);
   if (diferencia < 0.05) {
     return `La severidad promedio entre vulnerabilidades de acceso remoto (${comparacion.mediaA.toFixed(2)}) y local (${comparacion.mediaB.toFixed(2)}) es prácticamente igual.`;
   }
 
-  const esRemoto = comparacion.diferenciaMedias > 0;
+  const esRemoto = comparacion.diferenciaMedias! > 0;
   const masGrave = esRemoto ? 'remoto' : 'local';
   const masGravePlural = esRemoto ? 'remotos' : 'locales';
   return `Las vulnerabilidades de acceso ${masGrave} presentan, en promedio, una severidad ${diferencia.toFixed(2)} puntos mayor ` +

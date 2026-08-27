@@ -1,17 +1,12 @@
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
-import { randomUUID } from 'crypto';
-import { ImportarDatasetConAuditoria } from './auditoria/ImportarDatasetConAuditoria';
 import { SincronizarConApiNvdUseCase } from '../ports/in/SincronizarConApiNvdUseCase';
-import { LectorExcelDataset } from '../../infrastructure/adapters/out/dataset/LectorExcelDataset';
+import { ResumenImportacion } from '../ports/in/ImportarDatasetUseCase';
+import { ImportarDatasetConAuditoria } from './auditoria/ImportarDatasetConAuditoria';
 import { NvdApiClient } from '../ports/out/NvdApiClient';
 import { ServicioDeNotificaciones } from '../ports/out/ServicioDeNotificaciones';
 
 export class SincronizarConApiNvd implements SincronizarConApiNvdUseCase {
   constructor(
     private readonly nvdApiClient: NvdApiClient,
-    private readonly lectorExcel: LectorExcelDataset,
     // RF-94: antes este caso de uso instanciaba su propio `new ImportarDataset(...)`
     // sin envolver, así que una sincronización con NVD cambiaba el dataset sin
     // dejar rastro de auditoría (hueco reportado en M-12). Recibe la versión ya
@@ -23,22 +18,17 @@ export class SincronizarConApiNvd implements SincronizarConApiNvdUseCase {
     private readonly servicioDeNotificaciones: ServicioDeNotificaciones
   ) {}
 
-  async ejecutar(analistaId: string): Promise<{ importados: number; rechazados: number; errores: string[] }> {
-    const buffer = await this.nvdApiClient.descargarDataset();
-    // Nombre único (mismo patrón que DatasetController, Sprint 14): un
-    // nombre fijo aquí significaba que dos sincronizaciones concurrentes se
-    // pisarían el archivo temporal entre sí (hueco reportado al cerrar RF-17).
-    const tempPath = path.join(os.tmpdir(), `severa-nvd-sync-${randomUUID()}.xlsx`);
-    fs.writeFileSync(tempPath, buffer);
+  async ejecutar(analistaId: string, url: string): Promise<ResumenImportacion> {
+    // NvdApiClient ya devuelve {importables, rechazadas} parseado desde el
+    // JSON real de NVD (ver ParseadorRespuestaNvd) — ya no hace falta pasar
+    // por un archivo temporal ni por LectorExcelDataset (eso era solo
+    // necesario cuando esta clase asumía, incorrectamente, que la API
+    // devolvía un .xlsx). url: la URL exacta pegada por el usuario, ya
+    // validada por DetectorDeTipoDeLink — nunca una reconstruida acá.
+    const resultado = await this.nvdApiClient.descargarDataset(url);
+    const resumen = await this.importarDatasetUseCase.ejecutar(resultado, analistaId);
+    await this.servicioDeNotificaciones.notificarActualizacionDisponible(analistaId, resumen);
 
-    try {
-      const resultado = await this.lectorExcel.leerArchivo(tempPath);
-      const resumen = await this.importarDatasetUseCase.ejecutar(resultado, analistaId);
-      await this.servicioDeNotificaciones.notificarActualizacionDisponible(analistaId, resumen);
-
-      return resumen;
-    } finally {
-      fs.unlink(tempPath, () => {});
-    }
+    return resumen;
   }
 }

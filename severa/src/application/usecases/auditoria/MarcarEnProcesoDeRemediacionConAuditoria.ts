@@ -14,7 +14,7 @@ export class MarcarEnProcesoDeRemediacionConAuditoria {
   ) {}
 
   async ejecutar(cve: string, analistaId: string): Promise<Vulnerabilidad | null> {
-    const resultado = await this.usecase.ejecutar(cve);
+    const resultado = await this.usecase.ejecutar(cve, analistaId);
 
     if (resultado) {
       await this.auditoriaRepository.registrar({

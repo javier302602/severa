@@ -8,7 +8,9 @@ describe('ObtenerNotificaciones', () => {
     const notificacionRepository: NotificacionRepository = {
       guardar: jest.fn().mockResolvedValue(undefined),
       listarPorAnalista: jest.fn().mockResolvedValue(notificaciones),
-      marcarComoLeida: jest.fn().mockResolvedValue(true)
+      marcarComoLeida: jest.fn().mockResolvedValue(true),
+    marcarTodasComoLeidas: jest.fn().mockResolvedValue(0),
+    eliminarVarias: jest.fn().mockResolvedValue(0)
     };
 
     const usecase = new ObtenerNotificaciones(notificacionRepository);

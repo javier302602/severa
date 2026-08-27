@@ -6,8 +6,8 @@ import { generarTablaAgrupada, generarTablaSinAgrupar } from '../../domain/servi
 export class GenerarDistribucionFrecuencias implements GenerarDistribucionFrecuenciasUseCase {
   constructor(private readonly vulnerabilidadRepository: VulnerabilidadRepository) {}
 
-  async ejecutar(tipo: 'agrupada' | 'sinAgrupar', vulnerabilidades?: Vulnerabilidad[]): Promise<unknown> {
-    const lista = vulnerabilidades ?? await this.vulnerabilidadRepository.listar();
+  async ejecutar(tipo: 'agrupada' | 'sinAgrupar', analistaId: string, vulnerabilidades?: Vulnerabilidad[]): Promise<unknown> {
+    const lista = vulnerabilidades ?? await this.vulnerabilidadRepository.listar(analistaId);
     const scores = lista.map((item) => item.cvssScore.valor);
 
     if (tipo === 'agrupada') {

@@ -1,4 +1,5 @@
-import { Document, Packer, Paragraph, HeadingLevel, Table, TableRow, TableCell, TextRun, WidthType } from 'docx';
+import { Document, Packer, Paragraph, HeadingLevel, Table, TableRow, TableCell, TextRun, WidthType, TableOfContents, ImageRun, AlignmentType } from 'docx';
+import { generarImagenesDeGraficosInforme, ANCHO_IMAGEN_GRAFICO, ALTO_IMAGEN_GRAFICO } from './RasterizadorDeGraficosWord';
 import { DatosInforme, DatosInformeDataset } from '../../../../application/ports/out/GeneradorDeInformes';
 import {
   interpretarComposicionDataset,
@@ -12,12 +13,34 @@ import {
   interpretarPastelSeveridad,
   interpretarBoxplotCvss,
   interpretarHistogramaAgrupado,
-  interpretarCvssPorAcceso,
   interpretarDispersionCvssDias,
   interpretarHistogramaDiasParche,
   interpretarTopTipos,
   interpretarTopSoftware
 } from '../../../../domain/services/InterpretacionDeGraficos';
+import { interpretarComparacionAcceso } from '../../../../domain/services/InterpretadorDeResultados';
+import { formatearEstadistico } from '../../../../domain/services/ComparadorDeCategorias';
+import type { ResumenCincoNumeros } from '../../../../domain/services/EstadisticaDescriptiva';
+
+// resumen: null (2026-07-19, bug real): un catálogo sin ninguna vulnerabilidad
+// de un tipo de acceso (ej. todo Remoto, cero Local) ya no tiene un
+// ResumenCincoNumeros para ese lado (ver RecopilarDatosDeInforme.
+// resumenCincoNumerosSeguro) — la fila queda con "sin datos" en vez de
+// romper la generación del .docx entero.
+function filaResumenCincoNumeros(etiqueta: string, resumen: ResumenCincoNumeros | null): string[] {
+  if (resumen === null) {
+    return [etiqueta, 'sin datos', 'sin datos', 'sin datos', 'sin datos', 'sin datos', 'sin datos'];
+  }
+  return [
+    etiqueta,
+    resumen.minimo.toFixed(2),
+    resumen.q1.toFixed(2),
+    resumen.mediana.toFixed(2),
+    resumen.q3.toFixed(2),
+    resumen.maximo.toFixed(2),
+    resumen.media.toFixed(2)
+  ];
+}
 
 // RF-78: genera el .docx real con la librería "docx". No implementa
 // GeneradorDeInformes directamente: es un colaborador interno que
@@ -25,19 +48,35 @@ import {
 // puerto (así el archivo queda separado por formato, como se pidió).
 //
 // Fase 1 (retrofit): misma estructura de contenido que GeneradorInformePDF.ts
-// (mapeo confirmado contra el .qmd de referencia), con UNA diferencia real:
-// la librería "docx" no tiene ninguna API de dibujo vectorial (solo puede
-// insertar imágenes ya renderizadas vía ImageRun, o texto/tablas) — a
-// diferencia de pdfkit, que sí permite pintar rect/line/path directamente.
-// Decisión confirmada: en vez de agregar una dependencia nueva de
-// rasterizado SVG→PNG solo para esto, cada gráfico queda con su misma
-// estructura de 6 bloques y su tabla de datos subyacente, pero con una nota
-// explícita en vez de la imagen — el PDF es la versión con los gráficos
-// dibujados.
+// (mapeo confirmado contra el .qmd de referencia). La librería "docx" no
+// tiene ninguna API de dibujo vectorial (solo puede insertar imágenes ya
+// renderizadas vía ImageRun, o texto/tablas) — a diferencia de pdfkit, que sí
+// permite pintar rect/line/path directamente. Bug real reportado: esto
+// dejaba cada gráfico solo con su tabla de datos y una nota, sin imagen —
+// corregido rasterizando las mismas funciones SVG que ya sirven /graficos/:tipo
+// en pantalla (ver RasterizadorDeGraficosWord.ts, agrega "sharp" como
+// dependencia nueva, confirmada con el usuario).
+// Formato APA 7 (2026-07-20): fuente Times New Roman 12pt (24 en
+// "half-points", la unidad que usa docx) para el cuerpo, interlineado 1.5
+// (line: 360 = 1.5 × 240, donde 240 es "un renglón" en docx) y un espacio
+// después de cada párrafo. Los márgenes de 1 pulgada van en `sections.properties.page.margin`
+// de cada Document (1440 twips = 1 pulgada), no acá.
+const ESTILOS_APA7 = {
+  default: {
+    document: {
+      run: { font: 'Times New Roman', size: 24 },
+      paragraph: { spacing: { line: 360, after: 200 } }
+    }
+  }
+};
+
+const MARGEN_APA7_TWIPS = 1440; // 1 pulgada = 1440 twips (unidad de docx)
+
 export class GeneradorInformeWord {
   async generar(datos: DatosInforme): Promise<Buffer> {
     const documento = new Document({
-      sections: [{ children: construirContenido(datos) }]
+      styles: ESTILOS_APA7,
+      sections: [{ properties: { page: { margin: { top: MARGEN_APA7_TWIPS, bottom: MARGEN_APA7_TWIPS, left: MARGEN_APA7_TWIPS, right: MARGEN_APA7_TWIPS } } }, children: await construirContenido(datos) }]
     });
 
     return Packer.toBuffer(documento);
@@ -47,7 +86,8 @@ export class GeneradorInformeWord {
   // de datos" distinto — ver DatosInformeDataset en GeneradorDeInformes.ts.
   async generarDataset(datos: DatosInformeDataset): Promise<Buffer> {
     const documento = new Document({
-      sections: [{ children: construirContenidoDataset(datos) }]
+      styles: ESTILOS_APA7,
+      sections: [{ properties: { page: { margin: { top: MARGEN_APA7_TWIPS, bottom: MARGEN_APA7_TWIPS, left: MARGEN_APA7_TWIPS, right: MARGEN_APA7_TWIPS } } }, children: construirContenidoDataset(datos) }]
     });
 
     return Packer.toBuffer(documento);
@@ -61,10 +101,18 @@ function nivelDeRiesgoDesdeCvss(cvss: number): string {
   return 'Bajo';
 }
 
+// Bug real reportado: las tablas no tenían bordes visibles. BORDE_CELDA se
+// aplica a las 4 caras de cada celda (docx no hereda un borde "de tabla" a
+// las celdas si no se lo pasa explícito a cada una).
+const BORDE_CELDA = { style: 'single' as const, size: 4, color: '94A3B8' };
+const BORDES_DE_CELDA = { top: BORDE_CELDA, bottom: BORDE_CELDA, left: BORDE_CELDA, right: BORDE_CELDA };
+
 function celda(texto: string, encabezado = false): TableCell {
   return new TableCell({
-    children: [new Paragraph({ children: [new TextRun({ text: texto, bold: encabezado })] })],
-    width: { size: 100, type: WidthType.PERCENTAGE }
+    children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [new TextRun({ text: texto, bold: encabezado })] })],
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: BORDES_DE_CELDA,
+    shading: encabezado ? { fill: 'E2E8F0' } : undefined
   });
 }
 
@@ -78,12 +126,42 @@ function tabla(encabezados: string[], filas: string[][]): Table {
   });
 }
 
-function heading(texto: string, nivel: (typeof HeadingLevel)[keyof typeof HeadingLevel]): Paragraph {
-  return new Paragraph({ text: texto, heading: nivel });
+function heading(texto: string, nivel: (typeof HeadingLevel)[keyof typeof HeadingLevel], saltoDePaginaAntes = false): Paragraph {
+  return new Paragraph({ text: texto, heading: nivel, pageBreakBefore: saltoDePaginaAntes });
 }
 
 function texto(contenido: string): Paragraph {
   return new Paragraph({ text: contenido });
+}
+
+// TableOfContents (ver indice() más abajo) es un FileChild como Paragraph y
+// Table, pero no un subtipo de ninguno de los dos — se necesita esta unión
+// para que las listas de contenido de la sección puedan incluir los tres.
+type ElementoDocumento = Paragraph | Table | TableOfContents;
+
+// Índice: a diferencia del PDF (que puede calcular la página real de cada
+// capítulo con bufferPages, ver GeneradorInformePDF.ts), .docx no tiene forma
+// de saber en qué página cae un heading hasta que Word abre el archivo y
+// compone el layout con sus propias fuentes/tamaño de papel — por eso esto
+// es un CAMPO (field code), no texto ya calculado: Word lo rellena solo al
+// abrir el documento (o al presionar F9/"Actualizar campo" si ya estaba
+// abierto). headingStyleRange '1-1' limita el índice a los headings de nivel
+// 1 (los capítulos numerados), igual que el índice del PDF, que tampoco
+// lista subsecciones.
+function indice(): ElementoDocumento[] {
+  return [
+    new Paragraph({ text: 'Índice', heading: HeadingLevel.HEADING_1 }),
+    new TableOfContents('Índice', { hyperlink: true, headingStyleRange: '1-1' })
+  ];
+}
+
+// Celda genérica para el Anexo A del informe de dataset: los valores de un
+// dataset arbitrario pueden ser de cualquier tipo (number/string/Date/null),
+// mismo criterio de normalización que celdaComoTexto() en GeneradorInformePDF.ts.
+function celdaGenericaComoTexto(valor: unknown): string {
+  if (valor === null || valor === undefined || valor === '') return '—';
+  if (valor instanceof Date) return valor.toLocaleDateString();
+  return String(valor);
 }
 
 interface DefinicionGraficoWord {
@@ -96,7 +174,7 @@ interface DefinicionGraficoWord {
   analisis: string;
 }
 
-function construirContenido(datos: DatosInforme): Array<Paragraph | Table> {
+async function construirContenido(datos: DatosInforme): Promise<Array<ElementoDocumento>> {
   const r = datos.resumenEstadistico;
   const suma = r.media * datos.totalVulnerabilidades;
   const remotoVsLocal = datos.comparacionAccesoRemotoLocal;
@@ -109,13 +187,16 @@ function construirContenido(datos: DatosInforme): Array<Paragraph | Table> {
 
   const ultimo = datos.origenYCalidad.ultimoCambioRegistrado;
 
-  const contenido: Array<Paragraph | Table> = [
+  const contenido: Array<ElementoDocumento> = [
     new Paragraph({ text: 'Informe SEVERA — Análisis Estadístico de Vulnerabilidades', heading: HeadingLevel.TITLE }),
+    new Paragraph({ children: [new TextRun({ text: `Generado por SEVERA para ${datos.generadoPara}`, bold: true, size: 24 })] }),
     texto(`Generado: ${datos.generadoEn.toLocaleString()}`),
     texto(`Total de vulnerabilidades analizadas: ${datos.totalVulnerabilidades}`),
 
+    ...indice(),
+
     // 1. Introducción
-    heading('1. Introducción', HeadingLevel.HEADING_1),
+    heading('1. Introducción', HeadingLevel.HEADING_1, true),
     texto(
       `Este informe aplica técnicas de estadística descriptiva sobre el conjunto de ${datos.totalVulnerabilidades} ` +
         'vulnerabilidades de seguridad actualmente cargadas en SEVERA, con el fin de caracterizar su severidad ' +
@@ -215,17 +296,37 @@ function construirContenido(datos: DatosInforme): Array<Paragraph | Table> {
       ])
     ),
 
-    // 8. Gráficos (sin imagen — ver nota en el comentario de esta clase)
+    // 8. Gráficos — con imagen real (ver RasterizadorDeGraficosWord.ts)
     heading('8. Gráficos explicados en detalle', HeadingLevel.HEADING_1),
-    texto('Los 10 gráficos de esta sección están disponibles con su dibujo real en la versión PDF de este informe. Acá se incluye la misma explicación de 6 bloques y la tabla de datos subyacente de cada uno.')
+    texto('Cada gráfico de esta sección incluye su dibujo, un epígrafe, la explicación de 6 bloques y la tabla de datos subyacente.')
   ];
 
-  construirDefinicionesGraficosWord(datos).forEach((definicion) => {
+  const imagenes = await generarImagenesDeGraficosInforme(datos);
+
+  construirDefinicionesGraficosWord(datos).forEach((definicion, indice) => {
     contenido.push(heading(`8.${definicion.numero} Gráfico ${definicion.numero}: ${definicion.titulo}`, HeadingLevel.HEADING_2));
     contenido.push(new Paragraph({ children: [new TextRun({ text: 'Objetivo del gráfico: ', bold: true }), new TextRun(definicion.objetivo)] }));
     contenido.push(new Paragraph({ children: [new TextRun({ text: 'Fundamento estadístico: ', bold: true }), new TextRun(definicion.fundamento)] }));
     contenido.push(new Paragraph({ children: [new TextRun({ text: 'Relación con secciones anteriores: ', bold: true }), new TextRun(definicion.relacion)] }));
-    contenido.push(texto('Gráfico N disponible en la versión PDF de este informe.'));
+    contenido.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new ImageRun({
+            type: 'png',
+            data: imagenes[indice],
+            transformation: { width: ANCHO_IMAGEN_GRAFICO, height: ALTO_IMAGEN_GRAFICO }
+          })
+        ]
+      })
+    );
+    // Epígrafe (caption) — RF pedido explícitamente: "Gráfico X: [Título]".
+    contenido.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: `Gráfico ${definicion.numero}: ${definicion.titulo}`, italics: true, size: 18 })]
+      })
+    );
     contenido.push(definicion.tablaDatos);
     contenido.push(new Paragraph({ children: [new TextRun({ text: 'Análisis de resultados y conclusiones: ', bold: true }), new TextRun(definicion.analisis)] }));
   });
@@ -235,7 +336,7 @@ function construirContenido(datos: DatosInforme): Array<Paragraph | Table> {
     heading('9. Aplicación práctica: priorización de remediación', HeadingLevel.HEADING_1),
     texto(`¿Cuál es el nivel típico de riesgo? Media CVSS = ${r.media.toFixed(2)}, mediana = ${r.mediana.toFixed(2)} — riesgo "${nivelDeRiesgoDesdeCvss(r.media)}".`),
     texto(`¿Qué proporción requiere atención urgente? ${criticasYAltas} de ${datos.totalVulnerabilidades} (${porcentajeUrgente.toFixed(1)}%) son Crítica o Alta.`),
-    texto(`¿Influye el acceso remoto? Media remoto = ${remotoVsLocal.mediaA.toFixed(2)}, local = ${remotoVsLocal.mediaB.toFixed(2)} (diferencia ${remotoVsLocal.diferenciaMedias.toFixed(2)}).`),
+    texto(`¿Influye el acceso remoto? Media remoto = ${formatearEstadistico(remotoVsLocal.mediaA)}, local = ${formatearEstadistico(remotoVsLocal.mediaB)} (diferencia ${formatearEstadistico(remotoVsLocal.diferenciaMedias)}).`),
     texto(
       g.histogramaDiasParche.bins.length === 0
         ? '¿Cuánto toma disponer de un parche? No hay vulnerabilidades con ese dato registrado.'
@@ -270,7 +371,38 @@ function construirContenido(datos: DatosInforme): Array<Paragraph | Table> {
     // 11. Referencias
     heading('11. Referencias', HeadingLevel.HEADING_1),
     texto('FIRST — Forum of Incident Response and Security Teams. Common Vulnerability Scoring System (CVSS), versión 3.1. https://www.first.org/cvss/'),
-    texto('National Institute of Standards and Technology. National Vulnerability Database (NVD). https://nvd.nist.gov/')
+    texto('National Institute of Standards and Technology. National Vulnerability Database (NVD). https://nvd.nist.gov/'),
+
+    // 12. Anexos — mismo contenido que dibujarAnexos() en GeneradorInformePDF.ts.
+    heading('12. Anexos', HeadingLevel.HEADING_1),
+    texto(
+      'Material de respaldo que sustenta los resultados del informe: el dataset completo (o una muestra ' +
+        'representativa si excede el límite razonable de este anexo), la tabla de frecuencias sin agrupar íntegra y ' +
+        'el índice de las figuras generadas.'
+    ),
+    heading('Anexo A: Dataset completo', HeadingLevel.HEADING_2),
+    texto(
+      datos.anexoDataset.esMuestra
+        ? `El dataset completo tiene ${datos.anexoDataset.tamanoOriginal} registros, más de lo que este anexo puede ` +
+          `listar de forma legible. Se muestran ${datos.anexoDataset.filas.length} registros seleccionados por ` +
+          'muestreo sistemático (espaciado uniforme sobre el total).'
+        : `Se listan los ${datos.anexoDataset.filas.length} registros completos del dataset analizado.`
+    ),
+    tabla(
+      ['CVE', 'Software', 'CVSS', 'Severidad', 'Acceso', 'Estado'],
+      datos.anexoDataset.filas.map((fila) => [fila.cve, fila.software, fila.cvssScore.toFixed(1), fila.severidad, fila.tipoAcceso, fila.estadoRemediacion])
+    ),
+    heading('Anexo B: Tabla sin agrupar completa', HeadingLevel.HEADING_2),
+    texto(`Los ${datos.distribucionSinAgrupar.length} valores únicos de CVSS Score, con su frecuencia.`),
+    tabla(
+      ['CVSS Score', 'Frecuencia'],
+      datos.distribucionSinAgrupar.map((fila) => [fila.valor.toFixed(1), String(fila.frecuencia)])
+    ),
+    heading('Anexo C: Índice de figuras', HeadingLevel.HEADING_2),
+    tabla(
+      ['#', 'Título'],
+      construirDefinicionesGraficosWord(datos).map((definicion) => [String(definicion.numero), definicion.titulo])
+    )
   );
 
   return contenido;
@@ -350,34 +482,15 @@ function construirDefinicionesGraficosWord(datos: DatosInforme): DefinicionGrafi
       titulo: 'Comparación de CVSS por tipo de acceso',
       objetivo: 'comparar la severidad entre vulnerabilidades de acceso remoto y de acceso local.',
       fundamento: 'dos resúmenes de cinco números (uno por grupo) permiten comparar mediana, dispersión y atípicos.',
-      relacion: `las medias (remoto=${remotoVsLocal.mediaA.toFixed(2)}, local=${remotoVsLocal.mediaB.toFixed(2)}) son las de la Comparación acceso remoto/local.`,
+      relacion: `las medias (remoto=${formatearEstadistico(remotoVsLocal.mediaA)}, local=${formatearEstadistico(remotoVsLocal.mediaB)}) son las de la Comparación acceso remoto/local.`,
       tablaDatos: tabla(
         ['Grupo', 'Mínimo', 'Q1', 'Mediana', 'Q3', 'Máximo', 'Media'],
         [
-          [
-            'Remoto',
-            g.boxplotPorAcceso.remoto.minimo.toFixed(2),
-            g.boxplotPorAcceso.remoto.q1.toFixed(2),
-            g.boxplotPorAcceso.remoto.mediana.toFixed(2),
-            g.boxplotPorAcceso.remoto.q3.toFixed(2),
-            g.boxplotPorAcceso.remoto.maximo.toFixed(2),
-            g.boxplotPorAcceso.remoto.media.toFixed(2)
-          ],
-          [
-            'Local',
-            g.boxplotPorAcceso.local.minimo.toFixed(2),
-            g.boxplotPorAcceso.local.q1.toFixed(2),
-            g.boxplotPorAcceso.local.mediana.toFixed(2),
-            g.boxplotPorAcceso.local.q3.toFixed(2),
-            g.boxplotPorAcceso.local.maximo.toFixed(2),
-            g.boxplotPorAcceso.local.media.toFixed(2)
-          ]
+          filaResumenCincoNumeros('Remoto', g.boxplotPorAcceso.remoto),
+          filaResumenCincoNumeros('Local', g.boxplotPorAcceso.local)
         ]
       ),
-      analisis: interpretarCvssPorAcceso([
-        { etiqueta: 'Remoto', valor: remotoVsLocal.mediaA },
-        { etiqueta: 'Local', valor: remotoVsLocal.mediaB }
-      ])
+      analisis: interpretarComparacionAcceso(remotoVsLocal)
     },
     {
       numero: 7,
@@ -439,14 +552,17 @@ function resumenColumnaComoTextoWord(columna: DatosInformeDataset['estadisticasD
   return top ? `${columna.valoresUnicos} valor(es) único(s); más frecuente: "${top.valor}" (${top.frecuencia})` : 'sin valores';
 }
 
-function construirContenidoDataset(datos: DatosInformeDataset): Array<Paragraph | Table> {
-  const contenido: Array<Paragraph | Table> = [
+function construirContenidoDataset(datos: DatosInformeDataset): Array<ElementoDocumento> {
+  const contenido: Array<ElementoDocumento> = [
     new Paragraph({ text: 'Informe SEVERA — Análisis de Datos General', heading: HeadingLevel.TITLE }),
+    new Paragraph({ children: [new TextRun({ text: `Generado por SEVERA para ${datos.generadoPara}`, bold: true, size: 24 })] }),
     texto(`Generado: ${datos.generadoEn.toLocaleString()}`),
     texto(`${datos.totalFilas} fila(s) — ${datos.totalColumnas} columna(s)`),
 
+    ...indice(),
+
     // 1. Introducción
-    heading('1. Introducción', HeadingLevel.HEADING_1),
+    heading('1. Introducción', HeadingLevel.HEADING_1, true),
     texto(
       `Este informe aplica estadística descriptiva sobre un dataset genérico de ${datos.totalFilas} fila(s) y ` +
         `${datos.totalColumnas} columna(s) — el tipo de cada columna se infiere de sus propios valores, sin un ` +
@@ -566,6 +682,42 @@ function construirContenidoDataset(datos: DatosInformeDataset): Array<Paragraph 
     ...datos.interpretacion.map((parrafo) => new Paragraph({ text: parrafo, bullet: { level: 0 } })),
     heading('Limitaciones conocidas', HeadingLevel.HEADING_2),
     ...datos.limitacionesConocidas.map((limitacion) => new Paragraph({ text: limitacion, bullet: { level: 0 } }))
+  );
+
+  // 10. Anexos — mismo contenido que dibujarAnexosDataset() en GeneradorInformePDF.ts.
+  contenido.push(
+    heading('10. Anexos', HeadingLevel.HEADING_1),
+    texto('Material de respaldo del informe: una muestra cruda de filas del dataset y el índice de las figuras generadas.'),
+    heading('Anexo A: Muestra de filas', HeadingLevel.HEADING_2),
+    texto(
+      datos.anexoMuestraFilas.totalColumnas > datos.anexoMuestraFilas.columnasMostradas.length
+        ? `Se muestran las primeras ${datos.anexoMuestraFilas.columnasMostradas.length} de ${datos.anexoMuestraFilas.totalColumnas} ` +
+          `columnas y las primeras ${datos.anexoMuestraFilas.filas.length} de ${datos.anexoMuestraFilas.totalFilas} filas.`
+        : `Se muestran las primeras ${datos.anexoMuestraFilas.filas.length} de ${datos.anexoMuestraFilas.totalFilas} filas del dataset.`
+    )
+  );
+  if (datos.anexoMuestraFilas.filas.length === 0) {
+    contenido.push(texto('El dataset no tiene filas.'));
+  } else {
+    contenido.push(
+      tabla(
+        datos.anexoMuestraFilas.columnasMostradas,
+        datos.anexoMuestraFilas.filas.map((fila) => datos.anexoMuestraFilas.columnasMostradas.map((columna) => celdaGenericaComoTexto(fila[columna])))
+      )
+    );
+  }
+
+  contenido.push(heading('Anexo B: Índice de figuras generadas', HeadingLevel.HEADING_2));
+  const figuras: string[][] = datos.analisisUnivariado
+    .filter((analisis) => analisis.tipo === 'numerica')
+    .map((analisis, posicion): [string, string] => [String(posicion + 1), `Distribución de "${analisis.nombre}"`]);
+  if (datos.matrizCorrelacion.columnas.length > 0) {
+    figuras.push([String(figuras.length + 1), 'Heatmap de correlación de Pearson']);
+  }
+  contenido.push(
+    figuras.length === 0
+      ? texto('Este dataset no generó ninguna figura (sin columnas numéricas).')
+      : tabla(['#', 'Título'], figuras)
   );
 
   return contenido;

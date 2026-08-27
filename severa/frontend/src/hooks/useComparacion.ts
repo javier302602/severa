@@ -20,3 +20,12 @@ export function useComparacionSoftware(categoriaA: string, categoriaB: string) {
     queryFn: () => comparacionService.compararSoftware(categoriaA, categoriaB)
   });
 }
+
+// Dropdown de software (2026-07-20): catálogo real del analista, para el
+// selector de "Comparación por software" en vez de un campo de texto libre.
+export function useSoftwareDisponible() {
+  return useQuery({
+    queryKey: ['comparacion', 'software-disponible'],
+    queryFn: comparacionService.listarSoftwareDisponible
+  });
+}

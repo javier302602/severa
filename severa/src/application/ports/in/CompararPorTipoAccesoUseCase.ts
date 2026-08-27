@@ -1,5 +1,5 @@
 import { Vulnerabilidad } from '../../../domain/entities/Vulnerabilidad';
 
 export interface CompararPorTipoAccesoUseCase {
-  ejecutar(vulnerabilidades?: Vulnerabilidad[]): Promise<unknown>;
+  ejecutar(analistaId: string, vulnerabilidades?: Vulnerabilidad[]): Promise<unknown>;
 }

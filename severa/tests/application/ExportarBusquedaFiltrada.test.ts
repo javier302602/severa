@@ -1,3 +1,4 @@
+import ExcelJS from 'exceljs';
 import { ExportarBusquedaFiltrada } from '../../src/application/usecases/ExportarBusquedaFiltrada';
 import { VulnerabilidadRepository } from '../../src/application/ports/out/VulnerabilidadRepository';
 import { Vulnerabilidad } from '../../src/domain/entities/Vulnerabilidad';
@@ -9,6 +10,7 @@ import { FiltroVulnerabilidad } from '../../src/domain/value-objects/FiltroVulne
 function repositorioFalso(resultados: Vulnerabilidad[]): VulnerabilidadRepository {
   return {
     guardar: jest.fn().mockResolvedValue(undefined),
+    guardarLote: jest.fn().mockResolvedValue(undefined),
     contar: jest.fn().mockResolvedValue(0),
     listar: jest.fn().mockResolvedValue([]),
     buscarPorCve: jest.fn().mockResolvedValue(null),
@@ -16,14 +18,16 @@ function repositorioFalso(resultados: Vulnerabilidad[]): VulnerabilidadRepositor
     filtrarPorSeveridad: jest.fn().mockResolvedValue([]),
     listarPorTipoAcceso: jest.fn().mockResolvedValue([]),
     listarPorTipoVulnerabilidad: jest.fn().mockResolvedValue([]),
+    listarSoftwareDisponible: jest.fn().mockResolvedValue([]),
     listarPorSoftware: jest.fn().mockResolvedValue([]),
     actualizarEstado: jest.fn().mockResolvedValue(undefined),
-    buscarConFiltros: jest.fn().mockResolvedValue(resultados)
+    buscarConFiltros: jest.fn().mockResolvedValue(resultados),
+    eliminarTodas: jest.fn().mockResolvedValue(0)
   };
 }
 
 describe('ExportarBusquedaFiltrada', () => {
-  test('llama a buscarConFiltros con el filtro dado y exporta solo ese subconjunto en el mismo formato CSV de ExportarDatasetValidado', async () => {
+  test('llama a buscarConFiltros con el filtro dado y exporta un .xlsx real de ese subconjunto', async () => {
     const resultados = [
       new Vulnerabilidad('1', new IdentificadorCVE('CVE-2021-44228'), new CvssScore(10.0), 'Apache Log4j', new TipoAccesoValue('Sí'))
     ];
@@ -31,19 +35,22 @@ describe('ExportarBusquedaFiltrada', () => {
     const usecase = new ExportarBusquedaFiltrada(repository);
     const filtro = new FiltroVulnerabilidad({ cvssMin: 9.0, componente: 'Apache Log4j' });
 
-    const csv = await usecase.ejecutar(filtro);
+    const buffer = await usecase.ejecutar(filtro, 'analista-1');
 
-    expect(repository.buscarConFiltros).toHaveBeenCalledWith(filtro);
-    expect(csv).toBe('CVE-2021-44228,10,Apache Log4j');
+    expect(repository.buscarConFiltros).toHaveBeenCalledWith(filtro, 'analista-1');
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(buffer as any);
+    expect(libro.worksheets[0].getRow(3).getCell(1).value).toBe('CVE-2021-44228');
   });
 
-  test('devuelve cadena vacía cuando el filtro no arroja resultados', async () => {
+  test('sin resultados, igual devuelve un .xlsx válido', async () => {
     const repository = repositorioFalso([]);
     const usecase = new ExportarBusquedaFiltrada(repository);
     const filtro = new FiltroVulnerabilidad({ cve: 'CVE-2099-00000' });
 
-    const csv = await usecase.ejecutar(filtro);
+    const buffer = await usecase.ejecutar(filtro, 'analista-1');
 
-    expect(csv).toBe('');
+    const libro = new ExcelJS.Workbook();
+    await expect(libro.xlsx.load(buffer as any)).resolves.not.toThrow();
   });
 });

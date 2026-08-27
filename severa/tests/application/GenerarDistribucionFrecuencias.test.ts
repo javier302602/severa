@@ -9,6 +9,7 @@ describe('GenerarDistribucionFrecuencias', () => {
   test('genera la tabla sin agrupar para un conjunto fijo de CVSS', async () => {
     const repo: VulnerabilidadRepository = {
       guardar: jest.fn().mockResolvedValue(undefined),
+    guardarLote: jest.fn().mockResolvedValue(undefined),
       contar: jest.fn().mockResolvedValue(0),
       listar: jest.fn().mockResolvedValue([
         new Vulnerabilidad('1', new IdentificadorCVE('CVE-2024-00001'), new CvssScore(10.0), 'Apache Log4j', new TipoAccesoValue('Sí')),
@@ -21,13 +22,15 @@ describe('GenerarDistribucionFrecuencias', () => {
       filtrarPorSeveridad: jest.fn().mockResolvedValue([]),
       listarPorTipoAcceso: jest.fn().mockResolvedValue([]),
       listarPorTipoVulnerabilidad: jest.fn().mockResolvedValue([]),
+      listarSoftwareDisponible: jest.fn().mockResolvedValue([]),
       listarPorSoftware: jest.fn().mockResolvedValue([]),
       actualizarEstado: jest.fn().mockResolvedValue(undefined),
-      buscarConFiltros: jest.fn().mockResolvedValue([])
+      buscarConFiltros: jest.fn().mockResolvedValue([]),
+      eliminarTodas: jest.fn().mockResolvedValue(0)
     };
 
     const usecase = new GenerarDistribucionFrecuencias(repo);
-    const resultado = await usecase.ejecutar('sinAgrupar');
+    const resultado = await usecase.ejecutar('sinAgrupar', 'analista-1');
 
     expect(resultado).toEqual([
       { valor: 7.8, frecuencia: 2 },

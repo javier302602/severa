@@ -16,7 +16,22 @@ export interface ServicioDeNotificaciones {
   // destinatario (PriorizacionController ya lo pasa siempre).
   notificarPlazoExcedido(vulnerabilidad: Vulnerabilidad, analistaId?: string): Promise<void>;
   // RF-99: alerta de vulnerabilidad crítica (CVSS >= 9.0) recién importada.
+  // Ya no se dispara una vez por fila crítica (bug real reportado: importar
+  // un dataset con muchas críticas inundaba el centro de notificaciones con
+  // decenas de alertas idénticas en su forma) — se mantiene el método por si
+  // algún caller puntual necesita UNA alerta aislada, pero el camino de
+  // importación masiva usa notificarImportacionCompletada en su lugar (ver
+  // ImportarDatasetConAuditoria.ejecutar/registrarImportacionPorLink).
   notificarVulnerabilidadCritica(vulnerabilidad: Vulnerabilidad, analistaId: string): Promise<void>;
+  // Resumen único por importación (2026-07-19, bug real: "1 upload dataset
+  // -> 10+ notificaciones" — un dataset con N vulnerabilidades críticas
+  // disparaba N notificarVulnerabilidadCritica seguidas). Reemplaza esas N
+  // llamadas por UNA sola al terminar la importación completa (archivo,
+  // link o streaming), con el conteo de críticas incluido en el mensaje.
+  notificarImportacionCompletada(
+    analistaId: string,
+    resumen: { importados: number; rechazados: number; criticas: number }
+  ): Promise<void>;
   // RF-101: informe recién generado.
   notificarInformeListo(analistaId: string, formato: 'pdf' | 'docx'): Promise<void>;
   // RF-102: sincronización con la API NVD completada.

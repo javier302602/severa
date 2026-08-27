@@ -11,7 +11,7 @@ describe('RecopilarDatosDeInformeDataset — Mejora 4 (Análisis de Datos Genera
       { producto: 'E', precio: 100, cantidad: 1000 }
     ];
 
-    const datos = recopilarDatosDeInformeDataset(columnas, filas);
+    const datos = recopilarDatosDeInformeDataset(columnas, filas, 'Analista de Prueba');
 
     expect(datos.totalFilas).toBe(5);
     expect(datos.totalColumnas).toBe(3);
@@ -35,7 +35,7 @@ describe('RecopilarDatosDeInformeDataset — Mejora 4 (Análisis de Datos Genera
     const columnas = ['ciudad'];
     const filas = ['Lima', 'Cusco', 'Arequipa'].map((ciudad) => ({ ciudad }));
 
-    const datos = recopilarDatosDeInformeDataset(columnas, filas);
+    const datos = recopilarDatosDeInformeDataset(columnas, filas, 'Analista de Prueba');
 
     expect(datos.analisisUnivariado).toEqual([]);
     expect(datos.matrizCorrelacion.columnas).toEqual([]);

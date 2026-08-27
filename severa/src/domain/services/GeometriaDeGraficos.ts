@@ -8,6 +8,8 @@
 // lugares. Ningún renderer concreto vive acá: esto solo dice "dónde va cada
 // cosa", nunca "cómo se dibuja".
 
+import { minimoDe, maximoDe } from './MinMax';
+
 export interface Lienzo {
   ancho: number;
   alto: number;
@@ -271,6 +273,27 @@ function regresionLineal(puntos: PuntoDispersion[]): { pendiente: number; inters
   return { pendiente, interseccion };
 }
 
+// Bug real reproducido en vivo (2026-07-19, /informes/completo con 350k
+// puntos de dispersión): dibujar UN elemento vectorial por punto (círculo en
+// PDFKit) sobre cientos de miles de puntos agota el heap construyendo el
+// content stream del PDF ("FATAL ERROR: JavaScript heap out of memory" real,
+// confirmado con docker logs). Un scatter plot con más de unos pocos miles
+// de puntos tampoco es legible para un humano (se solapan). Se muestrea con
+// paso uniforme (misma técnica que muestraRepresentativa en
+// RecopilarDatosDeInforme.ts, para no inventar un segundo algoritmo de
+// muestreo) solo para lo que se DIBUJA — min/max/línea de tendencia siguen
+// calculándose sobre el conjunto COMPLETO, sin perder precisión estadística.
+const LIMITE_PUNTOS_RENDERIZADOS = 2000;
+
+function muestraDePuntos(puntos: PuntoDispersion[], limite: number): PuntoDispersion[] {
+  if (puntos.length <= limite) {
+    return puntos;
+  }
+  const paso = (puntos.length - 1) / (limite - 1);
+  const indices = Array.from({ length: limite }, (_, i) => Math.round(i * paso));
+  return [...new Set(indices)].map((indice) => puntos[indice]);
+}
+
 export function calcularGeometriaDispersion(puntos: PuntoDispersion[], lienzo: Lienzo): GeometriaDispersion {
   const area = areaDeTrazado(lienzo);
 
@@ -278,10 +301,12 @@ export function calcularGeometriaDispersion(puntos: PuntoDispersion[], lienzo: L
     return { puntos: [], area };
   }
 
-  const minX = Math.min(...puntos.map((punto) => punto.x));
-  const maxX = Math.max(...puntos.map((punto) => punto.x));
-  const minY = Math.min(...puntos.map((punto) => punto.y));
-  const maxY = Math.max(...puntos.map((punto) => punto.y));
+  const xs = puntos.map((punto) => punto.x);
+  const ys = puntos.map((punto) => punto.y);
+  const minX = minimoDe(xs);
+  const maxX = maximoDe(xs);
+  const minY = minimoDe(ys);
+  const maxY = maximoDe(ys);
   const marcasEjeX = calcularMarcasDeEje(minX, maxX);
   const marcasEjeY = calcularMarcasDeEje(minY, maxY);
   const rangoX = marcasEjeX.maximo - marcasEjeX.minimo || 1;
@@ -290,7 +315,7 @@ export function calcularGeometriaDispersion(puntos: PuntoDispersion[], lienzo: L
   const escalaX = (x: number) => area.x + ((x - marcasEjeX.minimo) / rangoX) * area.ancho;
   const escalaY = (y: number) => area.y + area.alto - ((y - marcasEjeY.minimo) / rangoY) * area.alto;
 
-  const puntosPosicionados = puntos.map((punto) => ({ cx: escalaX(punto.x), cy: escalaY(punto.y) }));
+  const puntosPosicionados = muestraDePuntos(puntos, LIMITE_PUNTOS_RENDERIZADOS).map((punto) => ({ cx: escalaX(punto.x), cy: escalaY(punto.y) }));
 
   const regresion = regresionLineal(puntos);
   const lineaTendencia = regresion

@@ -41,10 +41,24 @@ function parseCriterios(input: Record<string, unknown>): CriteriosFiltroVulnerab
   return criterios;
 }
 
+// Paginación (2026-07-19): sin esto, un filtro amplio (ej. severidad=Alta)
+// sobre un catálogo grande devolvía y renderizaba decenas de miles de filas
+// de una sola vez. "pagina" es opcional para no romper a nadie que ya
+// consuma esta ruta sin esos query params (recibe la primera página).
+const TAMANO_PAGINA_DEFECTO = 200;
+const TAMANO_PAGINA_MAXIMO = 500;
+
+function parsePaginacion(input: Record<string, unknown>): { limite: number; offset: number } {
+  const pagina = Math.max(1, Number(input.pagina) || 1);
+  const limite = Math.min(TAMANO_PAGINA_MAXIMO, Math.max(1, Number(input.limite) || TAMANO_PAGINA_DEFECTO));
+  return { limite, offset: (pagina - 1) * limite };
+}
+
 busquedaRouter.get('/vulnerabilidades/buscar', async (req, res) => {
   try {
-    const filtro = new FiltroVulnerabilidad(parseCriterios(req.query as Record<string, unknown>));
-    const resultados = await container.buscarConFiltrosUseCase.ejecutar(filtro);
+    const query = req.query as Record<string, unknown>;
+    const filtro = new FiltroVulnerabilidad(parseCriterios(query));
+    const resultados = await container.buscarConFiltrosUseCase.ejecutar(filtro, req.analistaAutenticado!.id, parsePaginacion(query));
 
     res.json(
       resultados.map((item) => ({
@@ -60,13 +74,16 @@ busquedaRouter.get('/vulnerabilidades/buscar', async (req, res) => {
   }
 });
 
+// Bug real reportado: la descarga era CSV plano — ahora es un .xlsx real
+// agrupado por severidad, con color y celdas fusionadas por bloque (mismo
+// exportador que /dataset/exportar, ver ExportadorExcelAgrupado.ts).
 busquedaRouter.get('/vulnerabilidades/buscar/exportar', async (req, res) => {
   try {
     const filtro = new FiltroVulnerabilidad(parseCriterios(req.query as Record<string, unknown>));
-    const csv = await container.exportarBusquedaFiltradaUseCase.ejecutar(filtro);
+    const buffer = await container.exportarBusquedaFiltradaUseCase.ejecutar(filtro, req.analistaAutenticado!.id);
 
-    res.setHeader('Content-Type', 'text/csv');
-    res.send(csv);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buffer);
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : 'Error desconocido' });
   }

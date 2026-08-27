@@ -10,6 +10,7 @@ import { EstadoRemediacionValue } from '../../src/domain/value-objects/EstadoRem
 function repoFalso(vulnerabilidades: Vulnerabilidad[]): VulnerabilidadRepository {
   return {
     guardar: jest.fn().mockResolvedValue(undefined),
+    guardarLote: jest.fn().mockResolvedValue(undefined),
     contar: jest.fn().mockResolvedValue(0),
     listar: jest.fn().mockResolvedValue(vulnerabilidades),
     buscarPorCve: jest.fn().mockResolvedValue(null),
@@ -17,9 +18,11 @@ function repoFalso(vulnerabilidades: Vulnerabilidad[]): VulnerabilidadRepository
     filtrarPorSeveridad: jest.fn().mockResolvedValue([]),
     listarPorTipoAcceso: jest.fn().mockResolvedValue([]),
     listarPorTipoVulnerabilidad: jest.fn().mockResolvedValue([]),
+    listarSoftwareDisponible: jest.fn().mockResolvedValue([]),
     listarPorSoftware: jest.fn().mockResolvedValue([]),
     actualizarEstado: jest.fn().mockResolvedValue(undefined),
-    buscarConFiltros: jest.fn().mockResolvedValue([])
+    buscarConFiltros: jest.fn().mockResolvedValue([]),
+    eliminarTodas: jest.fn().mockResolvedValue(0)
   };
 }
 
@@ -36,11 +39,12 @@ describe('GenerarRankingUrgencia', () => {
       notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
       notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
       notificarInformeListo: jest.fn().mockResolvedValue(undefined),
-      notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined)
+      notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
+    notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
     };
     const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
 
-    const ranking = await usecase.ejecutar();
+    const ranking = await usecase.ejecutar('analista-1');
 
     expect(ranking.map((entrada) => entrada.vulnerabilidad.cve.valor)).toEqual([
       'CVE-2021-44228',
@@ -73,16 +77,17 @@ describe('GenerarRankingUrgencia', () => {
       notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
       notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
       notificarInformeListo: jest.fn().mockResolvedValue(undefined),
-      notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined)
+      notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
+    notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
     };
     const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
 
-    await usecase.ejecutar();
+    await usecase.ejecutar('analista-1');
 
     expect(servicioDeNotificaciones.notificarPlazoExcedido).toHaveBeenCalledTimes(1);
     expect(servicioDeNotificaciones.notificarPlazoExcedido).toHaveBeenCalledWith(
       expect.objectContaining({ cve: expect.objectContaining({ valor: 'CVE-2021-44228' }) }),
-      undefined
+      'analista-1'
     );
   });
 
@@ -97,15 +102,103 @@ describe('GenerarRankingUrgencia', () => {
       notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
       notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
       notificarInformeListo: jest.fn().mockResolvedValue(undefined),
-      notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined)
+      notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
+    notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
     };
     const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
 
-    await usecase.ejecutar(undefined, 'analista-7');
+    await usecase.ejecutar('analista-7');
 
     expect(servicioDeNotificaciones.notificarPlazoExcedido).toHaveBeenCalledWith(
       expect.objectContaining({ cve: expect.objectContaining({ valor: 'CVE-2021-44228' }) }),
       'analista-7'
     );
+  });
+
+  // Carga por etapas (2026-07-19): con severidad, usa filtrarPorSeveridad
+  // (ya existente, reutilizado — no un método nuevo) en vez de listar() el
+  // catálogo completo.
+  test('con severidad, usa filtrarPorSeveridad en vez de listar() el catálogo completo', async () => {
+    const critica = new Vulnerabilidad('1', new IdentificadorCVE('CVE-2021-44228'), new CvssScore(9.8), 'Apache Log4j', new TipoAccesoValue('Sí'));
+    const repo = repoFalso([]);
+    (repo.filtrarPorSeveridad as jest.Mock).mockResolvedValue([critica]);
+    const servicioDeNotificaciones: ServicioDeNotificaciones = {
+      notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
+      notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
+      notificarInformeListo: jest.fn().mockResolvedValue(undefined),
+      notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
+    notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
+    };
+    const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
+
+    const ranking = await usecase.ejecutar('analista-1', undefined, 'Crítica');
+
+    expect(repo.filtrarPorSeveridad).toHaveBeenCalledWith('Crítica', 'analista-1');
+    expect(repo.listar).not.toHaveBeenCalled();
+    expect(ranking).toHaveLength(1);
+  });
+
+  test('sin severidad, sigue usando listar() (comportamiento sin cambios)', async () => {
+    const dataset = [new Vulnerabilidad('1', new IdentificadorCVE('CVE-2021-44228'), new CvssScore(9.8), 'Apache Log4j', new TipoAccesoValue('Sí'))];
+    const repo = repoFalso(dataset);
+    const servicioDeNotificaciones: ServicioDeNotificaciones = {
+      notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
+      notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
+      notificarInformeListo: jest.fn().mockResolvedValue(undefined),
+      notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
+    notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
+    };
+    const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
+
+    await usecase.ejecutar('analista-1');
+
+    expect(repo.listar).toHaveBeenCalledWith('analista-1');
+    expect(repo.filtrarPorSeveridad).not.toHaveBeenCalled();
+  });
+
+  // Bug real (2026-07-19): con miles de vulnerabilidades vencidas, un solo
+  // Promise.all sin límite dispara todas las notificaciones (cada una un
+  // INSERT real) en paralelo — satura el pool de conexiones de Postgres.
+  // Se procesan en lotes chicos y secuenciales entre sí, sin cambiar CUÁLES
+  // vulnerabilidades se notifican.
+  test('con muchas vulnerabilidades vencidas, notifica en lotes (no todas en un solo Promise.all sin límite)', async () => {
+    const TOTAL = 450; // > 2 lotes de 200
+    const vencidas = Array.from(
+      { length: TOTAL },
+      (_, i) =>
+        new Vulnerabilidad(
+          String(i),
+          new IdentificadorCVE(`CVE-2021-${20000 + i}`),
+          new CvssScore(9.5),
+          'Software',
+          new TipoAccesoValue('Sí'),
+          5,
+          undefined,
+          undefined,
+          undefined,
+          new Date('2000-01-01T00:00:00Z') // Crítico, cargada hace décadas -> vencida
+        )
+    );
+    const repo = repoFalso(vencidas);
+    let maximoEnParalelo = 0;
+    let enCurso = 0;
+    const servicioDeNotificaciones: ServicioDeNotificaciones = {
+      notificarPlazoExcedido: jest.fn().mockImplementation(async () => {
+        enCurso++;
+        maximoEnParalelo = Math.max(maximoEnParalelo, enCurso);
+        await Promise.resolve();
+        enCurso--;
+      }),
+      notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
+      notificarInformeListo: jest.fn().mockResolvedValue(undefined),
+      notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
+    notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
+    };
+    const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
+
+    await usecase.ejecutar('analista-1');
+
+    expect(servicioDeNotificaciones.notificarPlazoExcedido).toHaveBeenCalledTimes(TOTAL);
+    expect(maximoEnParalelo).toBeLessThanOrEqual(200);
   });
 });

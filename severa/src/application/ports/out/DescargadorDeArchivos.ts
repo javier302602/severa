@@ -1,5 +1,11 @@
 export interface ArchivoDescargado {
-  contenido: Buffer;
+  // Streaming a disco (2026-07-17, límite subido a 1GB): ya NO se junta todo
+  // el contenido en un Buffer en memoria — se escribe directo a un archivo
+  // temporal a medida que llega de la red (y se descomprime en el mismo
+  // stream si es gzip). Quien llama es responsable de borrar este archivo
+  // cuando termine (fs.unlink en un finally, mismo patrón que ya usaba
+  // ImportarDatasetDesdeUrl.ts con SUS propios temporales).
+  rutaArchivo: string;
   contentType: string | null;
   // URL final tras seguir redirecciones — se usa para validar la extensión
   // cuando el Content-Type que manda el servidor remoto es genérico

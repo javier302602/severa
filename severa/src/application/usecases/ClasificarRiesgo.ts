@@ -6,8 +6,8 @@ import { NivelDeRiesgo } from '../../domain/value-objects/NivelDeRiesgo';
 export class ClasificarRiesgo implements ClasificarRiesgoUseCase {
   constructor(private readonly vulnerabilidadRepository: VulnerabilidadRepository) {}
 
-  async ejecutar(cve: string): Promise<NivelDeRiesgo | null> {
-    const vulnerabilidad = await this.vulnerabilidadRepository.buscarPorCve(cve);
+  async ejecutar(cve: string, analistaId: string): Promise<NivelDeRiesgo | null> {
+    const vulnerabilidad = await this.vulnerabilidadRepository.buscarPorCve(cve, analistaId);
     if (!vulnerabilidad) {
       return null;
     }

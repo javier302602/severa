@@ -116,7 +116,7 @@ export function AnalisisDatosPage() {
       <div>
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Análisis de Datos</h1>
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Subí cualquier archivo .csv, .xlsx o .xls (máx. 5 MB) para analizarlo — a diferencia de "Dataset", este
+          Subí cualquier archivo .csv, .xlsx o .xls (máx. 100 MB) para analizarlo — a diferencia de "Dataset", este
           módulo no asume ningún esquema de vulnerabilidades: infiere el tipo de cada columna a partir de sus
           propios valores.
         </p>

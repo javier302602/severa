@@ -28,6 +28,7 @@ function severidadDe(vulnerabilidad: Vulnerabilidad): string {
 function repositorioFalso(): VulnerabilidadRepository {
   return {
     guardar: jest.fn().mockResolvedValue(undefined),
+    guardarLote: jest.fn().mockResolvedValue(undefined),
     contar: jest.fn().mockResolvedValue(0),
     listar: jest.fn().mockResolvedValue(dataset),
     buscarPorCve: jest.fn().mockResolvedValue(null),
@@ -35,6 +36,7 @@ function repositorioFalso(): VulnerabilidadRepository {
     filtrarPorSeveridad: jest.fn().mockResolvedValue([]),
     listarPorTipoAcceso: jest.fn().mockResolvedValue([]),
     listarPorTipoVulnerabilidad: jest.fn().mockResolvedValue([]),
+    listarSoftwareDisponible: jest.fn().mockResolvedValue([]),
     listarPorSoftware: jest.fn().mockResolvedValue([]),
     actualizarEstado: jest.fn().mockResolvedValue(undefined),
     buscarConFiltros: jest.fn().mockImplementation(async (filtro: FiltroVulnerabilidad) =>
@@ -46,7 +48,8 @@ function repositorioFalso(): VulnerabilidadRepository {
         if (filtro.componente && item.software !== filtro.componente) return false;
         return true;
       })
-    )
+    ),
+    eliminarTodas: jest.fn().mockResolvedValue(0)
   };
 }
 
@@ -56,9 +59,9 @@ describe('BuscarConFiltros', () => {
     const usecase = new BuscarConFiltros(repository);
     const filtro = new FiltroVulnerabilidad({ cvssMin: 9.0, severidad: 'Crítica', componente: 'Apache Log4j' });
 
-    const resultado = await usecase.ejecutar(filtro);
+    const resultado = await usecase.ejecutar(filtro, 'analista-1');
 
-    expect(repository.buscarConFiltros).toHaveBeenCalledWith(filtro);
+    expect(repository.buscarConFiltros).toHaveBeenCalledWith(filtro, 'analista-1', undefined);
     expect(resultado).toHaveLength(1);
     expect(resultado[0].cve.valor).toBe('CVE-2021-44228');
   });
@@ -68,7 +71,7 @@ describe('BuscarConFiltros', () => {
     const usecase = new BuscarConFiltros(repository);
     const filtro = new FiltroVulnerabilidad({ cvssMin: 9.0 });
 
-    const resultado = await usecase.ejecutar(filtro);
+    const resultado = await usecase.ejecutar(filtro, 'analista-1');
 
     expect(resultado.map((item) => item.cve.valor).sort()).toEqual(['CVE-2021-35587', 'CVE-2021-44228']);
   });
@@ -77,11 +80,24 @@ describe('BuscarConFiltros', () => {
     const repository = repositorioFalso();
     const usecase = new BuscarConFiltros(repository);
 
-    const soloCvss = await usecase.ejecutar(new FiltroVulnerabilidad({ cvssMin: 9.0 }));
-    const combinado = await usecase.ejecutar(new FiltroVulnerabilidad({ cvssMin: 9.0, componente: 'OpenSSL' }));
+    const soloCvss = await usecase.ejecutar(new FiltroVulnerabilidad({ cvssMin: 9.0 }), 'analista-1');
+    const combinado = await usecase.ejecutar(new FiltroVulnerabilidad({ cvssMin: 9.0, componente: 'OpenSSL' }), 'analista-1');
 
     expect(soloCvss).toHaveLength(2);
     expect(combinado).toHaveLength(1);
     expect(combinado[0].cve.valor).toBe('CVE-2021-35587');
+  });
+
+  // Paginación (2026-07-19): el usecase solo reenvía lo que le pasan, la
+  // página real la arma BusquedaController y el LIMIT/OFFSET los aplica
+  // PostgresVulnerabilidadRepository (ver test de integración para eso).
+  test('reenvía la paginación tal cual al repositorio cuando se la pasan', async () => {
+    const repository = repositorioFalso();
+    const usecase = new BuscarConFiltros(repository);
+    const filtro = new FiltroVulnerabilidad({ cvssMin: 9.0 });
+
+    await usecase.ejecutar(filtro, 'analista-1', { limite: 200, offset: 400 });
+
+    expect(repository.buscarConFiltros).toHaveBeenCalledWith(filtro, 'analista-1', { limite: 200, offset: 400 });
   });
 });

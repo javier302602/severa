@@ -9,6 +9,7 @@ import {
 } from './EstadisticaDescriptiva';
 import { generarTablaAgrupada, TablaFrecuencia } from './DistribucionFrecuencias';
 import { DatasetInvalidoError } from '../errors/DatasetInvalidoError';
+import { minimoDe, maximoDe } from './MinMax';
 
 // Mejora 4 (Análisis de Datos General) — Fase 3. A diferencia de
 // EstadisticasDescriptivasGenerico.ts (resumen liviano de TODAS las
@@ -70,8 +71,8 @@ function aFecha(valor: unknown): Date {
 // miles. Si todos los valores son idénticos no hay ancho que repartir: un
 // único intervalo que los contiene a todos.
 function generarIntervalosAutomaticos(valores: number[]): Array<{ inferior: number; superior: number }> {
-  const minimo = Math.min(...valores);
-  const maximo = Math.max(...valores);
+  const minimo = minimoDe(valores);
+  const maximo = maximoDe(valores);
 
   if (minimo === maximo) {
     return [{ inferior: minimo, superior: maximo }];

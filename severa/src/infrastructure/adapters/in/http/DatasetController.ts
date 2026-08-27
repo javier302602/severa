@@ -61,6 +61,29 @@ function manejarSubida(req: express.Request, res: express.Response, next: expres
 
 const CAMPOS_MAPEO_COLUMNAS = ['cve', 'cvssScore', 'software', 'tipoVulnerabilidad', 'accesoRemoto', 'diasParaParche'] as const;
 
+// Filtra un objeto candidato a solo las claves conocidas de MapeoColumnas con
+// valor string no vacío — compartido por parseMapeoColumnas (mapeo viaja como
+// JSON serializado dentro de multipart/form-data, ver abajo) y por
+// /dataset/importar-url (mapeo viaja directo como objeto en el body JSON,
+// sin necesitar un JSON.parse extra).
+function extraerMapeoColumnasValido(candidato: unknown): MapeoColumnas | undefined {
+  if (typeof candidato !== 'object' || candidato === null || Array.isArray(candidato)) {
+    return undefined;
+  }
+
+  const mapeo: MapeoColumnas = {};
+  for (const [clave, valor] of Object.entries(candidato)) {
+    if (!(CAMPOS_MAPEO_COLUMNAS as readonly string[]).includes(clave)) {
+      continue;
+    }
+    if (typeof valor === 'string' && valor.trim() !== '') {
+      mapeo[clave as (typeof CAMPOS_MAPEO_COLUMNAS)[number]] = valor;
+    }
+  }
+
+  return Object.keys(mapeo).length > 0 ? mapeo : undefined;
+}
+
 // El mapeo viaja como un campo de texto más dentro del mismo
 // multipart/form-data que el archivo (multer lo deja en req.body, igual que
 // cualquier campo no-archivo) — se manda como JSON serializado porque
@@ -83,17 +106,7 @@ function parseMapeoColumnas(raw: unknown): MapeoColumnas | undefined {
     throw new Error('El mapeo de columnas debe ser un objeto');
   }
 
-  const mapeo: MapeoColumnas = {};
-  for (const [clave, valor] of Object.entries(parseado)) {
-    if (!(CAMPOS_MAPEO_COLUMNAS as readonly string[]).includes(clave)) {
-      continue;
-    }
-    if (typeof valor === 'string' && valor.trim() !== '') {
-      mapeo[clave as (typeof CAMPOS_MAPEO_COLUMNAS)[number]] = valor;
-    }
-  }
-
-  return Object.keys(mapeo).length > 0 ? mapeo : undefined;
+  return extraerMapeoColumnasValido(parseado);
 }
 
 const LARGO_MAXIMO_NOMBRE_ARCHIVO = 200;
@@ -152,10 +165,13 @@ datasetRouter.post('/dataset/importar', manejarSubida, async (req, res) => {
   }
 });
 
-datasetRouter.get('/dataset/exportar', async (_req, res) => {
-  const csv = await container.exportarDatasetValidadoUseCase.ejecutar();
-  res.setHeader('Content-Type', 'text/csv');
-  res.send(csv);
+// Bug real reportado: la descarga era CSV plano, "un solo cuadro sin
+// separación visual" — ahora es un .xlsx real agrupado por severidad, con
+// color y celdas fusionadas por bloque (ver ExportadorExcelAgrupado.ts).
+datasetRouter.get('/dataset/exportar', async (req, res) => {
+  const buffer = await container.exportarDatasetValidadoUseCase.ejecutar(req.analistaAutenticado!.id);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.send(buffer);
 });
 
 // RF nuevo (Sprint 17): importar pegando un link en vez de subir un archivo.
@@ -174,8 +190,56 @@ datasetRouter.post('/dataset/importar-url', async (req, res) => {
   const analistaId = req.analistaAutenticado!.id;
 
   try {
-    const resumen = await container.importarDatasetDesdeUrlUseCase.ejecutar(url, analistaId);
+    // mapeoColumnas (2026-07-17): mismo mapeo flexible que "subir archivo" —
+    // ningún dataset público real trae las columnas con los nombres exactos
+    // que espera SEVERA por defecto. Acá viaja directo como objeto (JSON
+    // body, no multipart), sin el JSON.parse que sí hace falta arriba.
+    const mapeoColumnas = extraerMapeoColumnasValido(req.body.mapeoColumnas);
+    const resumen = await container.importarDatasetDesdeUrlUseCase.ejecutar(url, analistaId, mapeoColumnas);
     res.status(201).json(resumen);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Error desconocido' });
+  }
+});
+
+// "Restablecer mis datos": borra SOLO las vulnerabilidades del analista
+// autenticado. Acción DESTRUCTIVA e irreversible, pero ya NO requiere un rol
+// especial — con la multi-tenancy de este módulo (migración 006), cada
+// analista únicamente puede borrar su propio catálogo (ver
+// PostgresVulnerabilidadRepository.eliminarTodas, acotado por analista_id),
+// nunca el de otro. Alcanza con estar autenticado (AutenticacionMiddleware,
+// ya aplicado globalmente antes de este router — ver app.ts).
+datasetRouter.delete('/dataset/reiniciar', async (req, res) => {
+  const analistaId = req.analistaAutenticado!.id;
+  const resumen = await container.reiniciarDatasetUseCase.ejecutar(analistaId);
+  res.json(resumen);
+});
+
+// Sección Informes: "convertir link a Excel" — mismas reglas de seguridad
+// que /dataset/importar-url (allowlist + resolución de IP en
+// DetectorDeTipoDeLink/DescargadorDeArchivosHttp), pero sin persistir nada:
+// el resultado es un .xlsx para descargar directamente, no un catálogo
+// importado.
+datasetRouter.post('/dataset/convertir-url-a-excel', async (req, res) => {
+  const { url } = req.body;
+
+  if (typeof url !== 'string' || url.trim() === '') {
+    res.status(400).json({ error: 'Debe indicar una URL en el campo "url"' });
+    return;
+  }
+
+  try {
+    // formato (2026-07-19): un archivo que excede el límite seguro de
+    // conversión a .xlsx se sirve como CSV crudo (ver ConvertirUrlAExcel.ts)
+    // — el header le dice al frontend con qué extensión/tipo real está
+    // bajando el archivo, en vez de asumir siempre .xlsx.
+    const { buffer, formato } = await container.convertirUrlAExcelUseCase.ejecutar(url);
+    res.setHeader(
+      'Content-Type',
+      formato === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'text/csv'
+    );
+    res.setHeader('X-Formato-Archivo', formato);
+    res.send(buffer);
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : 'Error desconocido' });
   }

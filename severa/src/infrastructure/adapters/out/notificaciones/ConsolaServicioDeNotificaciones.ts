@@ -37,6 +37,19 @@ export class ConsolaServicioDeNotificaciones implements ServicioDeNotificaciones
     );
   }
 
+  async notificarImportacionCompletada(
+    analistaId: string,
+    resumen: { importados: number; rechazados: number; criticas: number }
+  ): Promise<void> {
+    const mensaje =
+      `Importación completada: ${resumen.importados} importados, ${resumen.rechazados} rechazados` +
+      (resumen.criticas > 0 ? `, ${resumen.criticas} crítica(s) detectada(s)` : '');
+    console.log(`[RF-99] ${mensaje}`);
+    await this.notificacionRepository.guardar(
+      new Notificacion(randomUUID(), 'ImportacionCompletada', analistaId, false, new Date(), mensaje)
+    );
+  }
+
   async notificarInformeListo(analistaId: string, formato: 'pdf' | 'docx'): Promise<void> {
     const mensaje = `Informe generado (${formato})`;
     console.log(`[RF-101] ${mensaje} para el analista ${analistaId}`);

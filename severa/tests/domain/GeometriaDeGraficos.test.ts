@@ -169,6 +169,37 @@ describe('GeometriaDeGraficos', () => {
       expect(puntos).toHaveLength(0);
       expect(lineaTendencia).toBeUndefined();
     });
+
+    // Bug real reproducido en vivo (2026-07-19, /graficos/dispersionCvssDias
+    // con 150k-350k filas reales): "Math.min(...puntos.map(...))" con spread
+    // lanzaba "RangeError: Maximum call stack size exceeded" pasado el
+    // umbral de argumentos por llamada de V8 (~120k-130k).
+    test('no lanza con 200.000 puntos (antes rompía por Math.min/max con spread)', () => {
+      const puntos = Array.from({ length: 200_000 }, (_, i) => ({ x: i % 11, y: i % 400 }));
+
+      expect(() => calcularGeometriaDispersion(puntos, lienzo)).not.toThrow();
+    });
+
+    // Bug real reproducido en vivo (2026-07-19, /informes/completo con 350k
+    // puntos): dibujar un elemento vectorial por punto en PDFKit agotaba el
+    // heap ("FATAL ERROR: JavaScript heap out of memory", confirmado con
+    // docker logs) — se muestrea a un tope fijo solo para lo que se dibuja.
+    test('con más de 2000 puntos, muestrea para el renderizado (sin perder precisión en min/max, ya cubierto por otros tests)', () => {
+      const puntos = Array.from({ length: 200_000 }, (_, i) => ({ x: i % 11, y: i % 400 }));
+
+      const resultado = calcularGeometriaDispersion(puntos, lienzo);
+
+      expect(resultado.puntos.length).toBeLessThanOrEqual(2000);
+      expect(resultado.puntos.length).toBeGreaterThan(0);
+    });
+
+    test('con 2000 puntos o menos, no muestrea (se dibujan todos)', () => {
+      const puntos = Array.from({ length: 1500 }, (_, i) => ({ x: i % 11, y: i % 400 }));
+
+      const resultado = calcularGeometriaDispersion(puntos, lienzo);
+
+      expect(resultado.puntos).toHaveLength(1500);
+    });
   });
 
   describe('calcularGeometriaPastel', () => {

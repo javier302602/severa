@@ -1,6 +1,9 @@
 import { GenerarInforme } from '../../src/application/usecases/GenerarInforme';
 import { VulnerabilidadRepository } from '../../src/application/ports/out/VulnerabilidadRepository';
 import { AuditoriaRepository } from '../../src/application/ports/out/AuditoriaRepository';
+import { AnalistaRepository } from '../../src/application/ports/out/AnalistaRepository';
+import { Analista } from '../../src/domain/entities/Analista';
+import { Correo } from '../../src/domain/value-objects/Correo';
 import { GeneradorDeInformes, DatosInforme } from '../../src/application/ports/out/GeneradorDeInformes';
 import { Vulnerabilidad } from '../../src/domain/entities/Vulnerabilidad';
 import { IdentificadorCVE } from '../../src/domain/value-objects/IdentificadorCVE';
@@ -11,6 +14,7 @@ import { calcularMedia, calcularMediana } from '../../src/domain/services/Estadi
 function repoFalso(vulnerabilidades: Vulnerabilidad[]): VulnerabilidadRepository {
   return {
     guardar: jest.fn().mockResolvedValue(undefined),
+    guardarLote: jest.fn().mockResolvedValue(undefined),
     contar: jest.fn().mockResolvedValue(0),
     listar: jest.fn().mockResolvedValue(vulnerabilidades),
     buscarPorCve: jest.fn().mockResolvedValue(null),
@@ -18,9 +22,11 @@ function repoFalso(vulnerabilidades: Vulnerabilidad[]): VulnerabilidadRepository
     filtrarPorSeveridad: jest.fn().mockResolvedValue([]),
     listarPorTipoAcceso: jest.fn().mockResolvedValue([]),
     listarPorTipoVulnerabilidad: jest.fn().mockResolvedValue([]),
+    listarSoftwareDisponible: jest.fn().mockResolvedValue([]),
     listarPorSoftware: jest.fn().mockResolvedValue([]),
     actualizarEstado: jest.fn().mockResolvedValue(undefined),
-    buscarConFiltros: jest.fn().mockResolvedValue([])
+    buscarConFiltros: jest.fn().mockResolvedValue([]),
+    eliminarTodas: jest.fn().mockResolvedValue(0)
   };
 }
 
@@ -28,6 +34,16 @@ function auditoriaRepositoryFalso(): AuditoriaRepository {
   return {
     registrar: jest.fn().mockResolvedValue(undefined),
     listar: jest.fn().mockResolvedValue([])
+  };
+}
+
+function analistaRepositoryFalso(): AnalistaRepository {
+  const analista = new Analista('analista-A', 'Ana Torres', new Correo('ana@example.com'), 'hash', 'analista');
+  return {
+    guardar: jest.fn().mockResolvedValue(undefined),
+    buscarPorCorreo: jest.fn().mockResolvedValue(null),
+    buscarPorId: jest.fn().mockResolvedValue(analista),
+    eliminar: jest.fn().mockResolvedValue(undefined)
   };
 }
 
@@ -54,9 +70,9 @@ const scores = [10.0, 9.8, 7.8, 5.5];
 describe('GenerarInforme', () => {
   test('formato pdf: arma los datos correctos y llama a generarInformeCompleto', async () => {
     const geradorDeInformes = generadorDeInformesFalso();
-    const usecase = new GenerarInforme(repoFalso(dataset), geradorDeInformes, auditoriaRepositoryFalso());
+    const usecase = new GenerarInforme(repoFalso(dataset), geradorDeInformes, auditoriaRepositoryFalso(), analistaRepositoryFalso());
 
-    const resultado = await usecase.ejecutar('pdf');
+    const resultado = await usecase.ejecutar('pdf', 'analista-A');
 
     expect(resultado.toString()).toBe('pdf-falso');
     expect(geradorDeInformes.generarInformeCompleto).toHaveBeenCalledTimes(1);
@@ -77,16 +93,27 @@ describe('GenerarInforme', () => {
     expect(datos.rankingUrgencia[0].vulnerabilidad.cve.valor).toBe('CVE-2021-44228');
     expect(datos.interpretacion).toHaveLength(4);
     expect(datos.generadoEn).toBeInstanceOf(Date);
+    expect(datos.generadoPara).toBe('Ana Torres');
   });
 
   test('formato docx: llama a generarInformeWord en vez de generarInformeCompleto', async () => {
     const geradorDeInformes = generadorDeInformesFalso();
-    const usecase = new GenerarInforme(repoFalso(dataset), geradorDeInformes, auditoriaRepositoryFalso());
+    const usecase = new GenerarInforme(repoFalso(dataset), geradorDeInformes, auditoriaRepositoryFalso(), analistaRepositoryFalso());
 
-    const resultado = await usecase.ejecutar('docx');
+    const resultado = await usecase.ejecutar('docx', 'analista-A');
 
     expect(resultado.toString()).toBe('docx-falso');
     expect(geradorDeInformes.generarInformeWord).toHaveBeenCalledTimes(1);
     expect(geradorDeInformes.generarInformeCompleto).not.toHaveBeenCalled();
+  });
+
+  test('si el analista del token ya no existe, usa un nombre por defecto en vez de fallar', async () => {
+    const geradorDeInformes = generadorDeInformesFalso();
+    const analistaRepository: AnalistaRepository = { ...analistaRepositoryFalso(), buscarPorId: jest.fn().mockResolvedValue(null) };
+    const usecase = new GenerarInforme(repoFalso(dataset), geradorDeInformes, auditoriaRepositoryFalso(), analistaRepository);
+
+    await usecase.ejecutar('pdf', 'analista-borrado');
+
+    expect(geradorDeInformes.datosRecibidos[0].generadoPara).toBe('Analista SEVERA');
   });
 });

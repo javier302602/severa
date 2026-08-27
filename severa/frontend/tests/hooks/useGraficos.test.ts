@@ -25,7 +25,7 @@ describe('useGrafico', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(graficoService.obtener).toHaveBeenCalledWith('topSoftware', 10);
+    expect(graficoService.obtener).toHaveBeenCalledWith('topSoftware', 10, expect.any(AbortSignal));
     expect(result.current.data).toEqual({ svg: '<svg>real</svg>', interpretacion: 'texto real' });
   });
 
@@ -35,7 +35,7 @@ describe('useGrafico', () => {
     const { result } = renderHook(() => useGrafico('histogramaCvss'), { wrapper: EnvoltorioQuery });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(graficoService.obtener).toHaveBeenCalledWith('histogramaCvss', undefined);
+    expect(graficoService.obtener).toHaveBeenCalledWith('histogramaCvss', undefined, expect.any(AbortSignal));
   });
 
   test('cuando el service rechaza, expone isError y el error tal cual', async () => {
@@ -46,5 +46,16 @@ describe('useGrafico', () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error).toBe(error);
+  });
+
+  // Bug real reportado: un gráfico que no respondía se quedaba cargando
+  // indefinidamente — ahora hay un timeout de 30s con un mensaje específico.
+  test('cuando el service tira un DOMException de timeout, expone un error con mensaje específico (no el genérico)', async () => {
+    vi.mocked(graficoService.obtener).mockRejectedValue(new DOMException('The operation was aborted', 'TimeoutError'));
+
+    const { result } = renderHook(() => useGrafico('dispersionCvssDias'), { wrapper: EnvoltorioQuery });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect((result.current.error as Error).message).toBe('Gráfico tardó demasiado, intenta de nuevo');
   });
 });

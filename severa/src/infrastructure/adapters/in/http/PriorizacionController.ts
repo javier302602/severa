@@ -7,10 +7,16 @@ import { TransicionDeEstadoInvalidaError } from '../../../../domain/errors/Trans
 export const priorizacionRouter = express.Router();
 
 priorizacionRouter.get('/priorizacion/ranking', async (req, res) => {
+  // severidad (2026-07-19, "carga por etapas"): opcional — el frontend pide
+  // una severidad por vez (Crítica/Alta/Media/Baja) en vez de todo el
+  // catálogo de una sola llamada. Sin el query param, se comporta como
+  // siempre (ranking completo) — no rompe a nadie que ya lo use así.
+  const severidad = typeof req.query.severidad === 'string' ? req.query.severidad : undefined;
+
   // RF-76: se pasa el analista autenticado para que, si esta llamada dispara
   // una alerta de plazo excedido, quede asociada a su centro de
   // notificaciones y no solo a consola.
-  const ranking = await container.generarRankingUrgenciaUseCase.ejecutar(undefined, req.analistaAutenticado!.id);
+  const ranking = await container.generarRankingUrgenciaUseCase.ejecutar(req.analistaAutenticado!.id, undefined, severidad);
   res.json(
     ranking.map((entrada) => ({
       posicion: entrada.posicion,

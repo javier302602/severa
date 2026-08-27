@@ -1,17 +1,24 @@
-import {
-  detectarTipoDeLink,
-  esHostPermitido,
-  esHostPermitidoComoRedireccion
-} from '../../src/domain/services/DetectorDeTipoDeLink';
+import { detectarTipoDeLink } from '../../src/domain/services/DetectorDeTipoDeLink';
 
 describe('DetectorDeTipoDeLink', () => {
   describe('NVD', () => {
-    test('nvd.nist.gov clasifica como nvd', () => {
-      expect(detectarTipoDeLink('https://nvd.nist.gov/vuln/detail/CVE-2021-44228')).toEqual({ tipo: 'nvd' });
+    test('nvd.nist.gov clasifica como nvd y conserva la URL exacta pegada', () => {
+      expect(detectarTipoDeLink('https://nvd.nist.gov/vuln/detail/CVE-2021-44228')).toEqual({
+        tipo: 'nvd',
+        urlDescargable: 'https://nvd.nist.gov/vuln/detail/CVE-2021-44228'
+      });
     });
 
-    test('api.nvd.nist.gov clasifica como nvd', () => {
-      expect(detectarTipoDeLink('https://api.nvd.nist.gov/rest/json/cves/2.0')).toEqual({ tipo: 'nvd' });
+    test('api.nvd.nist.gov clasifica como nvd y conserva la URL exacta pegada', () => {
+      expect(detectarTipoDeLink('https://api.nvd.nist.gov/rest/json/cves/2.0')).toEqual({
+        tipo: 'nvd',
+        urlDescargable: 'https://api.nvd.nist.gov/rest/json/cves/2.0'
+      });
+    });
+
+    test('services.nvd.nist.gov (host real de la API pública NVD 2.0) clasifica como nvd y conserva la URL EXACTA pegada, con sus query params', () => {
+      const url = 'https://services.nvd.nist.gov/rest/json/cves/2.0?pubStartDate=2024-01-01T00:00:00.000&pubEndDate=2024-01-02T00:00:00.000';
+      expect(detectarTipoDeLink(url)).toEqual({ tipo: 'nvd', urlDescargable: url });
     });
   });
 
@@ -29,10 +36,25 @@ describe('DetectorDeTipoDeLink', () => {
       expect(resultado.urlDescargable).toBe('https://docs.google.com/spreadsheets/d/ID123/export?format=xlsx');
     });
 
-    test('un path de docs.google.com que no es /spreadsheets/d/... cae en "directo", host confiable pero sin reescritura', () => {
+    test('un path de docs.google.com que no es /spreadsheets/d/... cae en "directo", sin reescritura', () => {
       const resultado = detectarTipoDeLink('https://docs.google.com/document/d/ID123/edit');
       expect(resultado.tipo).toBe('directo');
       expect(resultado.urlDescargable).toBe('https://docs.google.com/document/d/ID123/edit');
+    });
+
+    // Cuidado especial pedido explícitamente: storage.googleapis.com es
+    // Google Cloud Storage, NO Google Sheets — comparten organización pero
+    // son productos completamente distintos. La reescritura a
+    // export?format=xlsx es EXCLUSIVA de docs.google.com por comparación
+    // exacta de host, nunca por "termina en .google.com" o similar.
+    test('storage.googleapis.com (Google Cloud Storage, NO Sheets) NUNCA se transforma como si fuera Sheets', () => {
+      const urlFirmada =
+        'https://storage.googleapis.com/kagglesdsdata/datasets/6129413/18111744/cve_cisa_epss_enriched_dataset.csv?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Signature=abc123';
+      const resultado = detectarTipoDeLink(urlFirmada);
+
+      expect(resultado.tipo).toBe('directo');
+      expect(resultado.urlDescargable).toBe(urlFirmada);
+      expect(resultado.urlDescargable).not.toContain('export?format=xlsx');
     });
   });
 
@@ -61,37 +83,56 @@ describe('DetectorDeTipoDeLink', () => {
     });
   });
 
-  describe('Hosts no permitidos (deny-by-default)', () => {
-    test('un host arbitrario se rechaza explícitamente, con el host en el motivo', () => {
-      const resultado = detectarTipoDeLink('https://evil.example.com/malware.xlsx');
-      expect(resultado.tipo).toBe('noPermitido');
-      expect(resultado.motivoRechazo).toContain('evil.example.com');
+  // Cambio de diseño (2026-07-17): la allowlist de hosts específicos se
+  // eliminó como filtro de entrada. Cualquier host https que no sea NVD/
+  // Sheets/Dropbox ahora es 'directo' — la protección real contra SSRF vive
+  // en DescargadorDeArchivosHttp (DNS + IP pública en cada salto), no acá.
+  describe('Cualquier host público (ya no hay allowlist de entrada)', () => {
+    test('un host arbitrario, nunca antes visto, se acepta como "directo"', () => {
+      const resultado = detectarTipoDeLink('https://ejemplo-cualquiera.com/dataset.csv');
+      expect(resultado.tipo).toBe('directo');
+      expect(resultado.urlDescargable).toBe('https://ejemplo-cualquiera.com/dataset.csv');
     });
 
-    test('bypass clásico por subdominio ("nvd.nist.gov.evil.com") se rechaza — comparación exacta, no substring', () => {
-      const resultado = detectarTipoDeLink('https://nvd.nist.gov.evil.com/x.xlsx');
-      expect(resultado.tipo).toBe('noPermitido');
+    test('lo que antes era un bypass de allowlist ("nvd.nist.gov.evil.com") ahora simplemente se acepta como "directo" — ya no hay allowlist que eludir', () => {
+      const resultado = detectarTipoDeLink('https://nvd.nist.gov.evil.com/x.csv');
+      expect(resultado.tipo).toBe('directo');
     });
 
-    test('bypass clásico por prefijo ("evil-nvd.nist.gov") se rechaza', () => {
-      const resultado = detectarTipoDeLink('https://evil-nvd.nist.gov/x.xlsx');
-      expect(resultado.tipo).toBe('noPermitido');
+    // Crítico: la query string de una URL firmada (Google Cloud Storage,
+    // S3, etc.) debe llegar carácter por carácter igual — cualquier
+    // reconstrucción rompe la firma.
+    test('la query string de una URL firmada se preserva EXACTA, sin reordenar ni recodificar ningún parámetro', () => {
+      const urlFirmada =
+        'https://storage.googleapis.com/kagglesdsdata/datasets/6129413/18111744/cve_cisa_epss_enriched_dataset.csv' +
+        '?X-Goog-Algorithm=GOOG4-RSA-SHA256' +
+        '&X-Goog-Credential=gcp-kaggle-com%40kaggle-161607.iam.gserviceaccount.com%2F20260717%2Fauto%2Fstorage%2Fgoog4_request' +
+        '&X-Goog-Date=20260717T135525Z' +
+        '&X-Goog-Expires=259200' +
+        '&X-Goog-SignedHeaders=host' +
+        '&X-Goog-Signature=7d66e11c8cdd354a4602f8737b645478e93cfcf0bad2be08af1264c0cc1dea3';
+
+      const resultado = detectarTipoDeLink(urlFirmada);
+
+      expect(resultado.tipo).toBe('directo');
+      expect(resultado.urlDescargable).toBe(urlFirmada);
     });
 
-    test('bypass clásico por userinfo ("nvd.nist.gov@evil.com") se rechaza — el host real es evil.com', () => {
-      const resultado = detectarTipoDeLink('https://nvd.nist.gov@evil.com/x.xlsx');
-      expect(resultado.tipo).toBe('noPermitido');
-      expect(resultado.motivoRechazo).toContain('evil.com');
+    test('un IP literal (intento directo de SSRF) ya NO se rechaza en esta capa — queda a cargo de DescargadorDeArchivosHttp', () => {
+      const resultado = detectarTipoDeLink('https://169.254.169.254/latest/meta-data/');
+      expect(resultado.tipo).toBe('directo');
     });
+  });
 
-    test('esquema http (no https) se rechaza incluso contra un host permitido', () => {
-      const resultado = detectarTipoDeLink('http://nvd.nist.gov/vuln/detail/CVE-2021-44228');
+  describe('Lo que sigue rechazándose (no relacionado con la allowlist)', () => {
+    test('esquema http (no https) se rechaza incluso contra un host que sería válido', () => {
+      const resultado = detectarTipoDeLink('http://ejemplo-cualquiera.com/dataset.csv');
       expect(resultado.tipo).toBe('noPermitido');
       expect(resultado.motivoRechazo).toContain('https');
     });
 
-    test('un IP literal (intento directo de SSRF) se rechaza por no estar en la allowlist de hosts', () => {
-      const resultado = detectarTipoDeLink('https://169.254.169.254/latest/meta-data/');
+    test('esquema http se rechaza también contra un host de NVD', () => {
+      const resultado = detectarTipoDeLink('http://nvd.nist.gov/vuln/detail/CVE-2021-44228');
       expect(resultado.tipo).toBe('noPermitido');
     });
   });
@@ -105,52 +146,6 @@ describe('DetectorDeTipoDeLink', () => {
 
     test('string vacío se rechaza', () => {
       expect(detectarTipoDeLink('').tipo).toBe('noPermitido');
-    });
-  });
-
-  describe('esHostPermitido (reutilizado por DescargadorDeArchivosHttp para revalidar redirecciones)', () => {
-    test.each([
-      ['nvd.nist.gov', true],
-      ['api.nvd.nist.gov', true],
-      ['docs.google.com', true],
-      ['www.dropbox.com', true],
-      ['dropbox.com', true],
-      ['services.nvd.nist.gov', false],
-      ['evil.example.com', false],
-      ['nvd.nist.gov.evil.com', false]
-    ])('%s -> %s', (host, esperado) => {
-      expect(esHostPermitido(host)).toBe(esperado);
-    });
-  });
-
-  describe('esHostPermitidoComoRedireccion (caso especial acotado: export de Google Sheets)', () => {
-    test('redirección desde docs.google.com hacia un subdominio de googleusercontent.com se acepta', () => {
-      expect(esHostPermitidoComoRedireccion('doc-08-4o-sheets.googleusercontent.com', 'docs.google.com')).toBe(true);
-    });
-
-    test('la misma redirección SIN haber pasado antes por docs.google.com se rechaza', () => {
-      expect(esHostPermitidoComoRedireccion('doc-08-4o-sheets.googleusercontent.com', null)).toBe(false);
-      expect(esHostPermitidoComoRedireccion('doc-08-4o-sheets.googleusercontent.com', 'www.dropbox.com')).toBe(false);
-      expect(esHostPermitidoComoRedireccion('doc-08-4o-sheets.googleusercontent.com', 'evil.example.com')).toBe(false);
-    });
-
-    test('un googleusercontent.com encadenado (redirección de una redirección) también se rechaza', () => {
-      expect(
-        esHostPermitidoComoRedireccion('otro-subdominio.googleusercontent.com', 'doc-08-4o-sheets.googleusercontent.com')
-      ).toBe(false);
-    });
-
-    test('el dominio exacto "googleusercontent.com" (sin subdominio) no se acepta — no es el patrón real observado', () => {
-      expect(esHostPermitidoComoRedireccion('googleusercontent.com', 'docs.google.com')).toBe(false);
-    });
-
-    test('un host que ya está en la allowlist normal se sigue aceptando sin importar el salto anterior', () => {
-      expect(esHostPermitidoComoRedireccion('www.dropbox.com', null)).toBe(true);
-      expect(esHostPermitidoComoRedireccion('docs.google.com', 'nvd.nist.gov')).toBe(true);
-    });
-
-    test('bypass por substring ("evilgoogleusercontent.com") se rechaza — se exige el separador de subdominio', () => {
-      expect(esHostPermitidoComoRedireccion('evilgoogleusercontent.com', 'docs.google.com')).toBe(false);
     });
   });
 });

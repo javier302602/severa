@@ -1,7 +1,20 @@
 import { GenerarInformeDataset } from '../../src/application/usecases/GenerarInformeDataset';
 import { SesionAnalisisStore } from '../../src/application/ports/out/SesionAnalisisStore';
 import { GeneradorDeInformes } from '../../src/application/ports/out/GeneradorDeInformes';
+import { AnalistaRepository } from '../../src/application/ports/out/AnalistaRepository';
+import { Analista } from '../../src/domain/entities/Analista';
+import { Correo } from '../../src/domain/value-objects/Correo';
 import { SesionAnalisisNoEncontradaError } from '../../src/domain/errors/SesionAnalisisNoEncontradaError';
+
+function analistaRepositoryFalso(): AnalistaRepository {
+  const analista = new Analista('analista-A', 'Ana Torres', new Correo('ana@example.com'), 'hash', 'analista');
+  return {
+    guardar: jest.fn().mockResolvedValue(undefined),
+    buscarPorCorreo: jest.fn().mockResolvedValue(null),
+    buscarPorId: jest.fn().mockResolvedValue(analista),
+    eliminar: jest.fn().mockResolvedValue(undefined)
+  };
+}
 
 function storeFalso(datos: ReturnType<SesionAnalisisStore['obtener']>): jest.Mocked<SesionAnalisisStore> {
   return {
@@ -24,7 +37,7 @@ describe('GenerarInformeDataset — Mejora 4 (Análisis de Datos General) Fase 5
   test('formato pdf: delega en el store, arma el DTO y llama a generarInformeDataset', async () => {
     const store = storeFalso({ columnas: ['precio'], filas: [{ precio: 10 }, { precio: 20 }] });
     const gerador = geradorDeInformesFalso();
-    const useCase = new GenerarInformeDataset(store, gerador);
+    const useCase = new GenerarInformeDataset(store, gerador, analistaRepositoryFalso());
 
     const resultado = await useCase.ejecutar('analista-A', 'sesion-1', 'pdf');
 
@@ -40,7 +53,7 @@ describe('GenerarInformeDataset — Mejora 4 (Análisis de Datos General) Fase 5
   test('formato docx: llama a generarInformeDatasetWord en vez de generarInformeDataset', async () => {
     const store = storeFalso({ columnas: ['precio'], filas: [{ precio: 10 }, { precio: 20 }] });
     const gerador = geradorDeInformesFalso();
-    const useCase = new GenerarInformeDataset(store, gerador);
+    const useCase = new GenerarInformeDataset(store, gerador, analistaRepositoryFalso());
 
     const resultado = await useCase.ejecutar('analista-A', 'sesion-1', 'docx');
 
@@ -52,7 +65,7 @@ describe('GenerarInformeDataset — Mejora 4 (Análisis de Datos General) Fase 5
   test('si el store no encuentra la sesión, tira SesionAnalisisNoEncontradaError sin llamar al generador', async () => {
     const store = storeFalso(undefined);
     const gerador = geradorDeInformesFalso();
-    const useCase = new GenerarInformeDataset(store, gerador);
+    const useCase = new GenerarInformeDataset(store, gerador, analistaRepositoryFalso());
 
     await expect(useCase.ejecutar('analista-A', 'sesion-de-otro', 'pdf')).rejects.toThrow(SesionAnalisisNoEncontradaError);
     expect(gerador.generarInformeDataset).not.toHaveBeenCalled();

@@ -1,11 +1,12 @@
 import { ExportarDatasetValidadoUseCase } from '../ports/in/ExportarDatasetValidadoUseCase';
 import { VulnerabilidadRepository } from '../ports/out/VulnerabilidadRepository';
+import { construirExcelAgrupadoPorSeveridad } from '../../infrastructure/adapters/out/dataset/ExportadorExcelAgrupado';
 
 export class ExportarDatasetValidado implements ExportarDatasetValidadoUseCase {
   constructor(private readonly vulnerabilidadRepository: VulnerabilidadRepository) {}
 
-  async ejecutar(): Promise<string> {
-    const items = await this.vulnerabilidadRepository.listar();
-    return items.map((item) => `${item.cve.valor},${item.cvssScore.valor},${item.descripcion}`).join('\n');
+  async ejecutar(analistaId: string): Promise<Buffer> {
+    const items = await this.vulnerabilidadRepository.listar(analistaId);
+    return construirExcelAgrupadoPorSeveridad(items);
   }
 }

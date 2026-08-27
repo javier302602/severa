@@ -14,6 +14,7 @@ import type { GraficosOutputPort } from '../../src/application/ports/out/Grafico
 function repositorioVacio(): VulnerabilidadRepository {
   return {
     guardar: jest.fn().mockResolvedValue(undefined),
+    guardarLote: jest.fn().mockResolvedValue(undefined),
     contar: jest.fn().mockResolvedValue(0),
     listar: jest.fn().mockResolvedValue([]),
     buscarPorCve: jest.fn().mockResolvedValue(null),
@@ -21,9 +22,11 @@ function repositorioVacio(): VulnerabilidadRepository {
     filtrarPorSeveridad: jest.fn().mockResolvedValue([]),
     listarPorTipoAcceso: jest.fn().mockResolvedValue([]),
     listarPorTipoVulnerabilidad: jest.fn().mockResolvedValue([]),
+    listarSoftwareDisponible: jest.fn().mockResolvedValue([]),
     listarPorSoftware: jest.fn().mockResolvedValue([]),
     actualizarEstado: jest.fn().mockResolvedValue(undefined),
-    buscarConFiltros: jest.fn().mockResolvedValue([])
+    buscarConFiltros: jest.fn().mockResolvedValue([]),
+    eliminarTodas: jest.fn().mockResolvedValue(0)
   };
 }
 

@@ -21,12 +21,13 @@ import {
   interpretarPastelSeveridad,
   interpretarBoxplotCvss,
   interpretarHistogramaAgrupado,
-  interpretarCvssPorAcceso,
   interpretarDispersionCvssDias,
   interpretarHistogramaDiasParche,
   interpretarTopTipos,
   interpretarTopSoftware
 } from '../../../../domain/services/InterpretacionDeGraficos';
+import { interpretarComparacionAcceso } from '../../../../domain/services/InterpretadorDeResultados';
+import { formatearEstadistico } from '../../../../domain/services/ComparadorDeCategorias';
 
 // RF-77/RF-82: implementación única del puerto GeneradorDeInformes (mismo
 // patrón de "un solo adaptador por puerto de salida" que SvgGraficosAdapter
@@ -75,13 +76,22 @@ export class GeneradorInformePDF implements GeneradorDeInformes {
 
   private renderizarPdfDataset(datos: DatosInformeDataset): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50, size: 'A4' });
+      // bufferPages: true — necesario para el Índice (ver dibujarIndice más
+      // abajo): permite reservar una página en blanco justo después de la
+      // portada y volver a ella al final, cuando ya se sabe en qué página
+      // real cayó cada capítulo, sin tener que calcular la paginación a mano
+      // por adelantado.
+      // Formato APA 7 (2026-07-20): márgenes de 1 pulgada (72pt) en las 4
+      // direcciones, tamaño Carta (el estándar del formato) — antes eran
+      // márgenes de 50pt (~0.7in) sobre A4.
+      const doc = new PDFDocument({ margin: 72, size: 'LETTER', bufferPages: true });
       const chunks: Buffer[] = [];
       doc.on('data', (chunk: Buffer) => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
       dibujarPortadaDataset(doc, datos);
+      const paginaIndice = reservarPaginaDeIndice(doc);
       dibujarIntroduccionDataset(doc, datos);
       dibujarMetodologiaDataset(doc);
       dibujarDescripcionDataset(doc, datos);
@@ -91,20 +101,30 @@ export class GeneradorInformePDF implements GeneradorDeInformes {
       dibujarCorrelacionDataset(doc, datos);
       dibujarOutliersDataset(doc, datos);
       dibujarConclusionesDataset(doc, datos);
+      dibujarAnexosDataset(doc, datos);
 
+      completarIndice(doc, paginaIndice);
+      numerarPaginas(doc);
       doc.end();
     });
   }
 
   private renderizarPdf(titulo: string, datos: DatosInforme, resumido: boolean): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50, size: 'A4' });
+      // Formato APA 7 (2026-07-20): márgenes de 1 pulgada (72pt) en las 4
+      // direcciones, tamaño Carta (el estándar del formato) — antes eran
+      // márgenes de 50pt (~0.7in) sobre A4.
+      const doc = new PDFDocument({ margin: 72, size: 'LETTER', bufferPages: true });
       const chunks: Buffer[] = [];
       doc.on('data', (chunk: Buffer) => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
       dibujarPortada(doc, titulo, datos);
+      // El resumen ejecutivo es, por diseño, un documento corto de 3
+      // gráficos — un índice de una sola página para un puñado de secciones
+      // no aporta nada; se reserva solo para el informe completo.
+      const paginaIndice = resumido ? null : reservarPaginaDeIndice(doc);
       dibujarIntroduccion(doc, datos);
       dibujarOrigenYCalidad(doc, datos);
       if (!resumido) dibujarMetodologia(doc);
@@ -115,8 +135,13 @@ export class GeneradorInformePDF implements GeneradorDeInformes {
       dibujarGraficos(doc, datos, resumido);
       dibujarAplicacionPractica(doc, datos, resumido);
       dibujarConclusiones(doc, datos);
-      if (!resumido) dibujarReferencias(doc);
+      if (!resumido) {
+        dibujarReferencias(doc);
+        dibujarAnexos(doc, datos);
+      }
 
+      if (paginaIndice !== null) completarIndice(doc, paginaIndice);
+      numerarPaginas(doc);
       doc.end();
     });
   }
@@ -128,27 +153,127 @@ export class GeneradorInformePDF implements GeneradorDeInformes {
 // DibujoDeGraficosPdf no empujan doc.y solos) — se manejan a mano acá.
 // ---------------------------------------------------------------------
 
+// ---------------------------------------------------------------------
+// Índice (tabla de contenidos): cada llamada a nuevaSeccion() es un capítulo
+// numerado, y se registra acá con la página real donde cayó — no hay forma
+// de saber de antemano en qué página termina el capítulo anterior sin
+// contar párrafos a mano, así que se usa bufferPages (ver renderizarPdf/
+// renderizarPdfDataset) para volver a la página del índice al final, una vez
+// que la paginación completa ya se conoce.
+//
+// El array de entradas se guarda en una propiedad puesta directamente sobre
+// LA INSTANCIA de PDFDocument de esta generación (no en una variable de
+// módulo): dos informes generándose en paralelo (dos requests concurrentes)
+// tienen cada uno su propio `doc`, así que no hay estado compartido entre
+// ellos — dos analistas pidiendo un informe al mismo tiempo no se pisan.
+interface EntradaIndice {
+  numero: string;
+  titulo: string;
+  pagina: number;
+}
+
+interface DocConIndice extends PDFKit.PDFDocument {
+  _entradasIndice?: EntradaIndice[];
+}
+
 function nuevaSeccion(doc: PDFKit.PDFDocument, numero: string, titulo: string): void {
   if (doc.y > doc.page.margins.top) {
     doc.addPage();
   }
-  doc.fontSize(15).fillColor('#0f172a').font('Helvetica-Bold').text(`${numero}. ${titulo}`, { underline: true });
+  (doc as DocConIndice)._entradasIndice?.push({ numero, titulo, pagina: doc.bufferedPageRange().count });
+  doc.fontSize(15).fillColor('#0f172a').font('Times-Bold').text(`${numero}. ${titulo}`, { underline: true });
   doc.moveDown(0.5);
+}
+
+// Se llama justo después de dibujar la portada: agrega una página en blanco
+// que se reserva para el índice (se completa recién en completarIndice, una
+// vez conocida la paginación real de todo el documento) y, a continuación,
+// una segunda página nueva donde arranca el capítulo 1 — sin este segundo
+// addPage(), nuevaSeccion() vería doc.y ya en el margen superior de la
+// página recién creada y NO abriría una página nueva propia, así que el
+// capítulo 1 terminaría escribiéndose encima de la página reservada para el
+// índice en vez de después de ella.
+function reservarPaginaDeIndice(doc: PDFKit.PDFDocument): number {
+  (doc as DocConIndice)._entradasIndice = [];
+  doc.addPage();
+  const numeroDePagina = doc.bufferedPageRange().count - 1;
+  doc.addPage();
+  return numeroDePagina;
+}
+
+// Vuelve a la página reservada por reservarPaginaDeIndice() y dibuja el
+// título + una línea por capítulo con su página real, ya conocida a esta
+// altura porque todo el contenido del documento ya se generó. pdfkit no
+// resetea x/y al cambiar de página con switchToPage — se fijan a mano al
+// margen superior, si no se seguiría escribiendo desde donde haya quedado
+// la última página real del documento.
+function completarIndice(doc: PDFKit.PDFDocument, numeroDePagina: number): void {
+  const entradas = (doc as DocConIndice)._entradasIndice ?? [];
+  const ultimaPagina = doc.bufferedPageRange().count - 1;
+
+  doc.switchToPage(numeroDePagina);
+  doc.x = doc.page.margins.left;
+  doc.y = doc.page.margins.top;
+
+  doc.fontSize(18).fillColor('#0f172a').font('Times-Bold').text('Índice', { align: 'center' });
+  doc.moveDown(1.5);
+
+  // Una sola llamada a .text() por línea (título + relleno de espacios +
+  // página, ya combinados en un solo string) en vez de dos llamadas
+  // encadenadas con continued/align:'right': se probó esa variante contra un
+  // PDF real generado y el estado de "texto continuado" de pdfkit no se
+  // comportaba de forma confiable entre ambas llamadas (el número de página
+  // de las primeras entradas terminaba en la línea o página equivocada). Un
+  // único string por línea no tiene ese problema.
+  const anchoDisponible = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  doc.fontSize(11).font('Times-Roman').fillColor('#334155');
+  const anchoEspacio = doc.widthOfString(' ') || 1;
+  entradas.forEach((entrada) => {
+    const izquierda = `${entrada.numero}. ${entrada.titulo}`;
+    const derecha = `pág. ${entrada.pagina}`;
+    const espaciosDisponibles = Math.floor((anchoDisponible - doc.widthOfString(izquierda) - doc.widthOfString(derecha)) / anchoEspacio);
+    const relleno = ' '.repeat(Math.max(1, espaciosDisponibles));
+    doc.text(izquierda + relleno + derecha, doc.page.margins.left, doc.y, { width: anchoDisponible, lineBreak: false });
+    doc.moveDown(1.1);
+  });
+
+  doc.switchToPage(ultimaPagina);
+}
+
+// Numeración continua (APA 7, 2026-07-20): un número por página, arriba a la
+// derecha, sobre TODO el documento (incluida la portada) — llamada al final,
+// una vez que ya no queda ningún otro switchToPage pendiente (completarIndice
+// ya dejó al doc posicionado en la última página real antes de esto).
+function numerarPaginas(doc: PDFKit.PDFDocument): void {
+  const rango = doc.bufferedPageRange();
+  for (let indice = rango.start; indice < rango.start + rango.count; indice++) {
+    doc.switchToPage(indice);
+    const numero = indice - rango.start + 1;
+    doc
+      .fontSize(10)
+      .font('Times-Roman')
+      .fillColor('#334155')
+      .text(String(numero), doc.page.width - doc.page.margins.right - 40, doc.page.margins.top / 2, {
+        width: 40,
+        align: 'right',
+        lineBreak: false
+      });
+  }
 }
 
 function subseccion(doc: PDFKit.PDFDocument, titulo: string): void {
   doc.moveDown(0.3);
-  doc.fontSize(11).fillColor('#1e293b').font('Helvetica-Bold').text(titulo);
+  doc.fontSize(11).fillColor('#1e293b').font('Times-Bold').text(titulo);
   doc.moveDown(0.2);
 }
 
 function parrafo(doc: PDFKit.PDFDocument, texto: string): void {
-  doc.fontSize(9.5).fillColor('#334155').font('Helvetica').text(texto, { align: 'justify' });
+  doc.fontSize(9.5).fillColor('#334155').font('Times-Roman').text(texto, { align: 'justify' });
   doc.moveDown(0.4);
 }
 
 function formula(doc: PDFKit.PDFDocument, texto: string): void {
-  doc.fontSize(9).fillColor('#0f172a').font('Helvetica-Oblique').text(texto);
+  doc.fontSize(9).fillColor('#0f172a').font('Times-Italic').text(texto);
   doc.moveDown(0.3);
 }
 
@@ -167,7 +292,7 @@ function dibujarTabla(doc: PDFKit.PDFDocument, encabezados: string[], filas: str
   asegurarEspacio(doc, alturaFila * 2);
   let x = doc.page.margins.left;
   const yEncabezado = doc.y;
-  doc.fontSize(8).font('Helvetica-Bold').fillColor('#ffffff');
+  doc.fontSize(8).font('Times-Bold').fillColor('#ffffff');
   doc.rect(doc.page.margins.left, yEncabezado, anchoTotal, alturaFila).fill('#334155');
   encabezados.forEach((encabezado, indice) => {
     doc.fillColor('#ffffff').text(encabezado, x + 4, yEncabezado + 4, { width: anchos[indice] - 8 });
@@ -182,7 +307,7 @@ function dibujarTabla(doc: PDFKit.PDFDocument, encabezados: string[], filas: str
       doc.rect(doc.page.margins.left, y, anchoTotal, alturaFila).fill('#f1f5f9');
     }
     x = doc.page.margins.left;
-    doc.fontSize(8).font('Helvetica').fillColor('#1e293b');
+    doc.fontSize(8).font('Times-Roman').fillColor('#1e293b');
     fila.forEach((celda, indiceColumna) => {
       doc.text(celda, x + 4, y + 4, { width: anchos[indiceColumna] - 8 });
       x += anchos[indiceColumna];
@@ -199,9 +324,11 @@ function dibujarTabla(doc: PDFKit.PDFDocument, encabezados: string[], filas: str
 // ---------------------------------------------------------------------
 
 function dibujarPortada(doc: PDFKit.PDFDocument, titulo: string, datos: DatosInforme): void {
-  doc.fontSize(20).fillColor('#0f172a').font('Helvetica-Bold').text(titulo, { align: 'center' });
+  doc.fontSize(20).fillColor('#0f172a').font('Times-Bold').text(titulo, { align: 'center' });
   doc.moveDown(1);
-  doc.fontSize(10).fillColor('#64748b').font('Helvetica').text(`Generado: ${datos.generadoEn.toLocaleString()}`, { align: 'center' });
+  doc.fontSize(12).fillColor('#334155').font('Times-Bold').text(`Generado por SEVERA para ${datos.generadoPara}`, { align: 'center' });
+  doc.moveDown(0.5);
+  doc.fontSize(10).fillColor('#64748b').font('Times-Roman').text(`Generado: ${datos.generadoEn.toLocaleString()}`, { align: 'center' });
   doc.text(`Total de vulnerabilidades analizadas: ${datos.totalVulnerabilidades}`, { align: 'center' });
   doc.moveDown(2);
 }
@@ -264,8 +391,8 @@ function dibujarMetodologia(doc: PDFKit.PDFDocument): void {
     ['Correlación de Pearson', 'grado y dirección de la relación lineal entre CVSS Score y Días para Parche.']
   ];
   formulas.forEach(([nombre, uso]) => {
-    doc.fontSize(9.5).font('Helvetica-Bold').fillColor('#1e293b').text(`${nombre}: `, { continued: true });
-    doc.font('Helvetica').fillColor('#334155').text(uso);
+    doc.fontSize(9.5).font('Times-Bold').fillColor('#1e293b').text(`${nombre}: `, { continued: true });
+    doc.font('Times-Roman').fillColor('#334155').text(uso);
   });
   doc.moveDown(0.4);
 }
@@ -478,12 +605,15 @@ interface DefinicionGrafico {
   analisis: (doc: PDFKit.PDFDocument) => void;
 }
 
-function dibujarGraficos(doc: PDFKit.PDFDocument, datos: DatosInforme, resumido: boolean): void {
+// Extraído de dibujarGraficos (antes vivía inline ahí) para que Anexo C
+// ("Índice de figuras") pueda listar número + título de las 10 figuras sin
+// duplicar esta lista a mano en dos lugares — una sola fuente de verdad.
+function construirDefinicionesGraficos(datos: DatosInforme): DefinicionGrafico[] {
   const g = datos.graficos;
   const r = datos.resumenEstadistico;
   const remotoVsLocal = datos.comparacionAccesoRemotoLocal;
 
-  const definiciones: DefinicionGrafico[] = [
+  return [
     {
       numero: 1,
       titulo: 'Histograma de CVSS Score (distribución sin agrupar)',
@@ -534,7 +664,7 @@ function dibujarGraficos(doc: PDFKit.PDFDocument, datos: DatosInforme, resumido:
       titulo: 'Comparación de CVSS por tipo de acceso',
       objetivo: 'comparar la severidad entre vulnerabilidades de acceso remoto y de acceso local.',
       fundamento: 'dos boxplots lado a lado permiten comparar mediana, dispersión y atípicos de cada grupo sin una prueba estadística formal.',
-      relacion: `las medias (remoto=${remotoVsLocal.mediaA.toFixed(2)}, local=${remotoVsLocal.mediaB.toFixed(2)}) son las mismas de la Comparación acceso remoto/local.`,
+      relacion: `las medias (remoto=${formatearEstadistico(remotoVsLocal.mediaA)}, local=${formatearEstadistico(remotoVsLocal.mediaB)}) son las mismas de la Comparación acceso remoto/local.`,
       dibujar: (d) =>
         (d.y = dibujarBoxplotDoble(
           d,
@@ -542,14 +672,7 @@ function dibujarGraficos(doc: PDFKit.PDFDocument, datos: DatosInforme, resumido:
           { etiqueta: 'Local', resumen: g.boxplotPorAcceso.local },
           { titulo: 'Gráfico 6: CVSS por tipo de acceso', etiquetaEjeY: 'CVSS Score' }
         )),
-      analisis: (d) =>
-        parrafo(
-          d,
-          interpretarCvssPorAcceso([
-            { etiqueta: 'Remoto', valor: remotoVsLocal.mediaA },
-            { etiqueta: 'Local', valor: remotoVsLocal.mediaB }
-          ])
-        )
+      analisis: (d) => parrafo(d, interpretarComparacionAcceso(remotoVsLocal))
     },
     {
       numero: 7,
@@ -588,33 +711,36 @@ function dibujarGraficos(doc: PDFKit.PDFDocument, datos: DatosInforme, resumido:
       analisis: (d) => parrafo(d, interpretarTopSoftware(g.topSoftware))
     }
   ];
+}
 
+function dibujarGraficos(doc: PDFKit.PDFDocument, datos: DatosInforme, resumido: boolean): void {
+  const definiciones = construirDefinicionesGraficos(datos);
   const seleccionados = resumido ? definiciones.filter((d) => [1, 4, 3].includes(d.numero)) : definiciones;
 
   nuevaSeccion(doc, '8', 'Gráficos explicados en detalle');
   seleccionados.forEach((definicion) => {
     doc.addPage();
-    doc.fontSize(12).font('Helvetica-Bold').fillColor('#0f172a').text(`8.${definicion.numero} Gráfico ${definicion.numero}: ${definicion.titulo}`);
+    doc.fontSize(12).font('Times-Bold').fillColor('#0f172a').text(`8.${definicion.numero} Gráfico ${definicion.numero}: ${definicion.titulo}`);
     doc.moveDown(0.3);
 
-    doc.fontSize(9.5).font('Helvetica-Bold').fillColor('#1e293b').text('Objetivo del gráfico: ', { continued: true });
-    doc.font('Helvetica').fillColor('#334155').text(definicion.objetivo);
+    doc.fontSize(9.5).font('Times-Bold').fillColor('#1e293b').text('Objetivo del gráfico: ', { continued: true });
+    doc.font('Times-Roman').fillColor('#334155').text(definicion.objetivo);
 
-    doc.font('Helvetica-Bold').fillColor('#1e293b').text('Fundamento estadístico: ', { continued: true });
-    doc.font('Helvetica').fillColor('#334155').text(definicion.fundamento);
+    doc.font('Times-Bold').fillColor('#1e293b').text('Fundamento estadístico: ', { continued: true });
+    doc.font('Times-Roman').fillColor('#334155').text(definicion.fundamento);
 
-    doc.font('Helvetica-Bold').fillColor('#1e293b').text('Relación con secciones anteriores: ', { continued: true });
-    doc.font('Helvetica').fillColor('#334155').text(definicion.relacion);
+    doc.font('Times-Bold').fillColor('#1e293b').text('Relación con secciones anteriores: ', { continued: true });
+    doc.font('Times-Roman').fillColor('#334155').text(definicion.relacion);
     doc.moveDown(0.5);
 
     asegurarEspacio(doc, 260);
     definicion.dibujar(doc);
     doc.moveDown(0.5);
 
-    doc.fontSize(9.5).font('Helvetica-Bold').fillColor('#1e293b').text('Funcionamiento del algoritmo: ', { continued: true });
-    doc.font('Helvetica').fillColor('#334155').text('los datos se calculan a partir del conjunto completo de vulnerabilidades vigente al generar el informe (ver Metodología, sección 3) y se posicionan geométricamente antes de dibujarse — sin pasos manuales ni aproximaciones visuales.');
+    doc.fontSize(9.5).font('Times-Bold').fillColor('#1e293b').text('Funcionamiento del algoritmo: ', { continued: true });
+    doc.font('Times-Roman').fillColor('#334155').text('los datos se calculan a partir del conjunto completo de vulnerabilidades vigente al generar el informe (ver Metodología, sección 3) y se posicionan geométricamente antes de dibujarse — sin pasos manuales ni aproximaciones visuales.');
 
-    doc.fontSize(9.5).font('Helvetica-Bold').fillColor('#1e293b').text('Análisis de resultados y conclusiones:');
+    doc.fontSize(9.5).font('Times-Bold').fillColor('#1e293b').text('Análisis de resultados y conclusiones:');
     definicion.analisis(doc);
   });
 }
@@ -645,8 +771,8 @@ function dibujarAplicacionPractica(doc: PDFKit.PDFDocument, datos: DatosInforme,
   subseccion(doc, '¿Influye el acceso remoto en la severidad?');
   parrafo(
     doc,
-    `Media CVSS remoto = ${remotoVsLocal.mediaA.toFixed(2)}, local = ${remotoVsLocal.mediaB.toFixed(2)} ` +
-      `(diferencia de ${remotoVsLocal.diferenciaMedias.toFixed(2)} puntos).`
+    `Media CVSS remoto = ${formatearEstadistico(remotoVsLocal.mediaA)}, local = ${formatearEstadistico(remotoVsLocal.mediaB)} ` +
+      `(diferencia de ${formatearEstadistico(remotoVsLocal.diferenciaMedias)} puntos).`
   );
 
   subseccion(doc, '¿Cuánto tiempo toma en promedio disponer de un parche?');
@@ -686,13 +812,13 @@ function dibujarConclusiones(doc: PDFKit.PDFDocument, datos: DatosInforme): void
 
   subseccion(doc, 'Síntesis de hallazgos');
   datos.interpretacion.forEach((parrafoTexto) => {
-    doc.fontSize(9.5).fillColor('#334155').font('Helvetica').text(`•  ${parrafoTexto}`, { align: 'justify' });
+    doc.fontSize(9.5).fillColor('#334155').font('Times-Roman').text(`•  ${parrafoTexto}`, { align: 'justify' });
     doc.moveDown(0.3);
   });
 
   subseccion(doc, 'Limitaciones conocidas');
   datos.limitacionesConocidas.forEach((limitacion) => {
-    doc.fontSize(9).fillColor('#64748b').font('Helvetica').text(`•  ${limitacion}`, { align: 'justify' });
+    doc.fontSize(9).fillColor('#64748b').font('Times-Roman').text(`•  ${limitacion}`, { align: 'justify' });
     doc.moveDown(0.3);
   });
 
@@ -718,6 +844,60 @@ function dibujarReferencias(doc: PDFKit.PDFDocument): void {
   );
 }
 
+// ---------------------------------------------------------------------
+// Anexos (capítulo 12 del .qmd de referencia, adaptado): material de
+// respaldo que sustenta el resto del informe pero que, por su extensión,
+// dificultaría la lectura de los capítulos de análisis si estuviera ahí en
+// vez de acá. Solo se incluye en el informe completo (nunca en el resumen
+// ejecutivo, ver renderizarPdf) — un resumen de 3 gráficos no necesita un
+// dataset completo de respaldo.
+// ---------------------------------------------------------------------
+
+function dibujarAnexos(doc: PDFKit.PDFDocument, datos: DatosInforme): void {
+  nuevaSeccion(doc, '12', 'Anexos');
+  parrafo(
+    doc,
+    'Este capítulo reúne el material de respaldo que sustenta los resultados del informe: el dataset completo (o ' +
+      'una muestra representativa, si excede el límite razonable de este anexo), la tabla de frecuencias sin ' +
+      'agrupar en su versión íntegra y el índice de las figuras generadas.'
+  );
+
+  subseccion(doc, 'Anexo A: Dataset completo');
+  const anexoDataset = datos.anexoDataset;
+  parrafo(
+    doc,
+    anexoDataset.esMuestra
+      ? `El dataset completo tiene ${anexoDataset.tamanoOriginal} registros, más de lo que este anexo puede listar ` +
+        `de forma legible. Se muestran ${anexoDataset.filas.length} registros seleccionados por muestreo ` +
+        'sistemático (espaciado uniforme sobre el total, no solo los primeros casos cargados) — misma técnica que ' +
+        'la muestra representativa de la sección 4.'
+      : `Se listan los ${anexoDataset.filas.length} registros completos del dataset analizado.`
+  );
+  dibujarTabla(
+    doc,
+    ['CVE', 'Software', 'CVSS', 'Severidad', 'Acceso', 'Estado'],
+    anexoDataset.filas.map((fila) => [fila.cve, fila.software, fila.cvssScore.toFixed(1), fila.severidad, fila.tipoAcceso, fila.estadoRemediacion]),
+    [90, 140, 40, 55, 55, 70]
+  );
+
+  subseccion(doc, 'Anexo B: Tabla sin agrupar completa');
+  parrafo(doc, `Los ${datos.distribucionSinAgrupar.length} valores únicos de CVSS Score, con su frecuencia — sin el recorte a 20 filas de la sección 7.`);
+  dibujarTabla(
+    doc,
+    ['CVSS Score', 'Frecuencia'],
+    datos.distribucionSinAgrupar.map((fila) => [fila.valor.toFixed(1), String(fila.frecuencia)]),
+    [200, 200]
+  );
+
+  subseccion(doc, 'Anexo C: Índice de figuras');
+  dibujarTabla(
+    doc,
+    ['#', 'Título'],
+    construirDefinicionesGraficos(datos).map((definicion) => [String(definicion.numero), definicion.titulo]),
+    [40, 400]
+  );
+}
+
 // =======================================================================
 // Fase 5 (Mejora 4 — Análisis de Datos General): informe del módulo de
 // dataset genérico. Mismo patrón fórmula -> sustitución con datos reales ->
@@ -732,9 +912,11 @@ function dibujarReferencias(doc: PDFKit.PDFDocument): void {
 // =======================================================================
 
 function dibujarPortadaDataset(doc: PDFKit.PDFDocument, datos: DatosInformeDataset): void {
-  doc.fontSize(20).fillColor('#0f172a').font('Helvetica-Bold').text('Informe SEVERA — Análisis de Datos General', { align: 'center' });
+  doc.fontSize(20).fillColor('#0f172a').font('Times-Bold').text('Informe SEVERA — Análisis de Datos General', { align: 'center' });
   doc.moveDown(1);
-  doc.fontSize(10).fillColor('#64748b').font('Helvetica').text(`Generado: ${datos.generadoEn.toLocaleString()}`, { align: 'center' });
+  doc.fontSize(12).fillColor('#334155').font('Times-Bold').text(`Generado por SEVERA para ${datos.generadoPara}`, { align: 'center' });
+  doc.moveDown(0.5);
+  doc.fontSize(10).fillColor('#64748b').font('Times-Roman').text(`Generado: ${datos.generadoEn.toLocaleString()}`, { align: 'center' });
   doc.text(`${datos.totalFilas} fila(s) — ${datos.totalColumnas} columna(s)`, { align: 'center' });
   doc.moveDown(2);
 }
@@ -764,8 +946,8 @@ function dibujarMetodologiaDataset(doc: PDFKit.PDFDocument): void {
     ['Rango intercuartílico (1.5×IQR)', 'criterio estándar de detección de valores atípicos por columna.']
   ];
   formulas.forEach(([nombre, uso]) => {
-    doc.fontSize(9.5).font('Helvetica-Bold').fillColor('#1e293b').text(`${nombre}: `, { continued: true });
-    doc.font('Helvetica').fillColor('#334155').text(uso);
+    doc.fontSize(9.5).font('Times-Bold').fillColor('#1e293b').text(`${nombre}: `, { continued: true });
+    doc.font('Times-Roman').fillColor('#334155').text(uso);
   });
   doc.moveDown(0.4);
 }
@@ -857,7 +1039,7 @@ function dibujarAnalisisUnivariadoDataset(doc: PDFKit.PDFDocument, datos: DatosI
 
     doc.addPage();
     const r = analisis.resumenCincoNumeros;
-    doc.fontSize(12).font('Helvetica-Bold').fillColor('#0f172a').text(`6.${indice + 1} ${analisis.nombre}`);
+    doc.fontSize(12).font('Times-Bold').fillColor('#0f172a').text(`6.${indice + 1} ${analisis.nombre}`);
     doc.moveDown(0.3);
 
     formula(doc, `Media = (suma de ${analisis.valoresValidos} valores) / n = ${r.media.toFixed(2)}`);
@@ -962,13 +1144,61 @@ function dibujarConclusionesDataset(doc: PDFKit.PDFDocument, datos: DatosInforme
 
   subseccion(doc, 'Síntesis de hallazgos');
   datos.interpretacion.forEach((parrafoTexto) => {
-    doc.fontSize(9.5).fillColor('#334155').font('Helvetica').text(`•  ${parrafoTexto}`, { align: 'justify' });
+    doc.fontSize(9.5).fillColor('#334155').font('Times-Roman').text(`•  ${parrafoTexto}`, { align: 'justify' });
     doc.moveDown(0.3);
   });
 
   subseccion(doc, 'Limitaciones conocidas');
   datos.limitacionesConocidas.forEach((limitacion) => {
-    doc.fontSize(9).fillColor('#64748b').font('Helvetica').text(`•  ${limitacion}`, { align: 'justify' });
+    doc.fontSize(9).fillColor('#64748b').font('Times-Roman').text(`•  ${limitacion}`, { align: 'justify' });
     doc.moveDown(0.3);
   });
+}
+
+// Valores de un dataset genérico pueden ser de cualquier tipo (number,
+// string, Date, null/undefined por celdas faltantes) — se normalizan a texto
+// para la tabla del Anexo A sin asumir un formato de columna en particular.
+function celdaComoTexto(valor: unknown): string {
+  if (valor === null || valor === undefined || valor === '') return '—';
+  if (valor instanceof Date) return valor.toLocaleDateString();
+  return String(valor);
+}
+
+function dibujarAnexosDataset(doc: PDFKit.PDFDocument, datos: DatosInformeDataset): void {
+  nuevaSeccion(doc, '10', 'Anexos');
+  parrafo(doc, 'Material de respaldo del informe: una muestra cruda de filas del dataset y el índice de las figuras generadas.');
+
+  subseccion(doc, 'Anexo A: Muestra de filas');
+  const anexo = datos.anexoMuestraFilas;
+  parrafo(
+    doc,
+    anexo.totalColumnas > anexo.columnasMostradas.length
+      ? `Se muestran las primeras ${anexo.columnasMostradas.length} de ${anexo.totalColumnas} columnas y las primeras ` +
+        `${anexo.filas.length} de ${anexo.totalFilas} filas, para mantener la tabla legible dentro del ancho de una página.`
+      : `Se muestran las primeras ${anexo.filas.length} de ${anexo.totalFilas} filas del dataset.`
+  );
+  if (anexo.filas.length === 0) {
+    parrafo(doc, 'El dataset no tiene filas.');
+  } else {
+    dibujarTabla(
+      doc,
+      anexo.columnasMostradas,
+      anexo.filas.map((fila) => anexo.columnasMostradas.map((columna) => celdaComoTexto(fila[columna])))
+    );
+  }
+
+  subseccion(doc, 'Anexo B: Índice de figuras generadas');
+  const figuras: string[][] = [
+    ...datos.analisisUnivariado
+      .filter((analisis) => analisis.tipo === 'numerica')
+      .map((analisis, indice): [string, string] => [String(indice + 1), `Distribución de "${analisis.nombre}"`]),
+  ];
+  if (datos.matrizCorrelacion.columnas.length > 0) {
+    figuras.push([String(figuras.length + 1), 'Heatmap de correlación de Pearson']);
+  }
+  if (figuras.length === 0) {
+    parrafo(doc, 'Este dataset no generó ninguna figura (sin columnas numéricas).');
+  } else {
+    dibujarTabla(doc, ['#', 'Título'], figuras, [40, 400]);
+  }
 }

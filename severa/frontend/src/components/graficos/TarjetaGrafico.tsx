@@ -29,7 +29,7 @@ export function TarjetaGrafico({ tipo, titulo, limite }: TarjetaGraficoProps) {
       <h2 className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">{titulo}</h2>
       {isLoading && <Spinner etiqueta="Generando…" />}
       {isError && esCatalogoVacio(error) && <EstadoVacio mensaje="Sin datos todavía." />}
-      {isError && !esCatalogoVacio(error) && <MensajeError mensaje={mensajeDeError(error)} />}
+      {isError && !esCatalogoVacio(error) && <MensajeError mensaje={`Gráfico falló: ${mensajeDeError(error)}`} />}
       {data && (
         <>
           <div className="[&_svg]:mx-auto [&_svg]:max-w-full" dangerouslySetInnerHTML={{ __html: data.svg }} />

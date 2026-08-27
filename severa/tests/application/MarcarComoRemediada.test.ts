@@ -10,6 +10,7 @@ import { TransicionDeEstadoInvalidaError } from '../../src/domain/errors/Transic
 function repoFalso(vulnerabilidad: Vulnerabilidad | null): VulnerabilidadRepository {
   return {
     guardar: jest.fn().mockResolvedValue(undefined),
+    guardarLote: jest.fn().mockResolvedValue(undefined),
     contar: jest.fn().mockResolvedValue(0),
     listar: jest.fn().mockResolvedValue([]),
     buscarPorCve: jest.fn().mockResolvedValue(vulnerabilidad),
@@ -17,9 +18,11 @@ function repoFalso(vulnerabilidad: Vulnerabilidad | null): VulnerabilidadReposit
     filtrarPorSeveridad: jest.fn().mockResolvedValue([]),
     listarPorTipoAcceso: jest.fn().mockResolvedValue([]),
     listarPorTipoVulnerabilidad: jest.fn().mockResolvedValue([]),
+    listarSoftwareDisponible: jest.fn().mockResolvedValue([]),
     listarPorSoftware: jest.fn().mockResolvedValue([]),
     actualizarEstado: jest.fn().mockResolvedValue(undefined),
-    buscarConFiltros: jest.fn().mockResolvedValue([])
+    buscarConFiltros: jest.fn().mockResolvedValue([]),
+    eliminarTodas: jest.fn().mockResolvedValue(0)
   };
 }
 
@@ -32,11 +35,11 @@ describe('MarcarComoRemediada', () => {
     const repo = repoFalso(enProceso);
     const usecase = new MarcarComoRemediada(repo);
 
-    const resultado = await usecase.ejecutar('CVE-2021-44228');
+    const resultado = await usecase.ejecutar('CVE-2021-44228', 'analista-1');
 
     expect(resultado?.estadoRemediacion.valor).toBe('Remediada');
     expect(resultado?.fechaRemediacion).toBeInstanceOf(Date);
-    expect(repo.actualizarEstado).toHaveBeenCalledWith('CVE-2021-44228', 'Remediada', expect.any(Date));
+    expect(repo.actualizarEstado).toHaveBeenCalledWith('CVE-2021-44228', 'Remediada', 'analista-1', expect.any(Date));
   });
 
   test('transición inválida: Pendiente -> Remediada directo lanza TransicionDeEstadoInvalidaError y no persiste', async () => {
@@ -44,7 +47,7 @@ describe('MarcarComoRemediada', () => {
     const repo = repoFalso(pendiente);
     const usecase = new MarcarComoRemediada(repo);
 
-    await expect(usecase.ejecutar('CVE-2021-44228')).rejects.toThrow(TransicionDeEstadoInvalidaError);
+    await expect(usecase.ejecutar('CVE-2021-44228', 'analista-1')).rejects.toThrow(TransicionDeEstadoInvalidaError);
     expect(repo.actualizarEstado).not.toHaveBeenCalled();
   });
 
@@ -52,7 +55,7 @@ describe('MarcarComoRemediada', () => {
     const repo = repoFalso(null);
     const usecase = new MarcarComoRemediada(repo);
 
-    const resultado = await usecase.ejecutar('CVE-9999-99999');
+    const resultado = await usecase.ejecutar('CVE-9999-99999', 'analista-1');
 
     expect(resultado).toBeNull();
   });

@@ -1,6 +1,7 @@
 import { Vulnerabilidad } from '../entities/Vulnerabilidad';
 import { calcularMedia, calcularMediana } from './EstadisticaDescriptiva';
 import { generarTablaAgrupada } from './DistribucionFrecuencias';
+import { minimoDe, maximoDe } from './MinMax';
 import { clasificar } from './ClasificadorDeRiesgo';
 import { CvssScore } from '../value-objects/CvssScore';
 import { NivelDeRiesgo } from '../value-objects/NivelDeRiesgo';
@@ -40,8 +41,8 @@ function calcularHistograma(valores: number[], intervalos: number, etiqueta?: st
     return { bins: [], media: 0, mediana: 0 };
   }
 
-  const min = Math.min(...valores);
-  const max = Math.max(...valores);
+  const min = minimoDe(valores);
+  const max = maximoDe(valores);
   const ancho = (max - min) / intervalos || 1;
 
   const bins = Array.from({ length: intervalos }, (_, index) => {

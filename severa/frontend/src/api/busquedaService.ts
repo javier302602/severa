@@ -37,13 +37,19 @@ function criteriosAQuery(criterios: CriteriosBusqueda) {
   };
 }
 
+// Paginación (2026-07-19): un filtro amplio (ej. severidad=Alta) sobre un
+// catálogo grande podía traer decenas de miles de filas de una sola vez —
+// TAMANO_PAGINA coincide con el límite por defecto de BusquedaController.
+export const TAMANO_PAGINA = 200;
+
 export const busquedaService = {
-  buscar: (criterios: CriteriosBusqueda): Promise<VulnerabilidadBusqueda[]> =>
-    httpClient.get('/vulnerabilidades/buscar', criteriosAQuery(criterios)),
+  buscar: (criterios: CriteriosBusqueda, pagina = 1): Promise<VulnerabilidadBusqueda[]> =>
+    httpClient.get('/vulnerabilidades/buscar', { ...criteriosAQuery(criterios), pagina, limite: TAMANO_PAGINA }),
   // Mismos criterios que /buscar (parseCriterios es compartido en
-  // BusquedaController.ts) — GET /vulnerabilidades/buscar/exportar devuelve
-  // texto CSV plano (Content-Type: text/csv), que httpClient ya resuelve
-  // como string (ver leerCuerpoDeRespuesta).
-  exportar: (criterios: CriteriosBusqueda): Promise<string> =>
+  // BusquedaController.ts). Bug real reportado: la descarga era CSV plano —
+  // ahora es un .xlsx real agrupado por severidad (ver
+  // ExportadorExcelAgrupado.ts), que httpClient resuelve como Blob (no es
+  // text/csv, cae en la rama .blob() de leerCuerpoDeRespuesta).
+  exportar: (criterios: CriteriosBusqueda): Promise<Blob> =>
     httpClient.get('/vulnerabilidades/buscar/exportar', criteriosAQuery(criterios))
 };

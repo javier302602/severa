@@ -15,7 +15,7 @@ import {
 export class CalcularResumenEstadistico implements CalcularResumenEstadisticoUseCase {
   constructor(private readonly vulnerabilidadRepository: VulnerabilidadRepository) {}
 
-  async ejecutar(vulnerabilidades?: Vulnerabilidad[]): Promise<{
+  async ejecutar(analistaId: string, vulnerabilidades?: Vulnerabilidad[]): Promise<{
     media: number;
     mediana: number;
     moda: number[];
@@ -26,7 +26,7 @@ export class CalcularResumenEstadistico implements CalcularResumenEstadisticoUse
     desviacionEstandar: number;
     coeficienteVariacion: number;
   }> {
-    const lista = vulnerabilidades ?? await this.vulnerabilidadRepository.listar();
+    const lista = vulnerabilidades ?? await this.vulnerabilidadRepository.listar(analistaId);
     const scores = lista.map((item) => item.cvssScore.valor);
     const { q1, q3 } = calcularCuartiles(scores);
 

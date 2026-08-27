@@ -17,7 +17,11 @@ import { SesionAnalisisNoEncontradaError } from '../../../../domain/errors/Sesio
 // separado, no toca nada de lo que ya existe").
 export const analisisDatasetRouter = express.Router();
 
-const TAMANO_MAXIMO_BYTES = 5 * 1024 * 1024;
+// 100MB (2026-07-20, subido desde 5MB): medido en vivo que el lector actual
+// (SheetJS sin streaming, ver LectorDatasetGenerico.ts) usa ~1.8GB de heap
+// real con un CSV de 100MB — el mem_limit del contenedor se subió a 3g en
+// docker-compose.yml específicamente para darle margen a esto.
+const TAMANO_MAXIMO_BYTES = 100 * 1024 * 1024;
 
 const MIME_TYPES_PERMITIDOS = new Set([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx

@@ -26,14 +26,23 @@ export class ImportarDatasetConAuditoria {
     // embebe en `detalle` (no hay columna propia en registros_auditoria,
     // decisión confirmada para no agregar schema nuevo solo para esto) y
     // solo lo manda la vía "subir archivo" (DatasetController.ts); la
-    // sincronización con NVD y "importar desde link" no tienen un nombre
-    // de archivo real que ofrecer, así que quedan sin ese sufijo.
-    nombreArchivoOriginal?: string
+    // sincronización con NVD no tiene un nombre de archivo real que
+    // ofrecer, así que queda sin ese sufijo.
+    nombreArchivoOriginal?: string,
+    // "Importar desde link" (2026-07-17, allowlist de hosts eliminada):
+    // SOLO host+path del link real usado, NUNCA la query string completa
+    // — las URLs firmadas (Google Cloud Storage, S3, etc.) llevan el token
+    // de acceso ahí (ej. X-Goog-Signature) y guardarlo en nuestra propia
+    // auditoría sería dejar una credencial temporal persistida sin
+    // necesidad. El llamador (ImportarDatasetDesdeUrl) es responsable de
+    // despojar la query string ANTES de pasar este valor.
+    origenLink?: string
   ): Promise<ResumenImportacion> {
-    const resumen = await this.usecase.ejecutar(resultado);
+    const resumen = await this.usecase.ejecutar(resultado, analistaId);
 
     const detalle = `${resumen.importados} importados, ${resumen.rechazados} rechazados`
-      + (nombreArchivoOriginal ? ` (archivo: ${nombreArchivoOriginal})` : '');
+      + (nombreArchivoOriginal ? ` (archivo: ${nombreArchivoOriginal})` : '')
+      + (origenLink ? ` (origen: ${origenLink})` : '');
 
     await this.auditoriaRepository.registrar({
       usuario: analistaId,
@@ -41,15 +50,37 @@ export class ImportarDatasetConAuditoria {
       detalle
     });
 
-    // RF-99: alerta por cada vulnerabilidad crítica (CVSS >= 9.0) que haya
-    // entrado en esta importación. Se revisa `resultado.importables` (lo que
-    // efectivamente se guardó, ver ImportarDataset.ejecutar), no el resumen,
-    // porque el resumen solo trae conteos.
-    const criticas = (resultado?.importables ?? []).filter((item) => esVulnerabilidadCritica(item.vulnerabilidad));
-    await Promise.all(
-      criticas.map((item) => this.servicioDeNotificaciones.notificarVulnerabilidadCritica(item.vulnerabilidad, analistaId))
-    );
+    // RF-99 (bug real corregido 2026-07-19): antes se notificaba una vez POR
+    // CADA vulnerabilidad crítica (CVSS >= 9.0) — un dataset con muchas
+    // críticas inundaba el centro de notificaciones con decenas de alertas
+    // idénticas en su forma. Ahora es UNA sola notificación por importación,
+    // con el conteo de críticas incluido. Se revisa `resultado.importables`
+    // (lo que efectivamente se guardó), no el resumen, porque el resumen
+    // solo trae conteos totales.
+    const cantidadCriticas = (resultado?.importables ?? []).filter((item) => esVulnerabilidadCritica(item.vulnerabilidad)).length;
+    await this.servicioDeNotificaciones.notificarImportacionCompletada(analistaId, {
+      importados: resumen.importados,
+      rechazados: resumen.rechazados,
+      criticas: cantidadCriticas
+    });
 
     return resumen;
+  }
+
+  // Streaming (2026-07-17, "importar desde link" con CSV grandes — ver
+  // ImportarDatasetDesdeUrl.leerArchivoCsvEnStreaming): ese camino NO pasa
+  // por ejecutar() de arriba (no arma un array completo de importables en
+  // memoria, así que no puede reutilizar esa firma), pero necesita la MISMA
+  // auditoría y la MISMA notificación de resumen. `criticas` lo cuenta el
+  // propio streaming sobre la marcha (ImportarDatasetDesdeUrl.ts), porque acá
+  // ya no queda ningún array completo de importables para filtrar.
+  async registrarImportacionPorLink(resumen: ResumenImportacion, analistaId: string, origenLink: string, criticas: number): Promise<void> {
+    const detalle = `${resumen.importados} importados, ${resumen.rechazados} rechazados (origen: ${origenLink})`;
+    await this.auditoriaRepository.registrar({ usuario: analistaId, accion: 'ImportarDataset', detalle });
+    await this.servicioDeNotificaciones.notificarImportacionCompletada(analistaId, {
+      importados: resumen.importados,
+      rechazados: resumen.rechazados,
+      criticas
+    });
   }
 }

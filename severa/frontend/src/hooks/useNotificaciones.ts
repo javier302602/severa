@@ -26,3 +26,23 @@ export function useMarcarNotificacionLeida() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_NOTIFICACIONES })
   });
 }
+
+// "Marcar todas como leídas" (2026-07-19).
+export function useMarcarTodasLasNotificacionesLeidas() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => notificacionService.marcarTodasComoLeidas(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_NOTIFICACIONES })
+  });
+}
+
+// "Eliminar seleccionadas" (2026-07-20).
+export function useEliminarNotificaciones() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ids: string[]) => notificacionService.eliminarVarias(ids),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_NOTIFICACIONES })
+  });
+}

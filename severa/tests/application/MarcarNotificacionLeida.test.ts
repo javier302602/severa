@@ -5,7 +5,9 @@ function notificacionRepositoryFalso(marcarComoLeida: jest.Mock): NotificacionRe
   return {
     guardar: jest.fn().mockResolvedValue(undefined),
     listarPorAnalista: jest.fn().mockResolvedValue([]),
-    marcarComoLeida
+    marcarComoLeida,
+    marcarTodasComoLeidas: jest.fn().mockResolvedValue(0),
+    eliminarVarias: jest.fn().mockResolvedValue(0)
   };
 }
 

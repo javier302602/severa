@@ -5,7 +5,7 @@ import { VulnerabilidadRepository } from '../ports/out/VulnerabilidadRepository'
 export class ConsultarVulnerabilidadPorCVE implements ConsultarVulnerabilidadPorCVEUseCase {
   constructor(private readonly vulnerabilidadRepository: VulnerabilidadRepository) {}
 
-  async ejecutar(cve: string): Promise<Vulnerabilidad | null> {
-    return this.vulnerabilidadRepository.buscarPorCve(cve);
+  async ejecutar(cve: string, analistaId: string): Promise<Vulnerabilidad | null> {
+    return this.vulnerabilidadRepository.buscarPorCve(cve, analistaId);
   }
 }

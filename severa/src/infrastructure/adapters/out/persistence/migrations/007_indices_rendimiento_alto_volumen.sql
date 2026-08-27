@@ -1,0 +1,35 @@
+-- Índices de rendimiento para volumen alto (2026-07-17, datasets reales de
+-- 400.000+ filas por analista vía "importar desde link"). Con el
+-- aislamiento multiusuario (migración 006) casi toda consulta de este
+-- módulo filtra primero por analista_id — ya existe
+-- idx_vulnerabilidades_analista_id (single-column, migración 006), así que
+-- no se repite acá.
+--
+-- Los dos índices compuestos siguientes cubren los patrones de consulta
+-- reales que ESE índice solo no alcanza a optimizar del todo (confirmado
+-- revisando PostgresVulnerabilidadRepository.ts):
+--   - Rango/orden por CVSS: filtrarPorRangoCvss, buscarConFiltros (cuando
+--     trae cvssMin/cvssMax), y el "ORDER BY cvss_score DESC" que comparten
+--     casi todos los métodos de listado.
+--   - Filtro exacto por estado de remediación: buscarConFiltros (cuando
+--     trae estadoRemediacion) — comparación con "=", sargable de verdad.
+CREATE INDEX idx_vulnerabilidades_analista_cvss ON vulnerabilidades (analista_id, cvss_score DESC);
+CREATE INDEX idx_vulnerabilidades_analista_estado ON vulnerabilidades (analista_id, estado_remediacion);
+
+-- Deliberadamente NO se agrega un índice sobre severidad ni software:
+-- ambos se filtran con ILIKE (filtrarPorSeveridad/listarPorSoftware/
+-- buscarConFiltros) y un índice btree normal NO acelera ILIKE — solo sirve
+-- para igualdad exacta o LIKE con prefijo fijo bajo collation 'C'.
+-- Acelerar esas búsquedas de verdad necesitaría pg_trgm o un índice
+-- funcional sobre lower(...), un cambio más grande y con otro trade-off
+-- (costo de escritura) que no se justifica agregar sin evidencia real de
+-- que esas dos consultas sean el cuello de botella. Ver informe de
+-- verificación de rendimiento (2026-07-17) para el diagnóstico real medido.
+--
+-- Tampoco se agrega ningún índice para CalcularResumenEstadistico/
+-- GenerarDistribucionFrecuencias/GenerarGrafico/GenerarRankingUrgencia/
+-- RecopilarDatosDeInforme: las cinco llaman listar(analistaId), que trae
+-- TODO el catálogo del analista sin más filtro — ya está óptimamente
+-- servido por idx_vulnerabilidades_analista_id (index scan completo sobre
+-- las filas de ese analista). El costo real ahí es construir 400.000+
+-- objetos Vulnerabilidad en Node y agregarlos en JS, no falta de índice.

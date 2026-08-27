@@ -23,6 +23,33 @@ notificacionRouter.get('/notificaciones', async (req, res) => {
   );
 });
 
+// "Marcar todas como leídas" (2026-07-19). No colisiona con la ruta de abajo
+// (esta tiene 2 segmentos tras /notificaciones, la de :id/leida tiene 3),
+// pero se monta primero de todos modos por legibilidad.
+notificacionRouter.patch('/notificaciones/marcar-todas-leidas', async (req, res) => {
+  const analistaId = req.analistaAutenticado!.id;
+  const cantidad = await container.marcarTodasLasNotificacionesLeidasUseCase.ejecutar(analistaId);
+  res.json({ marcadas: cantidad });
+});
+
+// "Eliminar seleccionadas" (2026-07-20): recibe un array de ids en el body
+// (DELETE con body — soportado por express.json(), ya montado globalmente
+// en app.ts). Un id inválido, vacío o de otro analista simplemente no se
+// borra (eliminarVarias ya lo scopea por dueño) — no hace falta 404 por
+// cada uno para no filtrar si un id existe.
+notificacionRouter.delete('/notificaciones', async (req, res) => {
+  const analistaId = req.analistaAutenticado!.id;
+  const ids = req.body?.ids;
+
+  if (!Array.isArray(ids) || ids.some((id) => typeof id !== 'string')) {
+    res.status(400).json({ error: 'Debe indicar un array de ids en el campo "ids"' });
+    return;
+  }
+
+  const eliminadas = await container.eliminarNotificacionesUseCase.ejecutar(ids, analistaId);
+  res.json({ eliminadas });
+});
+
 notificacionRouter.patch('/notificaciones/:id/leida', async (req, res) => {
   const analistaId = req.analistaAutenticado!.id;
   const actualizada = await container.marcarNotificacionLeidaUseCase.ejecutar(req.params.id, analistaId);

@@ -37,3 +37,23 @@ export function useImportarDatasetDesdeUrl() {
     onSuccess: () => invalidarDependientesDelCatalogo(queryClient)
   });
 }
+
+// "Restablecer datos": mismas queries a invalidar que un import — el
+// catálogo queda vacío, así que estadísticas/gráficos/priorización tienen
+// que reflejar eso de inmediato, no seguir mostrando el estado anterior.
+export function useReiniciarDataset() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => datasetService.reiniciar(),
+    onSuccess: () => invalidarDependientesDelCatalogo(queryClient)
+  });
+}
+
+// Sección Informes: convierte un link a .xlsx descargable, sin tocar el
+// catálogo — no invalida ninguna query (nada cambió en los datos de SEVERA).
+export function useConvertirUrlAExcel() {
+  return useMutation({
+    mutationFn: (url: string) => datasetService.convertirUrlAExcel(url)
+  });
+}

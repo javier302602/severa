@@ -19,6 +19,7 @@ describe('CalcularResumenEstadistico', () => {
   test('calcula el resumen a partir de CVSS reales del dataset', async () => {
     const repo: VulnerabilidadRepository = {
       guardar: jest.fn().mockResolvedValue(undefined),
+    guardarLote: jest.fn().mockResolvedValue(undefined),
       contar: jest.fn().mockResolvedValue(0),
       listar: jest.fn().mockResolvedValue([
         new Vulnerabilidad('1', new IdentificadorCVE('CVE-2024-00001'), new CvssScore(10.0), 'Apache Log4j', new TipoAccesoValue('Sí')),
@@ -33,14 +34,16 @@ describe('CalcularResumenEstadistico', () => {
       filtrarPorSeveridad: jest.fn().mockResolvedValue([]),
       listarPorTipoAcceso: jest.fn().mockResolvedValue([]),
       listarPorTipoVulnerabilidad: jest.fn().mockResolvedValue([]),
+      listarSoftwareDisponible: jest.fn().mockResolvedValue([]),
       listarPorSoftware: jest.fn().mockResolvedValue([]),
       actualizarEstado: jest.fn().mockResolvedValue(undefined),
-      buscarConFiltros: jest.fn().mockResolvedValue([])
+      buscarConFiltros: jest.fn().mockResolvedValue([]),
+      eliminarTodas: jest.fn().mockResolvedValue(0)
     };
 
     const scores = [10.0, 9.8, 7.8, 7.8, 5.5, 4.0];
     const usecase = new CalcularResumenEstadistico(repo);
-    const resultado = await usecase.ejecutar();
+    const resultado = await usecase.ejecutar('analista-1');
     const { q1, q3 } = calcularCuartiles(scores);
 
     expect(resultado.media).toBeCloseTo(calcularMedia(scores), 10);

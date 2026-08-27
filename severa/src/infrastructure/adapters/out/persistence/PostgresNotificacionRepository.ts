@@ -36,6 +36,25 @@ export class PostgresNotificacionRepository implements NotificacionRepository {
     return (result.rowCount ?? 0) > 0;
   }
 
+  async marcarTodasComoLeidas(analistaId: string): Promise<number> {
+    const result = await this.pool.query(
+      'UPDATE notificaciones SET leida = TRUE WHERE destinatario = $1 AND leida = FALSE',
+      [analistaId]
+    );
+    return result.rowCount ?? 0;
+  }
+
+  async eliminarVarias(ids: string[], analistaId: string): Promise<number> {
+    if (ids.length === 0) {
+      return 0;
+    }
+    const result = await this.pool.query(
+      'DELETE FROM notificaciones WHERE id = ANY($1) AND destinatario = $2',
+      [ids, analistaId]
+    );
+    return result.rowCount ?? 0;
+  }
+
   private mapRow(row: {
     id: string;
     tipo: TipoNotificacion;

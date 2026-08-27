@@ -24,8 +24,13 @@ export class GenerarGrafico implements GenerarGraficoUseCase {
     private readonly graficosOutputPort: GraficosOutputPort
   ) {}
 
-  async ejecutar(tipo: TipoGrafico, opciones: { limite?: number; formato?: 'svg' | 'json' | 'png' | 'pdf' } = {}, vulnerabilidades?: Vulnerabilidad[]): Promise<unknown> {
-    const lista = vulnerabilidades ?? await this.vulnerabilidadRepository.listar();
+  async ejecutar(
+    tipo: TipoGrafico,
+    analistaId: string,
+    opciones: { limite?: number; formato?: 'svg' | 'json' | 'png' | 'pdf' } = {},
+    vulnerabilidades?: Vulnerabilidad[]
+  ): Promise<unknown> {
+    const lista = vulnerabilidades ?? await this.vulnerabilidadRepository.listar(analistaId);
     const scores = lista.map((item) => item.cvssScore.valor);
     const formato = opciones.formato ?? 'svg';
 

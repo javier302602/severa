@@ -29,6 +29,6 @@ export const graficoService = {
   // Sin `formato`: el backend por defecto devuelve SVG. PNG/PDF existen como
   // query param pero no están realmente implementados del lado del backend
   // (X-Formato-Real: svg, ver GraficoController.ts) — no se ofrecen acá.
-  obtener: (tipo: TipoGrafico, limite?: number): Promise<GraficoConInterpretacion> =>
-    httpClient.get(`/graficos/${tipo}`, { limite })
+  obtener: (tipo: TipoGrafico, limite?: number, signal?: AbortSignal): Promise<GraficoConInterpretacion> =>
+    httpClient.get(`/graficos/${tipo}`, { limite }, signal)
 };

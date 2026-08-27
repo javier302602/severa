@@ -1,6 +1,9 @@
 import { GenerarResumenEjecutivo } from '../../src/application/usecases/GenerarResumenEjecutivo';
 import { VulnerabilidadRepository } from '../../src/application/ports/out/VulnerabilidadRepository';
 import { AuditoriaRepository } from '../../src/application/ports/out/AuditoriaRepository';
+import { AnalistaRepository } from '../../src/application/ports/out/AnalistaRepository';
+import { Analista } from '../../src/domain/entities/Analista';
+import { Correo } from '../../src/domain/value-objects/Correo';
 import { GeneradorDeInformes, DatosInforme } from '../../src/application/ports/out/GeneradorDeInformes';
 import { Vulnerabilidad } from '../../src/domain/entities/Vulnerabilidad';
 import { IdentificadorCVE } from '../../src/domain/value-objects/IdentificadorCVE';
@@ -10,6 +13,7 @@ import { TipoAccesoValue } from '../../src/domain/value-objects/TipoAcceso';
 function repoFalso(vulnerabilidades: Vulnerabilidad[]): VulnerabilidadRepository {
   return {
     guardar: jest.fn().mockResolvedValue(undefined),
+    guardarLote: jest.fn().mockResolvedValue(undefined),
     contar: jest.fn().mockResolvedValue(0),
     listar: jest.fn().mockResolvedValue(vulnerabilidades),
     buscarPorCve: jest.fn().mockResolvedValue(null),
@@ -17,9 +21,11 @@ function repoFalso(vulnerabilidades: Vulnerabilidad[]): VulnerabilidadRepository
     filtrarPorSeveridad: jest.fn().mockResolvedValue([]),
     listarPorTipoAcceso: jest.fn().mockResolvedValue([]),
     listarPorTipoVulnerabilidad: jest.fn().mockResolvedValue([]),
+    listarSoftwareDisponible: jest.fn().mockResolvedValue([]),
     listarPorSoftware: jest.fn().mockResolvedValue([]),
     actualizarEstado: jest.fn().mockResolvedValue(undefined),
-    buscarConFiltros: jest.fn().mockResolvedValue([])
+    buscarConFiltros: jest.fn().mockResolvedValue([]),
+    eliminarTodas: jest.fn().mockResolvedValue(0)
   };
 }
 
@@ -27,6 +33,16 @@ function auditoriaRepositoryFalso(): AuditoriaRepository {
   return {
     registrar: jest.fn().mockResolvedValue(undefined),
     listar: jest.fn().mockResolvedValue([])
+  };
+}
+
+function analistaRepositoryFalso(): AnalistaRepository {
+  const analista = new Analista('analista-A', 'Ana Torres', new Correo('ana@example.com'), 'hash', 'analista');
+  return {
+    guardar: jest.fn().mockResolvedValue(undefined),
+    buscarPorCorreo: jest.fn().mockResolvedValue(null),
+    buscarPorId: jest.fn().mockResolvedValue(analista),
+    eliminar: jest.fn().mockResolvedValue(undefined)
   };
 }
 
@@ -48,8 +64,8 @@ describe('GenerarResumenEjecutivo', () => {
       generarInformeDatasetWord: jest.fn().mockResolvedValue(Buffer.from(''))
     };
 
-    const usecase = new GenerarResumenEjecutivo(repoFalso(dataset), geradorDeInformes, auditoriaRepositoryFalso());
-    const resultado = await usecase.ejecutar();
+    const usecase = new GenerarResumenEjecutivo(repoFalso(dataset), geradorDeInformes, auditoriaRepositoryFalso(), analistaRepositoryFalso());
+    const resultado = await usecase.ejecutar('analista-A');
 
     expect(resultado.toString()).toBe('resumen-falso');
     expect(geradorDeInformes.generarResumenEjecutivo).toHaveBeenCalledTimes(1);
@@ -57,5 +73,6 @@ describe('GenerarResumenEjecutivo', () => {
     expect(geradorDeInformes.generarInformeWord).not.toHaveBeenCalled();
     expect(datosRecibidos?.totalVulnerabilidades).toBe(4);
     expect(datosRecibidos?.interpretacion).toHaveLength(4);
+    expect(datosRecibidos?.generadoPara).toBe('Ana Torres');
   });
 });

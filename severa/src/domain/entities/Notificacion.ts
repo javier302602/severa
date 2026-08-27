@@ -1,4 +1,4 @@
-export type TipoNotificacion = 'VulnerabilidadCritica' | 'PlazoVencido' | 'InformeListo' | 'ActualizacionNVD';
+export type TipoNotificacion = 'VulnerabilidadCritica' | 'PlazoVencido' | 'InformeListo' | 'ActualizacionNVD' | 'ImportacionCompletada';
 
 // RF-99 a RF-104: modela la clase Notificacion del SDS (M-13). El campo
 // `mensaje` es una extensión sobre el modelo mínimo del SDS

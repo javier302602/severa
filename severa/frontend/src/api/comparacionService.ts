@@ -3,12 +3,18 @@ import { httpClient } from './httpClient';
 // Contrato verificado contra ComparacionController.ts / ComparadorDeCategorias.ts.
 // Los 3 endpoints devuelven la misma forma (compararGrupos), solo cambia qué
 // dos grupos arma el backend antes de comparar.
+//
+// Campos nulos (2026-07-19, bug real: "no hay suficientes vulnerabilidades"
+// aparecía aunque UN lado sí tuviera datos, ej. "Apache Log4j" con filas
+// reales vs. "Nginx" sin ninguna): el backend ya no rechaza toda la
+// comparación cuando un solo grupo está vacío — ese lado llega en null y el
+// otro con sus datos reales, para mostrar "lo que hay" en vez de un error.
 export interface ComparacionGrupos {
-  mediaA: number;
-  mediaB: number;
-  diferenciaMedias: number;
-  sdA: number;
-  sdB: number;
+  mediaA: number | null;
+  mediaB: number | null;
+  diferenciaMedias: number | null;
+  sdA: number | null;
+  sdB: number | null;
 }
 
 export const comparacionService = {
@@ -22,5 +28,8 @@ export const comparacionService = {
   compararTipo: (categoriaA?: string, categoriaB?: string): Promise<ComparacionGrupos> =>
     httpClient.get('/comparacion/tipo', { categoriaA: categoriaA || undefined, categoriaB: categoriaB || undefined }),
   compararSoftware: (categoriaA?: string, categoriaB?: string): Promise<ComparacionGrupos> =>
-    httpClient.get('/comparacion/software', { categoriaA: categoriaA || undefined, categoriaB: categoriaB || undefined })
+    httpClient.get('/comparacion/software', { categoriaA: categoriaA || undefined, categoriaB: categoriaB || undefined }),
+  // Dropdown de software (2026-07-20): valores reales del catálogo del
+  // analista, no una lista adivinada.
+  listarSoftwareDisponible: (): Promise<string[]> => httpClient.get('/comparacion/software-disponible')
 };

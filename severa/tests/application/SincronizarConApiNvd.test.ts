@@ -1,4 +1,3 @@
-import fs from 'fs';
 import { SincronizarConApiNvd } from '../../src/application/usecases/SincronizarConApiNvd';
 import { ImportarDataset } from '../../src/application/usecases/ImportarDataset';
 import { ImportarDatasetConAuditoria } from '../../src/application/usecases/auditoria/ImportarDatasetConAuditoria';
@@ -6,7 +5,6 @@ import { NvdApiClient } from '../../src/application/ports/out/NvdApiClient';
 import { VulnerabilidadRepository } from '../../src/application/ports/out/VulnerabilidadRepository';
 import { AuditoriaRepository } from '../../src/application/ports/out/AuditoriaRepository';
 import { ServicioDeNotificaciones } from '../../src/application/ports/out/ServicioDeNotificaciones';
-import { LectorExcelDataset } from '../../src/infrastructure/adapters/out/dataset/LectorExcelDataset';
 import { Vulnerabilidad } from '../../src/domain/entities/Vulnerabilidad';
 import { IdentificadorCVE } from '../../src/domain/value-objects/IdentificadorCVE';
 import { CvssScore } from '../../src/domain/value-objects/CvssScore';
@@ -15,6 +13,7 @@ import { TipoAccesoValue } from '../../src/domain/value-objects/TipoAcceso';
 function vulnerabilidadRepositoryFalso(): VulnerabilidadRepository {
   return {
     guardar: jest.fn().mockResolvedValue(undefined),
+    guardarLote: jest.fn().mockResolvedValue(undefined),
     contar: jest.fn().mockResolvedValue(0),
     listar: jest.fn().mockResolvedValue([]),
     buscarPorCve: jest.fn().mockResolvedValue(null),
@@ -22,9 +21,11 @@ function vulnerabilidadRepositoryFalso(): VulnerabilidadRepository {
     filtrarPorSeveridad: jest.fn().mockResolvedValue([]),
     listarPorTipoAcceso: jest.fn().mockResolvedValue([]),
     listarPorTipoVulnerabilidad: jest.fn().mockResolvedValue([]),
+    listarSoftwareDisponible: jest.fn().mockResolvedValue([]),
     listarPorSoftware: jest.fn().mockResolvedValue([]),
     actualizarEstado: jest.fn().mockResolvedValue(undefined),
-    buscarConFiltros: jest.fn().mockResolvedValue([])
+    buscarConFiltros: jest.fn().mockResolvedValue([]),
+    eliminarTodas: jest.fn().mockResolvedValue(0)
   };
 }
 
@@ -40,44 +41,31 @@ function servicioDeNotificacionesFalso(): ServicioDeNotificaciones {
     notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
     notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
     notificarInformeListo: jest.fn().mockResolvedValue(undefined),
-    notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined)
+    notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
+  notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
   };
 }
 
 describe('SincronizarConApiNvd', () => {
-  // El caso de uso escribe el dataset descargado a un archivo temporal antes de
-  // leerlo con LectorExcelDataset, y lo borra en `finally`; se evita tocar
-  // disco real en el test.
-  beforeEach(() => {
-    jest.spyOn(fs, 'writeFileSync').mockImplementation(() => undefined);
-    jest.spyOn(fs, 'unlink').mockImplementation(((_path: unknown, callback: (error: NodeJS.ErrnoException | null) => void) => {
-      callback(null);
-    }) as typeof fs.unlink);
-  });
-
-  afterEach(() => {
-    jest.restoreAllMocks();
-  });
-
+  // NvdApiClient ya devuelve {importables, rechazadas} parseado (ver
+  // ParseadorRespuestaNvd.ts) — el caso de uso ya no toca disco ni pasa por
+  // LectorExcelDataset, así que los tests de archivo temporal (nombre único,
+  // borrado en finally) quedaron obsoletos junto con ese código.
   test('importa el dataset descargado de NVD y registra la sincronización en auditoría con el analista que la disparó', async () => {
     const vulnerabilidadRepository = vulnerabilidadRepositoryFalso();
     const auditoriaRepository = auditoriaFalsa();
 
     const nvdApiClient: NvdApiClient = {
-      descargarDataset: jest.fn().mockResolvedValue(Buffer.from('contenido-fingido'))
-    };
-
-    const lectorExcel = {
-      leerArchivo: jest.fn().mockResolvedValue({
+      descargarDataset: jest.fn().mockResolvedValue({
         importables: [
           {
             vulnerabilidad: new Vulnerabilidad('1', new IdentificadorCVE('CVE-2024-00001'), new CvssScore(7.8), 'desc', new TipoAccesoValue('Sí')),
-            fuente: 'excel'
+            fuente: 'nvd-api'
           }
         ],
         rechazadas: []
       })
-    } as unknown as LectorExcelDataset;
+    };
 
     // Se usa el decorador REAL (no un mock) para probar que SincronizarConApiNvd
     // efectivamente pasa por el registro de auditoría, y no solo que llama a
@@ -90,12 +78,16 @@ describe('SincronizarConApiNvd', () => {
       servicioDeNotificaciones
     );
 
-    const usecase = new SincronizarConApiNvd(nvdApiClient, lectorExcel, importarDatasetUseCase, servicioDeNotificaciones);
+    const usecase = new SincronizarConApiNvd(nvdApiClient, importarDatasetUseCase, servicioDeNotificaciones);
 
-    const resultado = await usecase.ejecutar('analista-9');
+    const urlPegadaPorElUsuario = 'https://services.nvd.nist.gov/rest/json/cves/2.0?pubStartDate=2024-01-01T00:00:00.000&pubEndDate=2024-04-30T00:00:00.000';
+    const resultado = await usecase.ejecutar('analista-9', urlPegadaPorElUsuario);
 
+    // Bug real (2026-07-17): antes se ignoraba la URL pegada y se llamaba
+    // siempre contra un host fijo reconstruido internamente.
+    expect(nvdApiClient.descargarDataset).toHaveBeenCalledWith(urlPegadaPorElUsuario);
     expect(resultado.importados).toBe(1);
-    expect(vulnerabilidadRepository.guardar).toHaveBeenCalledTimes(1);
+    expect(vulnerabilidadRepository.guardarLote).toHaveBeenCalledTimes(1);
     expect(auditoriaRepository.registrar).toHaveBeenCalledWith(
       expect.objectContaining({ usuario: 'analista-9', accion: 'ImportarDataset' })
     );
@@ -115,8 +107,6 @@ describe('SincronizarConApiNvd', () => {
       descargarDataset: jest.fn().mockRejectedValue(new Error('NVD no responde'))
     };
 
-    const lectorExcel = { leerArchivo: jest.fn() } as unknown as LectorExcelDataset;
-
     const servicioDeNotificaciones = servicioDeNotificacionesFalso();
     const importarDatasetUseCase = new ImportarDatasetConAuditoria(
       new ImportarDataset(vulnerabilidadRepository),
@@ -124,9 +114,9 @@ describe('SincronizarConApiNvd', () => {
       servicioDeNotificaciones
     );
 
-    const usecase = new SincronizarConApiNvd(nvdApiClient, lectorExcel, importarDatasetUseCase, servicioDeNotificaciones);
+    const usecase = new SincronizarConApiNvd(nvdApiClient, importarDatasetUseCase, servicioDeNotificaciones);
 
-    await expect(usecase.ejecutar('analista-9')).rejects.toThrow('NVD no responde');
+    await expect(usecase.ejecutar('analista-9', 'https://services.nvd.nist.gov/rest/json/cves/2.0')).rejects.toThrow('NVD no responde');
 
     expect(auditoriaRepository.registrar).not.toHaveBeenCalled();
     expect(servicioDeNotificaciones.notificarActualizacionDisponible).not.toHaveBeenCalled();
@@ -137,20 +127,16 @@ describe('SincronizarConApiNvd', () => {
     const auditoriaRepository = auditoriaFalsa();
 
     const nvdApiClient: NvdApiClient = {
-      descargarDataset: jest.fn().mockResolvedValue(Buffer.from('contenido-fingido'))
-    };
-
-    const lectorExcel = {
-      leerArchivo: jest.fn().mockResolvedValue({
+      descargarDataset: jest.fn().mockResolvedValue({
         importables: [
           {
             vulnerabilidad: new Vulnerabilidad('1', new IdentificadorCVE('CVE-2021-44228'), new CvssScore(10.0), 'Apache Log4j', new TipoAccesoValue('Sí')),
-            fuente: 'excel'
+            fuente: 'nvd-api'
           }
         ],
         rechazadas: []
       })
-    } as unknown as LectorExcelDataset;
+    };
 
     const servicioDeNotificaciones = servicioDeNotificacionesFalso();
     const importarDatasetUseCase = new ImportarDatasetConAuditoria(
@@ -159,70 +145,23 @@ describe('SincronizarConApiNvd', () => {
       servicioDeNotificaciones
     );
 
-    const usecase = new SincronizarConApiNvd(nvdApiClient, lectorExcel, importarDatasetUseCase, servicioDeNotificaciones);
+    const usecase = new SincronizarConApiNvd(nvdApiClient, importarDatasetUseCase, servicioDeNotificaciones);
 
-    await usecase.ejecutar('analista-9');
+    await usecase.ejecutar('analista-9', 'https://services.nvd.nist.gov/rest/json/cves/2.0');
 
-    expect(servicioDeNotificaciones.notificarVulnerabilidadCritica).toHaveBeenCalledWith(
-      expect.objectContaining({ cve: expect.objectContaining({ valor: 'CVE-2021-44228' }) }),
-      'analista-9'
-    );
+    // Bug real corregido (2026-07-19): ya no es una alerta por fila crítica
+    // (notificarVulnerabilidadCritica) — la sincronización con NVD reusa
+    // ImportarDatasetConAuditoria.ejecutar(), que ahora resume las críticas
+    // en UNA sola notificarImportacionCompletada, además de la propia
+    // notificarActualizacionDisponible (RF-102) de esta clase.
+    expect(servicioDeNotificaciones.notificarImportacionCompletada).toHaveBeenCalledWith('analista-9', {
+      importados: 1,
+      rechazados: 0,
+      criticas: 1
+    });
     expect(servicioDeNotificaciones.notificarActualizacionDisponible).toHaveBeenCalledWith(
       'analista-9',
       expect.objectContaining({ importados: 1 })
     );
-  });
-
-  test('usa un nombre de archivo temporal único (no el nombre fijo tmp_dataset.xlsx) y lo borra al terminar', async () => {
-    const vulnerabilidadRepository = vulnerabilidadRepositoryFalso();
-    const auditoriaRepository = auditoriaFalsa();
-
-    const nvdApiClient: NvdApiClient = {
-      descargarDataset: jest.fn().mockResolvedValue(Buffer.from('contenido-fingido'))
-    };
-    const lectorExcel = {
-      leerArchivo: jest.fn().mockResolvedValue({ importables: [], rechazadas: [] })
-    } as unknown as LectorExcelDataset;
-    const servicioDeNotificaciones = servicioDeNotificacionesFalso();
-    const importarDatasetUseCase = new ImportarDatasetConAuditoria(
-      new ImportarDataset(vulnerabilidadRepository),
-      auditoriaRepository,
-      servicioDeNotificaciones
-    );
-    const usecase = new SincronizarConApiNvd(nvdApiClient, lectorExcel, importarDatasetUseCase, servicioDeNotificaciones);
-
-    await usecase.ejecutar('analista-9');
-
-    const rutaEscrita = (fs.writeFileSync as jest.Mock).mock.calls[0][0] as string;
-    const rutaLeida = (lectorExcel.leerArchivo as jest.Mock).mock.calls[0][0] as string;
-    const rutaBorrada = (fs.unlink as unknown as jest.Mock).mock.calls[0][0] as string;
-
-    expect(rutaEscrita).not.toBe('tmp_dataset.xlsx');
-    expect(rutaEscrita).toMatch(/severa-nvd-sync-.+\.xlsx$/);
-    expect(rutaLeida).toBe(rutaEscrita);
-    expect(rutaBorrada).toBe(rutaEscrita);
-  });
-
-  test('borra el archivo temporal incluso si la importación falla', async () => {
-    const vulnerabilidadRepository = vulnerabilidadRepositoryFalso();
-    const auditoriaRepository = auditoriaFalsa();
-
-    const nvdApiClient: NvdApiClient = {
-      descargarDataset: jest.fn().mockResolvedValue(Buffer.from('contenido-fingido'))
-    };
-    const lectorExcel = {
-      leerArchivo: jest.fn().mockRejectedValue(new Error('archivo corrupto'))
-    } as unknown as LectorExcelDataset;
-    const servicioDeNotificaciones = servicioDeNotificacionesFalso();
-    const importarDatasetUseCase = new ImportarDatasetConAuditoria(
-      new ImportarDataset(vulnerabilidadRepository),
-      auditoriaRepository,
-      servicioDeNotificaciones
-    );
-    const usecase = new SincronizarConApiNvd(nvdApiClient, lectorExcel, importarDatasetUseCase, servicioDeNotificaciones);
-
-    await expect(usecase.ejecutar('analista-9')).rejects.toThrow('archivo corrupto');
-
-    expect(fs.unlink).toHaveBeenCalledTimes(1);
   });
 });

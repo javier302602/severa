@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useDescargarInformeCompleto, useDescargarResumenEjecutivo, useProgramarInforme } from '../../hooks/useInformes';
+import { useConvertirUrlAExcel } from '../../hooks/useDataset';
 import type { FormatoInforme, FrecuenciaInformePeriodico } from '../../api/informeService';
 import { descargarArchivo } from '../../utils/descargarArchivo';
 import { Spinner } from '../../components/ui/Spinner';
@@ -9,6 +10,7 @@ import { EstadoVacio } from '../../components/ui/EstadoVacio';
 import { esCatalogoVacio } from '../../utils/esCatalogoVacio';
 import { mensajeDeError } from '../../utils/mensajeDeError';
 import { RUTAS } from '../../routes/paths';
+import { TEXTO_AYUDA_LINK_DATASET } from '../../constants/textosImportacion';
 
 const NOMBRE_ARCHIVO_POR_FORMATO: Record<FormatoInforme, string> = {
   pdf: 'informe-completo.pdf',
@@ -46,10 +48,12 @@ function ErrorDeGeneracion({ error }: { error: unknown }) {
 export function InformesPage() {
   const [formato, setFormato] = useState<FormatoInforme>('pdf');
   const [frecuencia, setFrecuencia] = useState<FrecuenciaInformePeriodico>('semanal');
+  const [urlAConvertir, setUrlAConvertir] = useState('');
 
   const descargaCompleto = useDescargarInformeCompleto();
   const descargaResumen = useDescargarResumenEjecutivo();
   const programar = useProgramarInforme();
+  const convertirUrl = useConvertirUrlAExcel();
 
   const onDescargarCompleto = () => {
     descargaCompleto.mutate(formato, {
@@ -66,6 +70,21 @@ export function InformesPage() {
   const onProgramar = (evento: FormEvent) => {
     evento.preventDefault();
     programar.mutate(frecuencia);
+  };
+
+  const onConvertirUrl = (evento: FormEvent) => {
+    evento.preventDefault();
+    if (!urlAConvertir.trim()) return;
+    convertirUrl.mutate(urlAConvertir.trim(), {
+      // Normalmente .xlsx (Blob) — si el archivo origen es demasiado grande
+      // para convertir de forma segura, el backend sirve el CSV original
+      // tal cual (texto plano, ver ConvertirUrlAExcel.ts): sigue siendo un
+      // dataset completo y real, solo que no en formato .xlsx.
+      onSuccess: (resultado) =>
+        typeof resultado === 'string'
+          ? descargarArchivo(resultado, 'dataset-convertido.csv', 'text/csv')
+          : descargarArchivo(resultado, 'dataset-convertido.xlsx')
+    });
   };
 
   return (
@@ -150,6 +169,45 @@ export function InformesPage() {
         {programar.isSuccess && (
           <p className="rounded-md border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-800 dark:border-green-900/50 dark:bg-green-950/30 dark:text-green-300">
             {programar.data.mensaje}
+          </p>
+        )}
+      </section>
+
+      <section className="space-y-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm p-6">
+        <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Convertir link a Excel</h2>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          Pegá el link de un dataset público y descargá su contenido convertido a .xlsx — sin importarlo al catálogo
+          de SEVERA. Si el archivo supera las 100.000 filas, se descarga como .csv (el dataset completo igual, sin
+          reconvertirlo) en vez de .xlsx.
+        </p>
+        <form onSubmit={onConvertirUrl} className="space-y-3">
+          <div>
+            <label htmlFor="url-convertir" className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+              Link a convertir
+            </label>
+            <input
+              id="url-convertir"
+              type="url"
+              placeholder="https://docs.google.com/spreadsheets/d/..."
+              value={urlAConvertir}
+              onChange={(evento) => setUrlAConvertir(evento.target.value)}
+              className="campo-formulario mt-1 w-full"
+            />
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{TEXTO_AYUDA_LINK_DATASET}</p>
+          </div>
+          <button
+            type="submit"
+            disabled={!urlAConvertir.trim() || convertirUrl.isPending}
+            className="rounded-md bg-slate-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-slate-300 disabled:opacity-50"
+          >
+            {convertirUrl.isPending ? 'Convirtiendo…' : 'Convertir y descargar'}
+          </button>
+        </form>
+        {convertirUrl.isPending && <Spinner etiqueta="Descargando y convirtiendo…" />}
+        {convertirUrl.isError && <MensajeError mensaje={mensajeDeError(convertirUrl.error)} />}
+        {convertirUrl.isSuccess && (
+          <p className="rounded-md border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-800 dark:border-green-900/50 dark:bg-green-950/30 dark:text-green-300">
+            Archivo convertido y descargado.
           </p>
         )}
       </section>

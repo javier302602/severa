@@ -156,4 +156,23 @@ describe('GraficosEstadisticos', () => {
       expect(resultado.totalSinClasificar).toBe(2);
     });
   });
+
+  // Bug real reproducido en vivo (2026-07-19, 150k-350k filas reales vía
+  // Postgres): "Math.min(...valores)"/"Math.max(...valores)" pasan cada
+  // elemento como un argumento de función aparte — V8 tiene un límite de
+  // ~120k-130k argumentos por llamada, así que con un dataset grande esto
+  // lanzaba "RangeError: Maximum call stack size exceeded" (confirmado
+  // contra /graficos/histogramaCvss real, y contra GenerarInforme/
+  // GenerarResumenEjecutivo, que reusan esta misma función). 200.000 en el
+  // test para estar claramente por encima del umbral real medido (~125.000).
+  describe('generarDatosHistogramaCvss con datasets grandes (bug real: Maximum call stack size exceeded)', () => {
+    test('no lanza con 200.000 valores (antes rompía por Math.min/max con spread)', () => {
+      const scores = Array.from({ length: 200_000 }, (_, i) => (i % 101) / 10);
+
+      expect(() => generarDatosHistogramaCvss(scores, { intervalos: 5 })).not.toThrow();
+
+      const resultado = generarDatosHistogramaCvss(scores, { intervalos: 5 });
+      expect(resultado.bins.reduce((suma, bin) => suma + bin.frecuencia, 0)).toBe(200_000);
+    });
+  });
 });

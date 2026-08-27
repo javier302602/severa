@@ -9,6 +9,7 @@ import { TipoAccesoValue } from '../../src/domain/value-objects/TipoAcceso';
 function repoFalso(vulnerabilidades: Vulnerabilidad[]): VulnerabilidadRepository {
   return {
     guardar: jest.fn(),
+    guardarLote: jest.fn(),
     contar: jest.fn(),
     listar: jest.fn().mockResolvedValue(vulnerabilidades),
     buscarPorCve: jest.fn(),
@@ -16,9 +17,11 @@ function repoFalso(vulnerabilidades: Vulnerabilidad[]): VulnerabilidadRepository
     filtrarPorSeveridad: jest.fn(),
     listarPorTipoAcceso: jest.fn(),
     listarPorTipoVulnerabilidad: jest.fn(),
+    listarSoftwareDisponible: jest.fn().mockResolvedValue([]),
     listarPorSoftware: jest.fn(),
     actualizarEstado: jest.fn(),
-    buscarConFiltros: jest.fn()
+    buscarConFiltros: jest.fn(),
+    eliminarTodas: jest.fn().mockResolvedValue(0)
   };
 }
 
@@ -43,7 +46,7 @@ describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () =
     const port = graficosOutputPortFalso();
     const useCase = new GenerarGrafico(repoFalso(dataset), port);
 
-    const resultado = await useCase.ejecutar('barrasSeveridad');
+    const resultado = await useCase.ejecutar('barrasSeveridad', 'analista-1');
 
     expect(resultado).toEqual({
       svg: '<svg>barras</svg>',
@@ -56,7 +59,7 @@ describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () =
     port.renderizarBarras.mockResolvedValue({ tipo: 'barras', datos: [] });
     const useCase = new GenerarGrafico(repoFalso(dataset), port);
 
-    const resultado = await useCase.ejecutar('barrasSeveridad', { formato: 'json' });
+    const resultado = await useCase.ejecutar('barrasSeveridad', 'analista-1', { formato: 'json' });
 
     expect(resultado).toEqual({ tipo: 'barras', datos: [] });
   });
@@ -66,7 +69,7 @@ describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () =
     port.renderizarBarras.mockResolvedValue('<svg>pendiente PNG</svg>');
     const useCase = new GenerarGrafico(repoFalso(dataset), port);
 
-    const resultado = await useCase.ejecutar('barrasSeveridad', { formato: 'png' });
+    const resultado = await useCase.ejecutar('barrasSeveridad', 'analista-1', { formato: 'png' });
 
     expect(resultado).toBe('<svg>pendiente PNG</svg>');
   });
@@ -75,7 +78,7 @@ describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () =
     const port = graficosOutputPortFalso();
     const useCase = new GenerarGrafico(repoFalso(dataset), port);
 
-    const resultado = await useCase.ejecutar('boxplotCvss');
+    const resultado = await useCase.ejecutar('boxplotCvss', 'analista-1');
 
     expect(resultado).toEqual({ svg: '<svg>boxplot</svg>', interpretacion: expect.stringContaining('10.0') });
   });
@@ -84,7 +87,7 @@ describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () =
     const port = graficosOutputPortFalso();
     const useCase = new GenerarGrafico(repoFalso(dataset), port);
 
-    const resultado = await useCase.ejecutar('dispersionCvssDias');
+    const resultado = await useCase.ejecutar('dispersionCvssDias', 'analista-1');
 
     expect(resultado).toEqual({
       svg: '<svg>dispersion</svg>',
@@ -96,7 +99,7 @@ describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () =
     const port = graficosOutputPortFalso();
     const useCase = new GenerarGrafico(repoFalso(dataset), port);
 
-    const resultado = await useCase.ejecutar('topSoftware');
+    const resultado = await useCase.ejecutar('topSoftware', 'analista-1');
 
     expect(resultado).toEqual({
       svg: '<svg>barrasH</svg>',

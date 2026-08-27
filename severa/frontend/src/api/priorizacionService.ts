@@ -19,8 +19,18 @@ export interface ResultadoCambioEstado {
   fechaRemediacion: string | null;
 }
 
+// Severidad, no NivelDeRiesgo: son las etiquetas reales de la columna
+// "severidad" en la base (PostgresVulnerabilidadRepository.calcularSeveridad),
+// no los nombres del dominio (NivelDeRiesgo usa "Moderado"/"Crítico", la
+// columna usa "Media"/"Crítica") — mismo query param que ya acepta
+// buscarConFiltros.
+export type SeveridadFiltro = 'Crítica' | 'Alta' | 'Media' | 'Baja';
+
 export const priorizacionService = {
-  obtenerRanking: (): Promise<EntradaRanking[]> => httpClient.get('/priorizacion/ranking'),
+  // severidad (2026-07-19, "carga por etapas"): sin especificar, se
+  // comporta como siempre (ranking completo del catálogo).
+  obtenerRanking: (severidad?: SeveridadFiltro): Promise<EntradaRanking[]> =>
+    httpClient.get('/priorizacion/ranking', severidad ? { severidad } : undefined),
   // Transición lineal Pendiente -> EnProceso -> Remediada (EstadoRemediacion.ts,
   // backend): pedir un salto inválido responde 409, no 400.
   marcarEstado: (cve: string, estado: 'EnProceso' | 'Remediada'): Promise<ResultadoCambioEstado> =>
