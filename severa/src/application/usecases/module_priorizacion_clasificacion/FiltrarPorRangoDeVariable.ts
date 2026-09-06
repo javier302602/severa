@@ -1,8 +1,8 @@
 import { Vulnerabilidad } from '../../../domain/entities/Vulnerabilidad';
-import { FiltrarPorRangoCvssUseCase } from '../../ports/in/module_priorizacion_clasificacion/FiltrarPorRangoDeVariableUseCase';
+import { FiltrarPorRangoDeVariableUseCase } from '../../ports/in/module_priorizacion_clasificacion/FiltrarPorRangoDeVariableUseCase';
 import { VulnerabilidadRepository } from '../../ports/out/persistencia/repositorios/VulnerabilidadRepository';
 
-export class FiltrarPorRangoCvss implements FiltrarPorRangoCvssUseCase {
+export class FiltrarPorRangoDeVariable implements FiltrarPorRangoDeVariableUseCase {
   constructor(private readonly vulnerabilidadRepository: VulnerabilidadRepository) {}
 
   async ejecutar(cvssMin: number, cvssMax: number, analistaId: string): Promise<Vulnerabilidad[]> {

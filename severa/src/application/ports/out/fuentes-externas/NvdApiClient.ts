@@ -1,4 +1,4 @@
-import { FilaImportable, FilaRechazada } from '../../../../infrastructure/adapters/out/dataset/LectorExcelDataset';
+import { FilaImportable, FilaRechazada } from '../../../../infrastructure/adapters/out/dataset/parsers/LectorExcelDataset';
 
 export interface NvdApiClient {
   // url: la URL EXACTA que ya pasó la allowlist de DetectorDeTipoDeLink —

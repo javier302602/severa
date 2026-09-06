@@ -1,5 +1,5 @@
 import express from 'express';
-import { container } from '../../../config/container';
+import { container } from '../../../../../../config/container';
 
 // RF-99 a RF-104: centro de notificaciones del analista autenticado. Montado
 // después de `autenticacion` en app.ts, igual que el resto de la API desde

@@ -4,13 +4,13 @@ import os from 'os';
 import path from 'path';
 import fs from 'fs';
 import { randomUUID } from 'crypto';
-import { container } from '../../../config/container';
-import { MapeoColumnas } from '../../out/dataset/LectorExcelDataset';
+import { container } from '../../../../../../config/container';
+import { MapeoColumnas } from '../../../../../out/dataset/parsers/LectorExcelDataset';
 
-// RF-17/RF-24: separado de VulnerabilidadController (catálogo/consulta de
-// vulnerabilidades ya cargadas, Módulo M-04 del SDS) porque carga y
-// exportación del dataset son el Módulo M-03 — misma frontera que ya separa
-// BusquedaController de VulnerabilidadController.
+// RF-17/RF-24: separado de VulnerabilidadController (M-09, priorización y
+// framework de clasificación configurable — ver sección V del doc de
+// arquitectura) porque carga y exportación del dataset son el Módulo M-03 —
+// misma frontera que ya separa BusquedaController de VulnerabilidadController.
 export const datasetRouter = express.Router();
 
 // RF-17 + Sprint 10 (xlsx identificado como superficie sensible: zip bombs,
@@ -116,26 +116,10 @@ function sanearNombreDeArchivo(nombre: string): string {
   return sinSaltosDeLinea.slice(0, LARGO_MAXIMO_NOMBRE_ARCHIVO);
 }
 
-// Mejora "mapeo flexible de columnas": el frontend llama a esto apenas el
-// usuario elige el archivo, antes de mostrar el formulario de mapeo — reusa
-// el mismo `manejarSubida` (límite de tamaño, tipo MIME) que /dataset/importar
-// para no duplicar esas reglas en dos endpoints.
-datasetRouter.post('/dataset/columnas', manejarSubida, async (req, res) => {
-  if (!req.file) {
-    res.status(400).json({ error: 'Debe subir un archivo .xlsx o .xls en el campo "archivo"' });
-    return;
-  }
-
-  try {
-    const columnas = await container.detectarColumnasDatasetUseCase.ejecutar(req.file.path);
-    res.json({ columnas });
-  } catch (error) {
-    res.status(400).json({ error: error instanceof Error ? error.message : 'Error desconocido' });
-  } finally {
-    fs.unlink(req.file.path, () => {});
-  }
-});
-
+// RF-14 (Vertical Slicing, sección IV/V del doc de arquitectura): la ruta
+// POST /dataset/columnas se movio a DeteccionColumnasController.ts
+// (module_deteccion_variables, M-14) porque DetectarColumnasDatasetUseCase
+// pertenece a ese modulo, no a M-03. Mismo comportamiento, archivo distinto.
 datasetRouter.post('/dataset/importar', manejarSubida, async (req, res) => {
   if (!req.file) {
     res.status(400).json({ error: 'Debe subir un archivo .xlsx o .xls en el campo "archivo"' });

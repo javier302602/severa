@@ -1,21 +1,21 @@
 import { Pool } from 'pg';
-import { PostgresVulnerabilidadRepository } from '../../src/infrastructure/adapters/out/persistence/PostgresVulnerabilidadRepository';
-import { PostgresAuditoriaRepository } from '../../src/infrastructure/adapters/out/persistence/PostgresAuditoriaRepository';
+import { PostgresVulnerabilidadRepository } from '../../src/infrastructure/adapters/out/persistencia/repositorios/PostgresVulnerabilidadRepository';
+import { PostgresAuditoriaRepository } from '../../src/infrastructure/adapters/out/persistencia/repositorios/PostgresAuditoriaRepository';
 import { Vulnerabilidad } from '../../src/domain/entities/Vulnerabilidad';
 import { IdentificadorCVE } from '../../src/domain/shared/value-objects/IdentificadorCVE';
 import { CvssScore } from '../../src/domain/shared/value-objects/CvssScore';
 import { TipoAccesoValue } from '../../src/domain/shared/value-objects/TipoAcceso';
 import { FiltroVulnerabilidad } from '../../src/domain/shared/value-objects/FiltroVulnerabilidad';
-import { ConsultarVulnerabilidadPorCVE } from '../../src/application/usecases/ConsultarVulnerabilidadPorCVE';
-import { FiltrarPorRangoCvss } from '../../src/application/usecases/FiltrarPorRangoCvss';
-import { CalcularResumenEstadistico } from '../../src/application/usecases/CalcularResumenEstadistico';
-import { GenerarGrafico } from '../../src/application/usecases/GenerarGrafico';
-import { CompararPorTipoAcceso } from '../../src/application/usecases/CompararPorTipoAcceso';
-import { GenerarRankingUrgencia } from '../../src/application/usecases/GenerarRankingUrgencia';
-import { BuscarConFiltros } from '../../src/application/usecases/BuscarConFiltros';
-import { recopilarDatosDeInforme } from '../../src/application/usecases/RecopilarDatosDeInforme';
-import { GraficosOutputPort } from '../../src/application/ports/out/GraficosOutputPort';
-import { ServicioDeNotificaciones } from '../../src/application/ports/out/ServicioDeNotificaciones';
+import { ConsultarVulnerabilidadPorCVE } from '../../src/application/usecases/module_priorizacion_clasificacion/ConsultarVulnerabilidadPorCVE';
+import { FiltrarPorRangoDeVariable } from '../../src/application/usecases/module_priorizacion_clasificacion/FiltrarPorRangoDeVariable';
+import { CalcularResumenEstadistico } from '../../src/application/usecases/module_medidas_tendencia_dispersion/CalcularResumenEstadistico';
+import { GenerarGrafico } from '../../src/application/usecases/module_visualizacion_grafica/GenerarGrafico';
+import { CompararPorTipoAcceso } from '../../src/application/usecases/module_comparacion_categorias/CompararPorTipoAcceso';
+import { GenerarRankingUrgencia } from '../../src/application/usecases/module_priorizacion_clasificacion/GenerarRankingUrgencia';
+import { BuscarConFiltros } from '../../src/application/usecases/module_busqueda_filtros_avanzados/BuscarConFiltros';
+import { recopilarDatosDeInforme } from '../../src/application/usecases/module_reportes_exportacion/RecopilarDatosDeInforme';
+import { GraficosOutputPort } from '../../src/application/ports/out/graphics/GraficosOutputPort';
+import { ServicioDeNotificaciones } from '../../src/application/ports/out/notificaciones/ServicioDeNotificaciones';
 
 // Test de integración REAL (Paso 5 — multi-tenancy): pega contra el mismo
 // Postgres real que PostgresVulnerabilidadRepository.integration.test.ts
@@ -142,7 +142,7 @@ describe('Multi-tenancy: aislamiento de datos por analista (Paso 5) — integrac
   // ------------------------------------------------------------------
   // 1. Catálogo
   // ------------------------------------------------------------------
-  describe('Catálogo (ConsultarVulnerabilidadPorCVE, FiltrarPorRangoCvss)', () => {
+  describe('Catálogo (ConsultarVulnerabilidadPorCVE, FiltrarPorRangoDeVariable)', () => {
     test('B no puede consultar por CVE un registro exclusivo de A; A sí puede', async () => {
       const usecase = new ConsultarVulnerabilidadPorCVE(vulnerabilidadRepository);
 
@@ -164,7 +164,7 @@ describe('Multi-tenancy: aislamiento de datos por analista (Paso 5) — integrac
     });
 
     test('filtrarPorRangoCvss de B nunca incluye CVEs exclusivos de A', async () => {
-      const usecase = new FiltrarPorRangoCvss(vulnerabilidadRepository);
+      const usecase = new FiltrarPorRangoDeVariable(vulnerabilidadRepository);
 
       const resultadosDeB = await usecase.ejecutar(0, 10, ANALISTA_B);
       const cvesDeB = resultadosDeB.map((item) => item.cve.valor);

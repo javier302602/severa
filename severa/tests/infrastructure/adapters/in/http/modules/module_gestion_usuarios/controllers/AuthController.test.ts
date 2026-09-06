@@ -1,15 +1,15 @@
 import request from 'supertest';
-import type { Analista } from '../../src/domain/entities/Analista';
-import type { AnalistaRepository } from '../../src/application/ports/out/AnalistaRepository';
-import type { HasherDeContrasenas } from '../../src/application/ports/out/HasherDeContrasenas';
+import type { Analista } from '../../../../../../../../src/domain/entities/Analista';
+import type { AnalistaRepository } from '../../../../../../../../src/application/ports/out/persistencia/repositorios/AnalistaRepository';
+import type { HasherDeContrasenas } from '../../../../../../../../src/application/ports/out/seguridad/HasherDeContrasenas';
 
 // Usa la clase REAL RegistrarAnalista (no un mock del caso de uso) para
 // probar la cadena completa HTTP -> controller -> caso de uso -> entidad:
 // el mock de más abajo solo reemplaza el repositorio y el hasher, nunca la
 // lógica de negocio que cierra el hueco (RF-04, Sprint 15) — mismo criterio
 // que SincronizarConApiNvd.test.ts en Sprint 12.
-jest.mock('../../src/infrastructure/config/container', () => {
-  const { RegistrarAnalista } = require('../../src/application/usecases/RegistrarAnalista');
+jest.mock('../../../../../../../../src/infrastructure/config/container', () => {
+  const { RegistrarAnalista } = require('../../../../../../../../src/application/usecases/module_gestion_usuarios/RegistrarAnalista');
 
   const analistasPorCorreo = new Map<string, Analista>();
 
@@ -35,7 +35,7 @@ jest.mock('../../src/infrastructure/config/container', () => {
   };
 });
 
-import { createApp } from '../../src/infrastructure/config/app';
+import { createApp } from '../../../../../../../../src/infrastructure/config/app';
 
 const app = createApp();
 

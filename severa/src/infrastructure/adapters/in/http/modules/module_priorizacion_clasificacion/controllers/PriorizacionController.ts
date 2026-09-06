@@ -1,6 +1,6 @@
 import express from 'express';
-import { container } from '../../../config/container';
-import { TransicionDeEstadoInvalidaError } from '../../../../domain/errors/TransicionDeEstadoInvalidaError';
+import { container } from '../../../../../../config/container';
+import { TransicionDeEstadoInvalidaError } from '../../../../../../../domain/errors/TransicionDeEstadoInvalidaError';
 
 // Rutas con prefijos distintos (/priorizacion y /vulnerabilidades), montadas
 // sin prefijo adicional en server.ts.

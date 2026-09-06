@@ -1,6 +1,6 @@
 import { VulnerabilidadRepository } from '../../ports/out/persistencia/repositorios/VulnerabilidadRepository';
 import { DatasetInvalidoError } from '../../../domain/errors/DatasetInvalidoError';
-import { FilaImportable, FilaRechazada, construirExcelDeRechazadas } from '../../../infrastructure/adapters/out/dataset/LectorExcelDataset';
+import { FilaImportable, FilaRechazada, construirExcelDeRechazadas } from '../../../infrastructure/adapters/out/dataset/parsers/LectorExcelDataset';
 import { ImportarDatasetUseCase, ResumenImportacion } from '../../ports/in/module_carga_gestion_datasets/ImportarDatasetUseCase';
 
 // Tamaño de lote para guardarLote() — mismo criterio en todo el módulo (ver

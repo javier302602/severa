@@ -1,4 +1,4 @@
-import { LectorDatasetGenerico } from '../../../infrastructure/adapters/out/dataset-generico/LectorDatasetGenerico';
+import { LectorDatasetGenerico } from '../../../infrastructure/adapters/out/dataset/parsers/LectorDatasetGenerico';
 import { AnalizarDatasetGenericoUseCase, ResultadoAnalisisDataset } from '../../ports/in/module_carga_gestion_datasets/AnalizarDatasetGenericoUseCase';
 import { analizarDataset } from '../../../domain/services/data-cleaning/CalidadDeDatosGenerico';
 import { SesionAnalisisStore } from '../../ports/out/dataset/SesionAnalisisStore';

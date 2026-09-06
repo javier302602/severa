@@ -1,5 +1,5 @@
 import express from 'express';
-import { container } from '../../../config/container';
+import { container } from '../../../../../../config/container';
 
 export const vulnerabilidadRouter = express.Router();
 
@@ -37,13 +37,13 @@ vulnerabilidadRouter.get('/', async (req, res) => {
   const severidad = typeof req.query.severidad === 'string' ? req.query.severidad : undefined;
 
   if (cvssMin !== undefined && cvssMax !== undefined) {
-    const resultados = await container.filtrarPorRangoCvssUseCase.ejecutar(cvssMin, cvssMax, req.analistaAutenticado!.id);
+    const resultados = await container.filtrarPorRangoDeVariableUseCase.ejecutar(cvssMin, cvssMax, req.analistaAutenticado!.id);
     res.json(resultados.map((item) => ({ cve: item.cve.valor, cvssScore: item.cvssScore.valor, software: item.descripcion })));
     return;
   }
 
   if (severidad) {
-    const resultados = await container.filtrarPorSeveridadUseCase.ejecutar(severidad, req.analistaAutenticado!.id);
+    const resultados = await container.filtrarPorCategoriaClasificacionUseCase.ejecutar(severidad, req.analistaAutenticado!.id);
     res.json(resultados.map((item) => ({ cve: item.cve.valor, cvssScore: item.cvssScore.valor, software: item.descripcion })));
     return;
   }

@@ -5,7 +5,7 @@ import os from 'os';
 import path from 'path';
 import * as XLSX from 'xlsx';
 
-jest.mock('../../src/infrastructure/config/container', () => ({
+jest.mock('../../../../../../../../src/infrastructure/config/container', () => ({
   container: {
     importarDatasetDesdeArchivoUseCase: {
       ejecutar: jest.fn().mockResolvedValue({ importados: 2, rechazados: 0, errores: [] })
@@ -28,9 +28,9 @@ jest.mock('../../src/infrastructure/config/container', () => ({
   }
 }));
 
-import { createApp } from '../../src/infrastructure/config/app';
-import { config } from '../../src/infrastructure/config/env';
-import { container } from '../../src/infrastructure/config/container';
+import { createApp } from '../../../../../../../../src/infrastructure/config/app';
+import { config } from '../../../../../../../../src/infrastructure/config/env';
+import { container } from '../../../../../../../../src/infrastructure/config/container';
 
 const app = createApp();
 

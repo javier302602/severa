@@ -13,7 +13,7 @@ import {
   FilaRechazada,
   construirExcelDeRechazadas,
   MAX_FILAS_RECHAZADAS_PARA_EXCEL
-} from '../../../infrastructure/adapters/out/dataset/LectorExcelDataset';
+} from '../../../infrastructure/adapters/out/dataset/parsers/LectorExcelDataset';
 import { ImportarDatasetConAuditoria } from '../module_seguridad_auditoria/decoradores/ImportarDatasetConAuditoria';
 import { esVulnerabilidadCritica } from '../../../domain/services/DetectorDeEventosNotificables';
 

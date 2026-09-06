@@ -6,7 +6,7 @@ import type { SincronizarConApiNvdUseCase } from '../../../src/application/ports
 import type { VulnerabilidadRepository } from '../../../src/application/ports/out/persistencia/repositorios/VulnerabilidadRepository';
 import type { AuditoriaRepository } from '../../../src/application/ports/out/persistencia/repositorios/AuditoriaRepository';
 import type { ServicioDeNotificaciones } from '../../../src/application/ports/out/notificaciones/ServicioDeNotificaciones';
-import { LectorExcelDataset, FilaProcesada } from '../../../src/infrastructure/adapters/out/dataset/LectorExcelDataset';
+import { LectorExcelDataset, FilaProcesada } from '../../../src/infrastructure/adapters/out/dataset/parsers/LectorExcelDataset';
 import { Vulnerabilidad } from '../../../src/domain/entities/Vulnerabilidad';
 import { IdentificadorCVE } from '../../../src/domain/shared/value-objects/IdentificadorCVE';
 import { CvssScore } from '../../../src/domain/shared/value-objects/CvssScore';

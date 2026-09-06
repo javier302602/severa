@@ -1,4 +1,4 @@
-import { LectorExcelDataset, MapeoColumnas } from '../../../infrastructure/adapters/out/dataset/LectorExcelDataset';
+import { LectorExcelDataset, MapeoColumnas } from '../../../infrastructure/adapters/out/dataset/parsers/LectorExcelDataset';
 import { ImportarDatasetDesdeArchivoUseCase } from '../../ports/in/module_carga_gestion_datasets/ImportarDatasetDesdeArchivoUseCase';
 import { ResumenImportacion } from '../../ports/in/module_carga_gestion_datasets/ImportarDatasetUseCase';
 import { ImportarDatasetConAuditoria } from '../module_seguridad_auditoria/decoradores/ImportarDatasetConAuditoria';

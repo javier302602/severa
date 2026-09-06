@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { requiereRol } from '../../../src/infrastructure/adapters/in/http/middleware/RolMiddleware';
+import { requiereRol } from '../../../../../../src/infrastructure/adapters/in/http/middleware/RolMiddleware';
 
 function fakeRes() {
   const res = {} as Response;

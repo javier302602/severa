@@ -1,7 +1,7 @@
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 
-jest.mock('../../src/infrastructure/config/container', () => ({
+jest.mock('../../../../../../../../src/infrastructure/config/container', () => ({
   container: {
     generarGraficoUseCase: {
       // 'svg' (formato real que usa GraficosPage.tsx) devuelve
@@ -17,8 +17,8 @@ jest.mock('../../src/infrastructure/config/container', () => ({
   }
 }));
 
-import { createApp } from '../../src/infrastructure/config/app';
-import { config } from '../../src/infrastructure/config/env';
+import { createApp } from '../../../../../../../../src/infrastructure/config/app';
+import { config } from '../../../../../../../../src/infrastructure/config/env';
 
 const app = createApp();
 

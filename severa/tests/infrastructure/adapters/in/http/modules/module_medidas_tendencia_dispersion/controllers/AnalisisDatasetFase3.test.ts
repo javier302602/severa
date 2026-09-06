@@ -4,8 +4,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import * as XLSX from 'xlsx';
-import { createApp } from '../../src/infrastructure/config/app';
-import { config } from '../../src/infrastructure/config/env';
+import { createApp } from '../../../../../../../../src/infrastructure/config/app';
+import { config } from '../../../../../../../../src/infrastructure/config/env';
 
 // Mejora 4 (Análisis de Datos General) — Fase 3/4/5. A diferencia de
 // AnalisisDatasetController.test.ts (que mockea todo el container para

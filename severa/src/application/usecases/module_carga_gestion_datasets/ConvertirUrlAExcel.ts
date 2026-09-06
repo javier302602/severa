@@ -5,7 +5,7 @@ import { detectarTipoDeLink } from '../../../domain/services/DetectorDeTipoDeLin
 import { UrlNoPermitidaError } from '../../../domain/errors/UrlNoPermitidaError';
 import { DescargadorDeArchivos, ArchivoDescargado } from '../../ports/out/dataset/DescargadorDeArchivos';
 import { NvdApiClient } from '../../ports/out/fuentes-externas/NvdApiClient';
-import { FilaImportable } from '../../../infrastructure/adapters/out/dataset/LectorExcelDataset';
+import { FilaImportable } from '../../../infrastructure/adapters/out/dataset/parsers/LectorExcelDataset';
 
 // Sección Informes: "convertir link a Excel" — a diferencia de
 // ImportarDatasetDesdeUrl.ts (que persiste el resultado en la base de datos

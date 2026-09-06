@@ -1,7 +1,7 @@
 import express from 'express';
-import { container } from '../../../config/container';
-import { FiltroVulnerabilidad, CriteriosFiltroVulnerabilidad } from '../../../../domain/shared/value-objects/FiltroVulnerabilidad';
-import { EstadoRemediacion } from '../../../../domain/shared/value-objects/EstadoRemediacion';
+import { container } from '../../../../../../config/container';
+import { FiltroVulnerabilidad, CriteriosFiltroVulnerabilidad } from '../../../../../../../domain/shared/value-objects/FiltroVulnerabilidad';
+import { EstadoRemediacion } from '../../../../../../../domain/shared/value-objects/EstadoRemediacion';
 
 // M-11 (RF-84 a RF-90): rutas literales /vulnerabilidades/buscar y
 // /vulnerabilidades/buscar/exportar, montadas ANTES de vulnerabilidadRouter en

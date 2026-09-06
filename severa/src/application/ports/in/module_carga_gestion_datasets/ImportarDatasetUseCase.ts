@@ -1,4 +1,4 @@
-import { FilaImportable, FilaRechazada } from '../../../../infrastructure/adapters/out/dataset/LectorExcelDataset';
+import { FilaImportable, FilaRechazada } from '../../../../infrastructure/adapters/out/dataset/parsers/LectorExcelDataset';
 
 export interface ResumenImportacion {
   importados: number;

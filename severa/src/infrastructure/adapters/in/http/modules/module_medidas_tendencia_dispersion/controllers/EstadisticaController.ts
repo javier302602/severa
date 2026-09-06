@@ -1,5 +1,5 @@
 import express from 'express';
-import { container } from '../../../config/container';
+import { container } from '../../../../../../config/container';
 
 export const estadisticaRouter = express.Router();
 
@@ -8,8 +8,7 @@ estadisticaRouter.get('/resumen', async (req, res) => {
   res.json(resultado);
 });
 
-estadisticaRouter.get('/frecuencias', async (req, res) => {
-  const tipo = req.query.tipo === 'agrupada' ? 'agrupada' : 'sinAgrupar';
-  const resultado = await container.generarDistribucionFrecuenciasUseCase.ejecutar(tipo, req.analistaAutenticado!.id);
-  res.json(resultado);
-});
+// GET /estadistica/frecuencias se movio a DistribucionFrecuenciasController.ts
+// (module_distribucion_frecuencias, M-05) — GenerarDistribucionFrecuenciasUseCase
+// pertenece a ese modulo, no a M-06. Sigue montado bajo el mismo prefijo
+// '/estadistica' en app.ts, mismo comportamiento.

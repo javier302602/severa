@@ -1,7 +1,7 @@
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 
-jest.mock('../../src/infrastructure/config/container', () => ({
+jest.mock('../../../../../../../../src/infrastructure/config/container', () => ({
   container: {
     programarInformePeriodicoUseCase: {
       ejecutar: jest.fn().mockResolvedValue(undefined)
@@ -9,9 +9,9 @@ jest.mock('../../src/infrastructure/config/container', () => ({
   }
 }));
 
-import { createApp } from '../../src/infrastructure/config/app';
-import { config } from '../../src/infrastructure/config/env';
-import { container } from '../../src/infrastructure/config/container';
+import { createApp } from '../../../../../../../../src/infrastructure/config/app';
+import { config } from '../../../../../../../../src/infrastructure/config/env';
+import { container } from '../../../../../../../../src/infrastructure/config/container';
 
 const app = createApp();
 

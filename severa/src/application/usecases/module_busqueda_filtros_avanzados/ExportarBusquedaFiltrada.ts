@@ -1,7 +1,7 @@
 import { FiltroVulnerabilidad } from '../../../domain/shared/value-objects/FiltroVulnerabilidad';
 import { ExportarBusquedaFiltradaUseCase } from '../../ports/in/module_busqueda_filtros_avanzados/ExportarBusquedaFiltradaUseCase';
 import { VulnerabilidadRepository } from '../../ports/out/persistencia/repositorios/VulnerabilidadRepository';
-import { construirExcelAgrupadoPorSeveridad } from '../../../infrastructure/adapters/out/dataset/ExportadorExcelAgrupado';
+import { construirExcelAgrupadoPorSeveridad } from '../../../infrastructure/adapters/out/dataset/parsers/ExportadorExcelAgrupado';
 
 // RF-90: mismo formato .xlsx agrupado por severidad que ExportarDatasetValidado,
 // pero aplicado al subconjunto que arroja el filtro en vez de al dataset completo.

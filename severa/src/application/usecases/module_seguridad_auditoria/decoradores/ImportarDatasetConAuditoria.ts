@@ -1,4 +1,4 @@
-import { FilaImportable, FilaRechazada } from '../../../../infrastructure/adapters/out/dataset/LectorExcelDataset';
+import { FilaImportable, FilaRechazada } from '../../../../infrastructure/adapters/out/dataset/parsers/LectorExcelDataset';
 import { ImportarDatasetUseCase, ResumenImportacion } from '../../../ports/in/module_carga_gestion_datasets/ImportarDatasetUseCase';
 import { AuditoriaRepository } from '../../../ports/out/persistencia/repositorios/AuditoriaRepository';
 import { ServicioDeNotificaciones } from '../../../ports/out/notificaciones/ServicioDeNotificaciones';

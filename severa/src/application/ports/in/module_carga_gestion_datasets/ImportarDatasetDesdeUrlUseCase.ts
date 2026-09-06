@@ -1,5 +1,5 @@
 import { ResumenImportacion } from './ImportarDatasetUseCase';
-import { MapeoColumnas } from '../../../../infrastructure/adapters/out/dataset/LectorExcelDataset';
+import { MapeoColumnas } from '../../../../infrastructure/adapters/out/dataset/parsers/LectorExcelDataset';
 
 export interface ImportarDatasetDesdeUrlUseCase {
   // mapeoColumnas (2026-07-17): ningún dataset público real (CISA, NVD/CISA/

@@ -1,5 +1,5 @@
 import { AnalizarDatasetGenerico } from '../../../src/application/usecases/module_carga_gestion_datasets/AnalizarDatasetGenerico';
-import { LectorDatasetGenerico } from '../../../src/infrastructure/adapters/out/dataset-generico/LectorDatasetGenerico';
+import { LectorDatasetGenerico } from '../../../src/infrastructure/adapters/out/dataset/parsers/LectorDatasetGenerico';
 import { SesionAnalisisStore } from '../../../src/application/ports/out/dataset/SesionAnalisisStore';
 
 describe('AnalizarDatasetGenerico — Mejora 4 (Análisis de Datos General) Fase 2/3', () => {

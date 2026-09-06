@@ -6,19 +6,25 @@ import 'express-async-errors';
 import express from 'express';
 import cors from 'cors';
 import { config } from './env';
-import { authRouter } from '../adapters/in/http/AuthController';
-import { perfilRouter } from '../adapters/in/http/PerfilController';
-import { vulnerabilidadRouter } from '../adapters/in/http/VulnerabilidadController';
-import { estadisticaRouter } from '../adapters/in/http/EstadisticaController';
-import { graficoRouter } from '../adapters/in/http/GraficoController';
-import { comparacionRouter } from '../adapters/in/http/ComparacionController';
-import { priorizacionRouter } from '../adapters/in/http/PriorizacionController';
-import { informeRouter } from '../adapters/in/http/InformeController';
-import { busquedaRouter } from '../adapters/in/http/BusquedaController';
-import { datasetRouter } from '../adapters/in/http/DatasetController';
-import { auditoriaRouter } from '../adapters/in/http/AuditoriaController';
-import { notificacionRouter } from '../adapters/in/http/NotificacionController';
-import { analisisDatasetRouter } from '../adapters/in/http/AnalisisDatasetController';
+import { authRouter } from '../adapters/in/http/modules/module_gestion_usuarios/controllers/AuthController';
+import { perfilRouter } from '../adapters/in/http/modules/module_perfil_analista/controllers/PerfilController';
+import { cuentaRouter } from '../adapters/in/http/modules/module_gestion_usuarios/controllers/CuentaController';
+import { vulnerabilidadRouter } from '../adapters/in/http/modules/module_priorizacion_clasificacion/controllers/VulnerabilidadController';
+import { estadisticaRouter } from '../adapters/in/http/modules/module_medidas_tendencia_dispersion/controllers/EstadisticaController';
+import { distribucionFrecuenciasRouter } from '../adapters/in/http/modules/module_distribucion_frecuencias/controllers/DistribucionFrecuenciasController';
+import { graficoRouter } from '../adapters/in/http/modules/module_visualizacion_grafica/controllers/GraficoController';
+import { comparacionRouter } from '../adapters/in/http/modules/module_comparacion_categorias/controllers/ComparacionController';
+import { priorizacionRouter } from '../adapters/in/http/modules/module_priorizacion_clasificacion/controllers/PriorizacionController';
+import { informeRouter } from '../adapters/in/http/modules/module_reportes_exportacion/controllers/InformeController';
+import { busquedaRouter } from '../adapters/in/http/modules/module_busqueda_filtros_avanzados/controllers/BusquedaController';
+import { datasetRouter } from '../adapters/in/http/modules/module_carga_gestion_datasets/controllers/DatasetController';
+import { deteccionColumnasRouter } from '../adapters/in/http/modules/module_deteccion_variables/controllers/DeteccionColumnasController';
+import { auditoriaRouter } from '../adapters/in/http/modules/module_seguridad_auditoria/controllers/AuditoriaController';
+import { notificacionRouter } from '../adapters/in/http/modules/module_notificaciones_alertas/controllers/NotificacionController';
+import { analisisDatasetRouter } from '../adapters/in/http/modules/module_medidas_tendencia_dispersion/controllers/AnalisisDatasetController';
+import { analisisDatasetAnalizarRouter } from '../adapters/in/http/modules/module_carga_gestion_datasets/controllers/AnalisisDatasetAnalizarController';
+import { analisisDatasetOutliersRouter } from '../adapters/in/http/modules/module_limpieza_calidad_datos/controllers/AnalisisDatasetOutliersController';
+import { analisisDatasetInformeRouter } from '../adapters/in/http/modules/module_reportes_exportacion/controllers/AnalisisDatasetInformeController';
 import { exigirHttps } from '../adapters/in/http/middleware/HttpsMiddleware';
 import { autenticacion } from '../adapters/in/http/middleware/AutenticacionMiddleware';
 
@@ -61,10 +67,19 @@ export function createApp(): express.Express {
   // /vulnerabilidades/:cve, que interpretaría "buscar" como un CVE si se
   // resolviera primero.
   app.use(perfilRouter);
+  // CuentaController (M-01) expone DELETE /analistas/me, extraído de
+  // PerfilController (M-02) — ver sección IV/V del doc de arquitectura.
+  app.use(cuentaRouter);
   app.use(busquedaRouter);
   app.use(datasetRouter);
+  // DeteccionColumnasController (M-14) expone POST /dataset/columnas,
+  // extraído de DatasetController (M-03).
+  app.use(deteccionColumnasRouter);
   app.use('/vulnerabilidades', vulnerabilidadRouter);
   app.use('/estadistica', estadisticaRouter);
+  // DistribucionFrecuenciasController (M-05) expone GET /estadistica/frecuencias,
+  // extraído de EstadisticaController (M-06) — mismo prefijo '/estadistica'.
+  app.use('/estadistica', distribucionFrecuenciasRouter);
   app.use('/graficos', graficoRouter);
   app.use('/comparacion', comparacionRouter);
   app.use(priorizacionRouter);
@@ -72,8 +87,15 @@ export function createApp(): express.Express {
   app.use(auditoriaRouter);
   app.use(notificacionRouter);
   // Mejora 4 (Análisis de Datos General) — módulo nuevo y separado del resto
-  // de la API, rutas propias bajo /analisis-datos/...
+  // de la API, rutas propias bajo /analisis-datos/... Repartido en 4 archivos
+  // por módulo del SDS (ver sección IV/V del doc de arquitectura): Fase 2
+  // (analizar, M-03), Fase 3/4 estadísticas/univariado/correlación (M-06,
+  // este mismo analisisDatasetRouter), Fase 4 outliers (M-15), Fase 5
+  // informe (M-10).
+  app.use(analisisDatasetAnalizarRouter);
   app.use(analisisDatasetRouter);
+  app.use(analisisDatasetOutliersRouter);
+  app.use(analisisDatasetInformeRouter);
 
   // Red de seguridad global: bug real encontrado en Sprint 15 — varios
   // controllers (EstadisticaController, InformeController, el gráfico

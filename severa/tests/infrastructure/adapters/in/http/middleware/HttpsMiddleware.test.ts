@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { exigirHttps } from '../../../src/infrastructure/adapters/in/http/middleware/HttpsMiddleware';
+import { exigirHttps } from '../../../../../../src/infrastructure/adapters/in/http/middleware/HttpsMiddleware';
 
 function fakeRes() {
   const res = {} as Response;

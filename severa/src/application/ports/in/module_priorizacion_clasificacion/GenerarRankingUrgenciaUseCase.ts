@@ -11,7 +11,7 @@ export interface GenerarRankingUrgenciaUseCase {
   // severidad (2026-07-19, "carga por etapas"): opcional — si viene, el
   // ranking se genera SOLO sobre esa severidad (reutiliza
   // VulnerabilidadRepository.filtrarPorSeveridad, ya usado por
-  // FiltrarPorSeveridad/BuscarConFiltros, no un mecanismo nuevo), en vez de
+  // FiltrarPorCategoriaClasificacion/BuscarConFiltros, no un mecanismo nuevo), en vez de
   // traer TODO el catálogo del analista de una sola vez.
   ejecutar(analistaId: string, vulnerabilidades?: Vulnerabilidad[], severidad?: string): Promise<EntradaRanking[]>;
 }

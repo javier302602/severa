@@ -1,4 +1,4 @@
-import { LectorExcelDataset } from '../../../infrastructure/adapters/out/dataset/LectorExcelDataset';
+import { LectorExcelDataset } from '../../../infrastructure/adapters/out/dataset/parsers/LectorExcelDataset';
 import { DetectarColumnasDatasetUseCase } from '../../ports/in/module_deteccion_variables/DetectarColumnasDatasetUseCase';
 
 // Mejora "mapeo flexible de columnas": el frontend llama a esto apenas el

@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { PostgresNotificacionRepository } from '../../src/infrastructure/adapters/out/persistence/PostgresNotificacionRepository';
+import { PostgresNotificacionRepository } from '../../src/infrastructure/adapters/out/persistencia/repositorios/PostgresNotificacionRepository';
 import { Notificacion } from '../../src/domain/entities/Notificacion';
 
 // Test de integración REAL: pega contra un Postgres de verdad (requiere

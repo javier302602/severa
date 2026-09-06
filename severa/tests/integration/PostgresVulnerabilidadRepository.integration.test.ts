@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { PostgresVulnerabilidadRepository } from '../../src/infrastructure/adapters/out/persistence/PostgresVulnerabilidadRepository';
+import { PostgresVulnerabilidadRepository } from '../../src/infrastructure/adapters/out/persistencia/repositorios/PostgresVulnerabilidadRepository';
 import { Vulnerabilidad } from '../../src/domain/entities/Vulnerabilidad';
 import { IdentificadorCVE } from '../../src/domain/shared/value-objects/IdentificadorCVE';
 import { CvssScore } from '../../src/domain/shared/value-objects/CvssScore';

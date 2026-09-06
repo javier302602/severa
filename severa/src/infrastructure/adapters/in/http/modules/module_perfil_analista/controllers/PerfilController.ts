@@ -1,5 +1,5 @@
 import express from 'express';
-import { container } from '../../../config/container';
+import { container } from '../../../../../../config/container';
 
 export const perfilRouter = express.Router();
 
@@ -23,10 +23,6 @@ perfilRouter.put('/perfil', async (req, res) => {
   res.json({ id: analista.id, nombre: analista.nombre, correo: analista.correo.valor, rol: analista.rol });
 });
 
-// RF-98/RF-15: eliminación definitiva de la propia cuenta. El id viene del
-// token, nunca de la URL — es imposible pedir la baja de otra cuenta.
-perfilRouter.delete('/analistas/me', async (req, res) => {
-  const id = req.analistaAutenticado!.id;
-  await container.eliminarCuentaUseCase.ejecutar(id);
-  res.status(204).send();
-});
+// DELETE /analistas/me se movió a CuentaController.ts (module_gestion_usuarios,
+// M-01) — EliminarCuentaUseCase pertenece a ese módulo, no a M-02. Mismo
+// comportamiento, solo cambia el archivo.

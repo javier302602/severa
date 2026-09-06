@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { Request, Response } from 'express';
-import { autenticacion } from '../../../src/infrastructure/adapters/in/http/middleware/AutenticacionMiddleware';
-import { config } from '../../../src/infrastructure/config/env';
+import { autenticacion } from '../../../../../../src/infrastructure/adapters/in/http/middleware/AutenticacionMiddleware';
+import { config } from '../../../../../../src/infrastructure/config/env';
 
 function fakeRes() {
   const res = {} as Response;

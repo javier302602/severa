@@ -3,12 +3,12 @@ import jwt from 'jsonwebtoken';
 
 const FECHA_CARGA = new Date('2024-01-15T00:00:00Z');
 
-jest.mock('../../src/infrastructure/config/container', () => {
-  const { Vulnerabilidad } = require('../../src/domain/entities/Vulnerabilidad');
-  const { IdentificadorCVE } = require('../../src/domain/shared/value-objects/IdentificadorCVE');
-  const { CvssScore } = require('../../src/domain/shared/value-objects/CvssScore');
-  const { TipoAccesoValue } = require('../../src/domain/shared/value-objects/TipoAcceso');
-  const { EstadoRemediacionValue } = require('../../src/domain/shared/value-objects/EstadoRemediacion');
+jest.mock('../../../../../../../../src/infrastructure/config/container', () => {
+  const { Vulnerabilidad } = require('../../../../../../../../src/domain/entities/Vulnerabilidad');
+  const { IdentificadorCVE } = require('../../../../../../../../src/domain/shared/value-objects/IdentificadorCVE');
+  const { CvssScore } = require('../../../../../../../../src/domain/shared/value-objects/CvssScore');
+  const { TipoAccesoValue } = require('../../../../../../../../src/domain/shared/value-objects/TipoAcceso');
+  const { EstadoRemediacionValue } = require('../../../../../../../../src/domain/shared/value-objects/EstadoRemediacion');
 
   const vulnerabilidadCompleta = new Vulnerabilidad(
     '1',
@@ -33,8 +33,8 @@ jest.mock('../../src/infrastructure/config/container', () => {
   };
 });
 
-import { createApp } from '../../src/infrastructure/config/app';
-import { config } from '../../src/infrastructure/config/env';
+import { createApp } from '../../../../../../../../src/infrastructure/config/app';
+import { config } from '../../../../../../../../src/infrastructure/config/env';
 
 const app = createApp();
 

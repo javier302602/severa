@@ -1,6 +1,6 @@
 import express from 'express';
-import { container } from '../../../config/container';
-import { requiereRol } from './middleware/RolMiddleware';
+import { container } from '../../../../../../config/container';
+import { requiereRol } from '../../../middleware/RolMiddleware';
 
 export const auditoriaRouter = express.Router();
 
