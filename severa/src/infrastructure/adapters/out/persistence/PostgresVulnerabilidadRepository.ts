@@ -1,13 +1,13 @@
 import { Pool } from 'pg';
 import { Vulnerabilidad } from '../../../../domain/entities/Vulnerabilidad';
 import { VulnerabilidadRepository, Paginacion } from '../../../../application/ports/out/VulnerabilidadRepository';
-import { IdentificadorCVE } from '../../../../domain/value-objects/IdentificadorCVE';
-import { CvssScore } from '../../../../domain/value-objects/CvssScore';
-import { TipoAccesoValue } from '../../../../domain/value-objects/TipoAcceso';
-import { EstadoRemediacion, EstadoRemediacionValue } from '../../../../domain/value-objects/EstadoRemediacion';
-import { FiltroVulnerabilidad } from '../../../../domain/value-objects/FiltroVulnerabilidad';
-import { clasificar } from '../../../../domain/services/ClasificadorDeRiesgo';
-import { NivelDeRiesgo } from '../../../../domain/value-objects/NivelDeRiesgo';
+import { IdentificadorCVE } from '../../../../domain/shared/value-objects/IdentificadorCVE';
+import { CvssScore } from '../../../../domain/shared/value-objects/CvssScore';
+import { TipoAccesoValue } from '../../../../domain/shared/value-objects/TipoAcceso';
+import { EstadoRemediacion, EstadoRemediacionValue } from '../../../../domain/shared/value-objects/EstadoRemediacion';
+import { FiltroVulnerabilidad } from '../../../../domain/shared/value-objects/FiltroVulnerabilidad';
+import { clasificar } from '../../../../domain/services/classification/ClasificadorDeRiesgo';
+import { NivelDeRiesgo } from '../../../../domain/shared/value-objects/NivelDeRiesgo';
 
 // Multi-tenancy a nivel de dueño (migración 006): TODA consulta/modificación
 // de esta tabla lleva WHERE/columna analista_id — no hay ningún método acá

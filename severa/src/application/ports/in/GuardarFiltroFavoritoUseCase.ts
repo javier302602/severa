@@ -1,5 +1,5 @@
 import { FiltroFavorito } from '../../../domain/entities/FiltroFavorito';
-import { CriteriosFiltroVulnerabilidad } from '../../../domain/value-objects/FiltroVulnerabilidad';
+import { CriteriosFiltroVulnerabilidad } from '../../../domain/shared/value-objects/FiltroVulnerabilidad';
 
 export interface GuardarFiltroFavoritoUseCase {
   ejecutar(input: {

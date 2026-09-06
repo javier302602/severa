@@ -1,7 +1,7 @@
 import { Vulnerabilidad } from '../../../../domain/entities/Vulnerabilidad';
-import { IdentificadorCVE } from '../../../../domain/value-objects/IdentificadorCVE';
-import { CvssScore } from '../../../../domain/value-objects/CvssScore';
-import { TipoAccesoValue } from '../../../../domain/value-objects/TipoAcceso';
+import { IdentificadorCVE } from '../../../../domain/shared/value-objects/IdentificadorCVE';
+import { CvssScore } from '../../../../domain/shared/value-objects/CvssScore';
+import { TipoAccesoValue } from '../../../../domain/shared/value-objects/TipoAcceso';
 import { FilaImportable, FilaRechazada } from '../dataset/LectorExcelDataset';
 
 // Anticorruption layer para la API pública de NVD 2.0

@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 import { FiltroFavorito } from '../../../../domain/entities/FiltroFavorito';
 import { FiltroFavoritoRepository } from '../../../../application/ports/out/FiltroFavoritoRepository';
-import { CriteriosFiltroVulnerabilidad } from '../../../../domain/value-objects/FiltroVulnerabilidad';
+import { CriteriosFiltroVulnerabilidad } from '../../../../domain/shared/value-objects/FiltroVulnerabilidad';
 
 export class PostgresFiltroFavoritoRepository implements FiltroFavoritoRepository {
   constructor(private readonly pool: Pool) {}

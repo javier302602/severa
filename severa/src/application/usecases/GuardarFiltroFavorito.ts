@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { FiltroFavorito } from '../../domain/entities/FiltroFavorito';
-import { CriteriosFiltroVulnerabilidad } from '../../domain/value-objects/FiltroVulnerabilidad';
+import { CriteriosFiltroVulnerabilidad } from '../../domain/shared/value-objects/FiltroVulnerabilidad';
 import { GuardarFiltroFavoritoUseCase } from '../ports/in/GuardarFiltroFavoritoUseCase';
 import { FiltroFavoritoRepository } from '../ports/out/FiltroFavoritoRepository';
 

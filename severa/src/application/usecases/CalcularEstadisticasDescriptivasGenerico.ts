@@ -1,6 +1,6 @@
 import { CalcularEstadisticasDescriptivasGenericoUseCase } from '../ports/in/CalcularEstadisticasDescriptivasGenericoUseCase';
 import { SesionAnalisisStore } from '../ports/out/SesionAnalisisStore';
-import { ResumenColumna, calcularEstadisticasDescriptivas } from '../../domain/services/EstadisticasDescriptivasGenerico';
+import { ResumenColumna, calcularEstadisticasDescriptivas } from '../../domain/services/descriptive-statistics/EstadisticasDescriptivasGenerico';
 import { SesionAnalisisNoEncontradaError } from '../../domain/errors/SesionAnalisisNoEncontradaError';
 
 // Mejora 4 (Análisis de Datos General) — Fase 3.

@@ -1,7 +1,7 @@
 import { ClasificarRiesgoUseCase } from '../ports/in/ClasificarRiesgoUseCase';
 import { VulnerabilidadRepository } from '../ports/out/VulnerabilidadRepository';
-import { clasificar } from '../../domain/services/ClasificadorDeRiesgo';
-import { NivelDeRiesgo } from '../../domain/value-objects/NivelDeRiesgo';
+import { clasificar } from '../../domain/services/classification/ClasificadorDeRiesgo';
+import { NivelDeRiesgo } from '../../domain/shared/value-objects/NivelDeRiesgo';
 
 export class ClasificarRiesgo implements ClasificarRiesgoUseCase {
   constructor(private readonly vulnerabilidadRepository: VulnerabilidadRepository) {}

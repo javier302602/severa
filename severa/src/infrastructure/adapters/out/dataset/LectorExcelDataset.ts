@@ -2,9 +2,9 @@ import fs from 'fs';
 import * as XLSX from 'xlsx';
 import { parse } from 'csv-parse';
 import { Vulnerabilidad } from '../../../../domain/entities/Vulnerabilidad';
-import { CvssScore } from '../../../../domain/value-objects/CvssScore';
-import { IdentificadorCVE } from '../../../../domain/value-objects/IdentificadorCVE';
-import { TipoAccesoValue } from '../../../../domain/value-objects/TipoAcceso';
+import { CvssScore } from '../../../../domain/shared/value-objects/CvssScore';
+import { IdentificadorCVE } from '../../../../domain/shared/value-objects/IdentificadorCVE';
+import { TipoAccesoValue } from '../../../../domain/shared/value-objects/TipoAcceso';
 import { DatasetInvalidoError } from '../../../../domain/errors/DatasetInvalidoError';
 import { EstructuraColumnasInvalidaError } from '../../../../domain/errors/EstructuraColumnasInvalidaError';
 

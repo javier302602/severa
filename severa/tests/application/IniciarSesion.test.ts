@@ -3,7 +3,7 @@ import { IniciarSesion } from '../../src/application/usecases/IniciarSesion';
 import { AnalistaRepository } from '../../src/application/ports/out/AnalistaRepository';
 import { HasherDeContrasenas } from '../../src/application/ports/out/HasherDeContrasenas';
 import { Analista } from '../../src/domain/entities/Analista';
-import { Correo } from '../../src/domain/value-objects/Correo';
+import { Correo } from '../../src/domain/shared/value-objects/Correo';
 import { CredencialesInvalidasError } from '../../src/domain/errors/CredencialesInvalidasError';
 import { CuentaBloqueadaError } from '../../src/domain/errors/CuentaBloqueadaError';
 

@@ -1,4 +1,4 @@
-import { DiagnosticoDataset } from '../../../domain/services/CalidadDeDatosGenerico';
+import { DiagnosticoDataset } from '../../../domain/services/data-cleaning/CalidadDeDatosGenerico';
 
 export interface ResultadoAnalisisDataset {
   diagnostico: DiagnosticoDataset;

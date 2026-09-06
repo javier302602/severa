@@ -1,7 +1,7 @@
 import { Vulnerabilidad } from '../../domain/entities/Vulnerabilidad';
 import { CompararPorTipoDeVulnerabilidadUseCase } from '../ports/in/CompararPorTipoDeVulnerabilidadUseCase';
 import { VulnerabilidadRepository } from '../ports/out/VulnerabilidadRepository';
-import { compararGrupos } from '../../domain/services/ComparadorDeCategorias';
+import { compararGrupos } from '../../domain/services/inferential-statistics/ComparadorDeCategorias';
 
 export class CompararPorTipoDeVulnerabilidad implements CompararPorTipoDeVulnerabilidadUseCase {
   constructor(private readonly vulnerabilidadRepository: VulnerabilidadRepository) {}

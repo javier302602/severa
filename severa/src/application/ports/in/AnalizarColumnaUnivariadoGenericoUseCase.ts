@@ -1,4 +1,4 @@
-import { AnalisisUnivariado } from '../../../domain/services/AnalisisUnivariadoGenerico';
+import { AnalisisUnivariado } from '../../../domain/services/descriptive-statistics/AnalisisUnivariadoGenerico';
 
 export interface AnalizarColumnaUnivariadoGenericoUseCase {
   // Mismo criterio que CalcularEstadisticasDescriptivasGenericoUseCase:

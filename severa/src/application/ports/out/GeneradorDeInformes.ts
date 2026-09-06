@@ -1,13 +1,13 @@
-import { TablaFrecuencia } from '../../../domain/services/DistribucionFrecuencias';
-import { ComparacionGrupos } from '../../../domain/services/ComparadorDeCategorias';
-import { EntradaRanking } from '../../../domain/services/MotorDePriorizacion';
-import { ResumenCincoNumeros } from '../../../domain/services/EstadisticaDescriptiva';
-import { DatosHistogramaCvss, DatoConteo } from '../../../domain/services/GraficosEstadisticos';
-import { DiagnosticoColumna } from '../../../domain/services/CalidadDeDatosGenerico';
-import { ResumenColumna } from '../../../domain/services/EstadisticasDescriptivasGenerico';
-import { AnalisisUnivariado } from '../../../domain/services/AnalisisUnivariadoGenerico';
-import { MatrizCorrelacion } from '../../../domain/services/CorrelacionGenerico';
-import { ResultadoDeteccionOutliers } from '../../../domain/services/DeteccionOutliersGenerico';
+import { TablaFrecuencia } from '../../../domain/services/descriptive-statistics/DistribucionFrecuencias';
+import { ComparacionGrupos } from '../../../domain/services/inferential-statistics/ComparadorDeCategorias';
+import { EntradaRanking } from '../../../domain/services/classification/MotorDePriorizacion';
+import { ResumenCincoNumeros } from '../../../domain/services/descriptive-statistics/EstadisticaDescriptiva';
+import { DatosHistogramaCvss, DatoConteo } from '../../../domain/services/graphs/GraficosEstadisticos';
+import { DiagnosticoColumna } from '../../../domain/services/data-cleaning/CalidadDeDatosGenerico';
+import { ResumenColumna } from '../../../domain/services/descriptive-statistics/EstadisticasDescriptivasGenerico';
+import { AnalisisUnivariado } from '../../../domain/services/descriptive-statistics/AnalisisUnivariadoGenerico';
+import { MatrizCorrelacion } from '../../../domain/services/descriptive-statistics/CorrelacionGenerico';
+import { ResultadoDeteccionOutliers } from '../../../domain/services/data-cleaning/DeteccionOutliersGenerico';
 
 export interface ResumenEstadisticoInforme {
   media: number;

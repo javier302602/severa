@@ -4,9 +4,9 @@ import { recopilarDatosDeInforme } from '../../src/application/usecases/Recopila
 import { VulnerabilidadRepository } from '../../src/application/ports/out/VulnerabilidadRepository';
 import { AuditoriaRepository } from '../../src/application/ports/out/AuditoriaRepository';
 import { Vulnerabilidad } from '../../src/domain/entities/Vulnerabilidad';
-import { IdentificadorCVE } from '../../src/domain/value-objects/IdentificadorCVE';
-import { CvssScore } from '../../src/domain/value-objects/CvssScore';
-import { TipoAccesoValue } from '../../src/domain/value-objects/TipoAcceso';
+import { IdentificadorCVE } from '../../src/domain/shared/value-objects/IdentificadorCVE';
+import { CvssScore } from '../../src/domain/shared/value-objects/CvssScore';
+import { TipoAccesoValue } from '../../src/domain/shared/value-objects/TipoAcceso';
 
 function repositorioFalso(vulnerabilidades: Vulnerabilidad[]): VulnerabilidadRepository {
   return {

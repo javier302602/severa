@@ -2,7 +2,7 @@ import { RegistrarAnalista } from '../../src/application/usecases/RegistrarAnali
 import { AnalistaRepository } from '../../src/application/ports/out/AnalistaRepository';
 import { HasherDeContrasenas } from '../../src/application/ports/out/HasherDeContrasenas';
 import { Analista } from '../../src/domain/entities/Analista';
-import { Correo } from '../../src/domain/value-objects/Correo';
+import { Correo } from '../../src/domain/shared/value-objects/Correo';
 import { CorreoInvalidoError } from '../../src/domain/errors/CorreoInvalidoError';
 import { CorreoYaRegistradoError } from '../../src/domain/errors/CorreoYaRegistradoError';
 

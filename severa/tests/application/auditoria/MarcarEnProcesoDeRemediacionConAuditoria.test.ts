@@ -2,10 +2,10 @@ import { MarcarEnProcesoDeRemediacionConAuditoria } from '../../../src/applicati
 import { MarcarEnProcesoDeRemediacionUseCase } from '../../../src/application/ports/in/MarcarEnProcesoDeRemediacionUseCase';
 import { AuditoriaRepository } from '../../../src/application/ports/out/AuditoriaRepository';
 import { Vulnerabilidad } from '../../../src/domain/entities/Vulnerabilidad';
-import { IdentificadorCVE } from '../../../src/domain/value-objects/IdentificadorCVE';
-import { CvssScore } from '../../../src/domain/value-objects/CvssScore';
-import { TipoAccesoValue } from '../../../src/domain/value-objects/TipoAcceso';
-import { EstadoRemediacionValue } from '../../../src/domain/value-objects/EstadoRemediacion';
+import { IdentificadorCVE } from '../../../src/domain/shared/value-objects/IdentificadorCVE';
+import { CvssScore } from '../../../src/domain/shared/value-objects/CvssScore';
+import { TipoAccesoValue } from '../../../src/domain/shared/value-objects/TipoAcceso';
+import { EstadoRemediacionValue } from '../../../src/domain/shared/value-objects/EstadoRemediacion';
 
 function auditoriaFalsa(): AuditoriaRepository {
   return {

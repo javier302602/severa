@@ -11,7 +11,7 @@ import {
   type Lienzo,
   type MarcasDeEje,
   type AreaDeTrazado
-} from '../../../../domain/services/GeometriaDeGraficos';
+} from '../../../../domain/services/graphs/GeometriaDeGraficos';
 
 // Bug real (auditoría de cierre de Mejora 4, confirmado en vivo contra
 // GET /graficos/:tipo): SvgGraficosAdapter.ts nunca dibujaba nada — siempre

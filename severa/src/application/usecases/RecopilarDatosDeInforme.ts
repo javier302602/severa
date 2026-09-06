@@ -12,13 +12,13 @@ import {
   calcularCoeficienteVariacion,
   calcularResumenCincoNumeros,
   ResumenCincoNumeros
-} from '../../domain/services/EstadisticaDescriptiva';
-import { generarTablaAgrupada, generarTablaSinAgrupar } from '../../domain/services/DistribucionFrecuencias';
-import { compararGrupos } from '../../domain/services/ComparadorDeCategorias';
-import { generarRanking } from '../../domain/services/MotorDePriorizacion';
+} from '../../domain/services/descriptive-statistics/EstadisticaDescriptiva';
+import { generarTablaAgrupada, generarTablaSinAgrupar } from '../../domain/services/descriptive-statistics/DistribucionFrecuencias';
+import { compararGrupos } from '../../domain/services/inferential-statistics/ComparadorDeCategorias';
+import { generarRanking } from '../../domain/services/classification/MotorDePriorizacion';
 import { generarInterpretacion } from '../../domain/services/InterpretadorDeResultados';
-import { calcularCorrelacionPearson } from '../../domain/services/Correlacion';
-import { clasificar } from '../../domain/services/ClasificadorDeRiesgo';
+import { calcularCorrelacionPearson } from '../../domain/services/descriptive-statistics/Correlacion';
+import { clasificar } from '../../domain/services/classification/ClasificadorDeRiesgo';
 import {
   generarDatosHistogramaCvss,
   generarDatosHistogramaAgrupado,
@@ -27,7 +27,7 @@ import {
   generarTopN,
   generarTopTiposClasificados,
   ETIQUETA_POR_NIVEL
-} from '../../domain/services/GraficosEstadisticos';
+} from '../../domain/services/graphs/GraficosEstadisticos';
 import { Vulnerabilidad } from '../../domain/entities/Vulnerabilidad';
 
 const LIMITACIONES_CONOCIDAS: string[] = [

@@ -1,9 +1,9 @@
 import { CompararPorTipoDeVulnerabilidad } from '../../src/application/usecases/CompararPorTipoDeVulnerabilidad';
 import { VulnerabilidadRepository } from '../../src/application/ports/out/VulnerabilidadRepository';
 import { Vulnerabilidad } from '../../src/domain/entities/Vulnerabilidad';
-import { IdentificadorCVE } from '../../src/domain/value-objects/IdentificadorCVE';
-import { CvssScore } from '../../src/domain/value-objects/CvssScore';
-import { TipoAccesoValue } from '../../src/domain/value-objects/TipoAcceso';
+import { IdentificadorCVE } from '../../src/domain/shared/value-objects/IdentificadorCVE';
+import { CvssScore } from '../../src/domain/shared/value-objects/CvssScore';
+import { TipoAccesoValue } from '../../src/domain/shared/value-objects/TipoAcceso';
 
 describe('CompararPorTipoDeVulnerabilidad', () => {
   test('compara medias entre dos tipos de vulnerabilidad', async () => {

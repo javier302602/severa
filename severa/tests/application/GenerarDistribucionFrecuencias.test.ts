@@ -1,9 +1,9 @@
 import { GenerarDistribucionFrecuencias } from '../../src/application/usecases/GenerarDistribucionFrecuencias';
 import { VulnerabilidadRepository } from '../../src/application/ports/out/VulnerabilidadRepository';
 import { Vulnerabilidad } from '../../src/domain/entities/Vulnerabilidad';
-import { IdentificadorCVE } from '../../src/domain/value-objects/IdentificadorCVE';
-import { CvssScore } from '../../src/domain/value-objects/CvssScore';
-import { TipoAccesoValue } from '../../src/domain/value-objects/TipoAcceso';
+import { IdentificadorCVE } from '../../src/domain/shared/value-objects/IdentificadorCVE';
+import { CvssScore } from '../../src/domain/shared/value-objects/CvssScore';
+import { TipoAccesoValue } from '../../src/domain/shared/value-objects/TipoAcceso';
 
 describe('GenerarDistribucionFrecuencias', () => {
   test('genera la tabla sin agrupar para un conjunto fijo de CVSS', async () => {

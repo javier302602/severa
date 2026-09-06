@@ -1,6 +1,6 @@
 import { Analista } from '../../domain/entities/Analista';
 import { AnalistaRepository } from '../ports/out/AnalistaRepository';
-import { Correo } from '../../domain/value-objects/Correo';
+import { Correo } from '../../domain/shared/value-objects/Correo';
 
 export class EditarPerfil {
   constructor(private readonly analistaRepository: AnalistaRepository) {}

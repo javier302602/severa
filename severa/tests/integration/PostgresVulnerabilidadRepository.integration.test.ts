@@ -1,10 +1,10 @@
 import { Pool } from 'pg';
 import { PostgresVulnerabilidadRepository } from '../../src/infrastructure/adapters/out/persistence/PostgresVulnerabilidadRepository';
 import { Vulnerabilidad } from '../../src/domain/entities/Vulnerabilidad';
-import { IdentificadorCVE } from '../../src/domain/value-objects/IdentificadorCVE';
-import { CvssScore } from '../../src/domain/value-objects/CvssScore';
-import { TipoAccesoValue } from '../../src/domain/value-objects/TipoAcceso';
-import { FiltroVulnerabilidad } from '../../src/domain/value-objects/FiltroVulnerabilidad';
+import { IdentificadorCVE } from '../../src/domain/shared/value-objects/IdentificadorCVE';
+import { CvssScore } from '../../src/domain/shared/value-objects/CvssScore';
+import { TipoAccesoValue } from '../../src/domain/shared/value-objects/TipoAcceso';
+import { FiltroVulnerabilidad } from '../../src/domain/shared/value-objects/FiltroVulnerabilidad';
 
 // Test de integración REAL: pega contra un Postgres de verdad (mismo
 // DATABASE_URL que usa la app — requiere `docker compose up -d postgres` o

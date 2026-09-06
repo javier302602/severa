@@ -1,4 +1,4 @@
-import { ResumenColumna } from '../../../domain/services/EstadisticasDescriptivasGenerico';
+import { ResumenColumna } from '../../../domain/services/descriptive-statistics/EstadisticasDescriptivasGenerico';
 
 export interface CalcularEstadisticasDescriptivasGenericoUseCase {
   // analistaId viene siempre del token, nunca del body/query/params — ver

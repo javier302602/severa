@@ -1,10 +1,10 @@
 import { BuscarConFiltros } from '../../src/application/usecases/BuscarConFiltros';
 import { VulnerabilidadRepository } from '../../src/application/ports/out/VulnerabilidadRepository';
 import { Vulnerabilidad } from '../../src/domain/entities/Vulnerabilidad';
-import { IdentificadorCVE } from '../../src/domain/value-objects/IdentificadorCVE';
-import { CvssScore } from '../../src/domain/value-objects/CvssScore';
-import { TipoAccesoValue } from '../../src/domain/value-objects/TipoAcceso';
-import { FiltroVulnerabilidad } from '../../src/domain/value-objects/FiltroVulnerabilidad';
+import { IdentificadorCVE } from '../../src/domain/shared/value-objects/IdentificadorCVE';
+import { CvssScore } from '../../src/domain/shared/value-objects/CvssScore';
+import { TipoAccesoValue } from '../../src/domain/shared/value-objects/TipoAcceso';
+import { FiltroVulnerabilidad } from '../../src/domain/shared/value-objects/FiltroVulnerabilidad';
 
 // Dataset realista (mismo usado en otros tests del módulo de comparación):
 // dos entradas con CVSS >= 9.0 (Crítica), pero solo una es "Apache Log4j".

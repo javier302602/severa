@@ -1,5 +1,5 @@
 import { Analista } from '../../domain/entities/Analista';
-import { Correo } from '../../domain/value-objects/Correo';
+import { Correo } from '../../domain/shared/value-objects/Correo';
 import { AnalistaRepository } from '../ports/out/AnalistaRepository';
 import { HasherDeContrasenas } from '../ports/out/HasherDeContrasenas';
 import { CorreoYaRegistradoError } from '../../domain/errors/CorreoYaRegistradoError';

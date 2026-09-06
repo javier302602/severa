@@ -2,9 +2,9 @@ import { ConsolaServicioDeNotificaciones } from '../../src/infrastructure/adapte
 import { NotificacionRepository } from '../../src/application/ports/out/NotificacionRepository';
 import { Notificacion } from '../../src/domain/entities/Notificacion';
 import { Vulnerabilidad } from '../../src/domain/entities/Vulnerabilidad';
-import { IdentificadorCVE } from '../../src/domain/value-objects/IdentificadorCVE';
-import { CvssScore } from '../../src/domain/value-objects/CvssScore';
-import { TipoAccesoValue } from '../../src/domain/value-objects/TipoAcceso';
+import { IdentificadorCVE } from '../../src/domain/shared/value-objects/IdentificadorCVE';
+import { CvssScore } from '../../src/domain/shared/value-objects/CvssScore';
+import { TipoAccesoValue } from '../../src/domain/shared/value-objects/TipoAcceso';
 
 function notificacionRepositoryEnMemoria(): NotificacionRepository & { registros: Notificacion[] } {
   const registros: Notificacion[] = [];

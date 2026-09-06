@@ -1,7 +1,7 @@
 import { Vulnerabilidad } from '../../domain/entities/Vulnerabilidad';
 import { GenerarDistribucionFrecuenciasUseCase } from '../ports/in/GenerarDistribucionFrecuenciasUseCase';
 import { VulnerabilidadRepository } from '../ports/out/VulnerabilidadRepository';
-import { generarTablaAgrupada, generarTablaSinAgrupar } from '../../domain/services/DistribucionFrecuencias';
+import { generarTablaAgrupada, generarTablaSinAgrupar } from '../../domain/services/descriptive-statistics/DistribucionFrecuencias';
 
 export class GenerarDistribucionFrecuencias implements GenerarDistribucionFrecuenciasUseCase {
   constructor(private readonly vulnerabilidadRepository: VulnerabilidadRepository) {}

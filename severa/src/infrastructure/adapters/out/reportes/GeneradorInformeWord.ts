@@ -17,10 +17,10 @@ import {
   interpretarHistogramaDiasParche,
   interpretarTopTipos,
   interpretarTopSoftware
-} from '../../../../domain/services/InterpretacionDeGraficos';
+} from '../../../../domain/services/graphs/InterpretacionDeGraficos';
 import { interpretarComparacionAcceso } from '../../../../domain/services/InterpretadorDeResultados';
-import { formatearEstadistico } from '../../../../domain/services/ComparadorDeCategorias';
-import type { ResumenCincoNumeros } from '../../../../domain/services/EstadisticaDescriptiva';
+import { formatearEstadistico } from '../../../../domain/services/inferential-statistics/ComparadorDeCategorias';
+import type { ResumenCincoNumeros } from '../../../../domain/services/descriptive-statistics/EstadisticaDescriptiva';
 
 // resumen: null (2026-07-19, bug real): un catálogo sin ninguna vulnerabilidad
 // de un tipo de acceso (ej. todo Remoto, cero Local) ya no tiene un

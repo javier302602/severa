@@ -1,6 +1,6 @@
 import { DetectarOutliersGenericoUseCase } from '../ports/in/DetectarOutliersGenericoUseCase';
 import { SesionAnalisisStore } from '../ports/out/SesionAnalisisStore';
-import { ResultadoDeteccionOutliers, detectarOutliers } from '../../domain/services/DeteccionOutliersGenerico';
+import { ResultadoDeteccionOutliers, detectarOutliers } from '../../domain/services/data-cleaning/DeteccionOutliersGenerico';
 import { SesionAnalisisNoEncontradaError } from '../../domain/errors/SesionAnalisisNoEncontradaError';
 
 // Mejora 4 (Análisis de Datos General) — Fase 4.

@@ -3,7 +3,7 @@ import { SesionAnalisisStore } from '../../src/application/ports/out/SesionAnali
 import { GeneradorDeInformes } from '../../src/application/ports/out/GeneradorDeInformes';
 import { AnalistaRepository } from '../../src/application/ports/out/AnalistaRepository';
 import { Analista } from '../../src/domain/entities/Analista';
-import { Correo } from '../../src/domain/value-objects/Correo';
+import { Correo } from '../../src/domain/shared/value-objects/Correo';
 import { SesionAnalisisNoEncontradaError } from '../../src/domain/errors/SesionAnalisisNoEncontradaError';
 
 function analistaRepositoryFalso(): AnalistaRepository {

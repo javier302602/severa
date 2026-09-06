@@ -10,7 +10,7 @@ import {
   calcularVarianzaMuestral,
   calcularDesviacionEstandarMuestral,
   calcularCoeficienteVariacion
-} from '../../domain/services/EstadisticaDescriptiva';
+} from '../../domain/services/descriptive-statistics/EstadisticaDescriptiva';
 
 export class CalcularResumenEstadistico implements CalcularResumenEstadisticoUseCase {
   constructor(private readonly vulnerabilidadRepository: VulnerabilidadRepository) {}

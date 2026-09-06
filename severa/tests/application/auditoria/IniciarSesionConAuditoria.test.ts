@@ -2,7 +2,7 @@ import { IniciarSesionConAuditoria } from '../../../src/application/usecases/aud
 import { IniciarSesionUseCase } from '../../../src/application/ports/in/IniciarSesionUseCase';
 import { AuditoriaRepository } from '../../../src/application/ports/out/AuditoriaRepository';
 import { Analista } from '../../../src/domain/entities/Analista';
-import { Correo } from '../../../src/domain/value-objects/Correo';
+import { Correo } from '../../../src/domain/shared/value-objects/Correo';
 import { CredencialesInvalidasError } from '../../../src/domain/errors/CredencialesInvalidasError';
 
 function auditoriaFalsa(): AuditoriaRepository {

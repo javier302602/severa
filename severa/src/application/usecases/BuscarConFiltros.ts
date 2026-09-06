@@ -1,5 +1,5 @@
 import { Vulnerabilidad } from '../../domain/entities/Vulnerabilidad';
-import { FiltroVulnerabilidad } from '../../domain/value-objects/FiltroVulnerabilidad';
+import { FiltroVulnerabilidad } from '../../domain/shared/value-objects/FiltroVulnerabilidad';
 import { BuscarConFiltrosUseCase } from '../ports/in/BuscarConFiltrosUseCase';
 import { VulnerabilidadRepository, Paginacion } from '../ports/out/VulnerabilidadRepository';
 

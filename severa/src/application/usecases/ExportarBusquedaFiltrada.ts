@@ -1,4 +1,4 @@
-import { FiltroVulnerabilidad } from '../../domain/value-objects/FiltroVulnerabilidad';
+import { FiltroVulnerabilidad } from '../../domain/shared/value-objects/FiltroVulnerabilidad';
 import { ExportarBusquedaFiltradaUseCase } from '../ports/in/ExportarBusquedaFiltradaUseCase';
 import { VulnerabilidadRepository } from '../ports/out/VulnerabilidadRepository';
 import { construirExcelAgrupadoPorSeveridad } from '../../infrastructure/adapters/out/dataset/ExportadorExcelAgrupado';

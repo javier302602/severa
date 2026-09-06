@@ -8,9 +8,9 @@ import type { DescargadorDeArchivos } from '../../src/application/ports/out/Desc
 import type { NvdApiClient } from '../../src/application/ports/out/NvdApiClient';
 import { UrlNoPermitidaError } from '../../src/domain/errors/UrlNoPermitidaError';
 import { Vulnerabilidad } from '../../src/domain/entities/Vulnerabilidad';
-import { IdentificadorCVE } from '../../src/domain/value-objects/IdentificadorCVE';
-import { CvssScore } from '../../src/domain/value-objects/CvssScore';
-import { TipoAccesoValue } from '../../src/domain/value-objects/TipoAcceso';
+import { IdentificadorCVE } from '../../src/domain/shared/value-objects/IdentificadorCVE';
+import { CvssScore } from '../../src/domain/shared/value-objects/CvssScore';
+import { TipoAccesoValue } from '../../src/domain/shared/value-objects/TipoAcceso';
 
 // DescargadorDeArchivos ahora entrega un archivo en disco (streaming, ver
 // DescargadorDeArchivosHttp.ts), no un Buffer en memoria — estos tests

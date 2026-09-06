@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 import { Analista } from '../../../../domain/entities/Analista';
 import { AnalistaRepository } from '../../../../application/ports/out/AnalistaRepository';
-import { Correo } from '../../../../domain/value-objects/Correo';
+import { Correo } from '../../../../domain/shared/value-objects/Correo';
 
 export class PostgresAnalistaRepository implements AnalistaRepository {
   constructor(private readonly pool: Pool) {}

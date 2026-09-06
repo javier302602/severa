@@ -1,6 +1,6 @@
 import { Vulnerabilidad } from '../../../domain/entities/Vulnerabilidad';
-import { EstadoRemediacion } from '../../../domain/value-objects/EstadoRemediacion';
-import { FiltroVulnerabilidad } from '../../../domain/value-objects/FiltroVulnerabilidad';
+import { EstadoRemediacion } from '../../../domain/shared/value-objects/EstadoRemediacion';
+import { FiltroVulnerabilidad } from '../../../domain/shared/value-objects/FiltroVulnerabilidad';
 
 // Paginación (2026-07-19): opcional para no romper a ExportarBusquedaFiltrada,
 // que necesita TODAS las filas para el CSV — solo la búsqueda para pantalla

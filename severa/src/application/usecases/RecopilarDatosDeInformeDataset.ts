@@ -1,9 +1,9 @@
 import { DatosInformeDataset, AnexoMuestraFilasDataset } from '../ports/out/GeneradorDeInformes';
-import { analizarDataset } from '../../domain/services/CalidadDeDatosGenerico';
-import { calcularEstadisticasDescriptivas } from '../../domain/services/EstadisticasDescriptivasGenerico';
-import { analizarColumnaUnivariado } from '../../domain/services/AnalisisUnivariadoGenerico';
-import { calcularMatrizCorrelacion } from '../../domain/services/CorrelacionGenerico';
-import { detectarOutliers } from '../../domain/services/DeteccionOutliersGenerico';
+import { analizarDataset } from '../../domain/services/data-cleaning/CalidadDeDatosGenerico';
+import { calcularEstadisticasDescriptivas } from '../../domain/services/descriptive-statistics/EstadisticasDescriptivasGenerico';
+import { analizarColumnaUnivariado } from '../../domain/services/descriptive-statistics/AnalisisUnivariadoGenerico';
+import { calcularMatrizCorrelacion } from '../../domain/services/descriptive-statistics/CorrelacionGenerico';
+import { detectarOutliers } from '../../domain/services/data-cleaning/DeteccionOutliersGenerico';
 import { generarInterpretacionDataset } from '../../domain/services/InterpretadorDeResultadosGenerico';
 
 // Mejora 4 (Análisis de Datos General) — Fase 5. Mismo rol que

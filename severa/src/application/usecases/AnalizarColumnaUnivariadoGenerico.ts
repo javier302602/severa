@@ -1,6 +1,6 @@
 import { AnalizarColumnaUnivariadoGenericoUseCase } from '../ports/in/AnalizarColumnaUnivariadoGenericoUseCase';
 import { SesionAnalisisStore } from '../ports/out/SesionAnalisisStore';
-import { AnalisisUnivariado, analizarColumnaUnivariado } from '../../domain/services/AnalisisUnivariadoGenerico';
+import { AnalisisUnivariado, analizarColumnaUnivariado } from '../../domain/services/descriptive-statistics/AnalisisUnivariadoGenerico';
 import { SesionAnalisisNoEncontradaError } from '../../domain/errors/SesionAnalisisNoEncontradaError';
 
 // Mejora 4 (Análisis de Datos General) — Fase 3.

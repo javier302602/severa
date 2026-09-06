@@ -2,9 +2,9 @@ import { Vulnerabilidad } from '../../domain/entities/Vulnerabilidad';
 import { GenerarGraficoUseCase, TipoGrafico } from '../ports/in/GenerarGraficoUseCase';
 import { VulnerabilidadRepository } from '../ports/out/VulnerabilidadRepository';
 import { GraficosOutputPort } from '../ports/out/GraficosOutputPort';
-import { generarDatosHistogramaCvss, contarPorSeveridad, generarTopN, generarTopTiposClasificados, generarDatosHistogramaAgrupado, generarDatosCvssPorAcceso, generarDatosHistogramaDiasParche } from '../../domain/services/GraficosEstadisticos';
-import { calcularResumenCincoNumeros } from '../../domain/services/EstadisticaDescriptiva';
-import { calcularCorrelacionPearson } from '../../domain/services/Correlacion';
+import { generarDatosHistogramaCvss, contarPorSeveridad, generarTopN, generarTopTiposClasificados, generarDatosHistogramaAgrupado, generarDatosCvssPorAcceso, generarDatosHistogramaDiasParche } from '../../domain/services/graphs/GraficosEstadisticos';
+import { calcularResumenCincoNumeros } from '../../domain/services/descriptive-statistics/EstadisticaDescriptiva';
+import { calcularCorrelacionPearson } from '../../domain/services/descriptive-statistics/Correlacion';
 import {
   interpretarHistogramaCvss,
   interpretarBarrasSeveridad,
@@ -16,7 +16,7 @@ import {
   interpretarHistogramaDiasParche,
   interpretarTopTipos,
   interpretarTopSoftware
-} from '../../domain/services/InterpretacionDeGraficos';
+} from '../../domain/services/graphs/InterpretacionDeGraficos';
 
 export class GenerarGrafico implements GenerarGraficoUseCase {
   constructor(

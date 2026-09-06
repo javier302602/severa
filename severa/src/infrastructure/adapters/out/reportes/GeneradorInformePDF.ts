@@ -25,9 +25,9 @@ import {
   interpretarHistogramaDiasParche,
   interpretarTopTipos,
   interpretarTopSoftware
-} from '../../../../domain/services/InterpretacionDeGraficos';
+} from '../../../../domain/services/graphs/InterpretacionDeGraficos';
 import { interpretarComparacionAcceso } from '../../../../domain/services/InterpretadorDeResultados';
-import { formatearEstadistico } from '../../../../domain/services/ComparadorDeCategorias';
+import { formatearEstadistico } from '../../../../domain/services/inferential-statistics/ComparadorDeCategorias';
 
 // RF-77/RF-82: implementación única del puerto GeneradorDeInformes (mismo
 // patrón de "un solo adaptador por puerto de salida" que SvgGraficosAdapter

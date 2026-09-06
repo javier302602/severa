@@ -2,10 +2,10 @@ import ExcelJS from 'exceljs';
 import { ExportarBusquedaFiltrada } from '../../src/application/usecases/ExportarBusquedaFiltrada';
 import { VulnerabilidadRepository } from '../../src/application/ports/out/VulnerabilidadRepository';
 import { Vulnerabilidad } from '../../src/domain/entities/Vulnerabilidad';
-import { IdentificadorCVE } from '../../src/domain/value-objects/IdentificadorCVE';
-import { CvssScore } from '../../src/domain/value-objects/CvssScore';
-import { TipoAccesoValue } from '../../src/domain/value-objects/TipoAcceso';
-import { FiltroVulnerabilidad } from '../../src/domain/value-objects/FiltroVulnerabilidad';
+import { IdentificadorCVE } from '../../src/domain/shared/value-objects/IdentificadorCVE';
+import { CvssScore } from '../../src/domain/shared/value-objects/CvssScore';
+import { TipoAccesoValue } from '../../src/domain/shared/value-objects/TipoAcceso';
+import { FiltroVulnerabilidad } from '../../src/domain/shared/value-objects/FiltroVulnerabilidad';
 
 function repositorioFalso(resultados: Vulnerabilidad[]): VulnerabilidadRepository {
   return {

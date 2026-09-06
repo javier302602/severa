@@ -1,7 +1,7 @@
 import { VerPerfil } from '../../src/application/usecases/VerPerfil';
 import { AnalistaRepository } from '../../src/application/ports/out/AnalistaRepository';
 import { Analista } from '../../src/domain/entities/Analista';
-import { Correo } from '../../src/domain/value-objects/Correo';
+import { Correo } from '../../src/domain/shared/value-objects/Correo';
 
 describe('VerPerfil', () => {
   test('devuelve el analista correspondiente al id recibido, a través del repositorio', async () => {

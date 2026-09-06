@@ -5,10 +5,10 @@ const FECHA_CARGA = new Date('2024-01-15T00:00:00Z');
 
 jest.mock('../../src/infrastructure/config/container', () => {
   const { Vulnerabilidad } = require('../../src/domain/entities/Vulnerabilidad');
-  const { IdentificadorCVE } = require('../../src/domain/value-objects/IdentificadorCVE');
-  const { CvssScore } = require('../../src/domain/value-objects/CvssScore');
-  const { TipoAccesoValue } = require('../../src/domain/value-objects/TipoAcceso');
-  const { EstadoRemediacionValue } = require('../../src/domain/value-objects/EstadoRemediacion');
+  const { IdentificadorCVE } = require('../../src/domain/shared/value-objects/IdentificadorCVE');
+  const { CvssScore } = require('../../src/domain/shared/value-objects/CvssScore');
+  const { TipoAccesoValue } = require('../../src/domain/shared/value-objects/TipoAcceso');
+  const { EstadoRemediacionValue } = require('../../src/domain/shared/value-objects/EstadoRemediacion');
 
   const vulnerabilidadCompleta = new Vulnerabilidad(
     '1',

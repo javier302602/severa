@@ -8,9 +8,9 @@ import type { AuditoriaRepository } from '../../src/application/ports/out/Audito
 import type { ServicioDeNotificaciones } from '../../src/application/ports/out/ServicioDeNotificaciones';
 import { LectorExcelDataset, FilaProcesada } from '../../src/infrastructure/adapters/out/dataset/LectorExcelDataset';
 import { Vulnerabilidad } from '../../src/domain/entities/Vulnerabilidad';
-import { IdentificadorCVE } from '../../src/domain/value-objects/IdentificadorCVE';
-import { CvssScore } from '../../src/domain/value-objects/CvssScore';
-import { TipoAccesoValue } from '../../src/domain/value-objects/TipoAcceso';
+import { IdentificadorCVE } from '../../src/domain/shared/value-objects/IdentificadorCVE';
+import { CvssScore } from '../../src/domain/shared/value-objects/CvssScore';
+import { TipoAccesoValue } from '../../src/domain/shared/value-objects/TipoAcceso';
 import { UrlNoPermitidaError } from '../../src/domain/errors/UrlNoPermitidaError';
 
 function vulnerabilidadRepositoryFalso(): VulnerabilidadRepository {

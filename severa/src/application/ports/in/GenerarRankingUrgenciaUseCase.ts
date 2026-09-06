@@ -1,5 +1,5 @@
 import { Vulnerabilidad } from '../../../domain/entities/Vulnerabilidad';
-import { EntradaRanking } from '../../../domain/services/MotorDePriorizacion';
+import { EntradaRanking } from '../../../domain/services/classification/MotorDePriorizacion';
 
 export interface GenerarRankingUrgenciaUseCase {
   // analistaId ahora cumple doble función: (1) aísla el ranking al catálogo

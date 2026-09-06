@@ -1,5 +1,5 @@
 import { GraficosOutputPort } from '../../../../application/ports/out/GraficosOutputPort';
-import { DatoBarra, ResumenCincoNumeros, PuntoDispersion } from '../../../../domain/services/GeometriaDeGraficos';
+import { DatoBarra, ResumenCincoNumeros, PuntoDispersion } from '../../../../domain/services/graphs/GeometriaDeGraficos';
 import { dibujarBarras, dibujarBarrasHorizontales, dibujarBoxplot, dibujarDispersion, dibujarHistograma, dibujarPastel } from './SvgDibujoDeGraficos';
 
 interface DatosHistograma {

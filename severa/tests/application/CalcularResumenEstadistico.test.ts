@@ -1,9 +1,9 @@
 import { CalcularResumenEstadistico } from '../../src/application/usecases/CalcularResumenEstadistico';
 import { VulnerabilidadRepository } from '../../src/application/ports/out/VulnerabilidadRepository';
 import { Vulnerabilidad } from '../../src/domain/entities/Vulnerabilidad';
-import { IdentificadorCVE } from '../../src/domain/value-objects/IdentificadorCVE';
-import { CvssScore } from '../../src/domain/value-objects/CvssScore';
-import { TipoAccesoValue } from '../../src/domain/value-objects/TipoAcceso';
+import { IdentificadorCVE } from '../../src/domain/shared/value-objects/IdentificadorCVE';
+import { CvssScore } from '../../src/domain/shared/value-objects/CvssScore';
+import { TipoAccesoValue } from '../../src/domain/shared/value-objects/TipoAcceso';
 import {
   calcularMedia,
   calcularMediana,
@@ -13,7 +13,7 @@ import {
   calcularVarianzaMuestral,
   calcularDesviacionEstandarMuestral,
   calcularCoeficienteVariacion
-} from '../../src/domain/services/EstadisticaDescriptiva';
+} from '../../src/domain/services/descriptive-statistics/EstadisticaDescriptiva';
 
 describe('CalcularResumenEstadistico', () => {
   test('calcula el resumen a partir de CVSS reales del dataset', async () => {

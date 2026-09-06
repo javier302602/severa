@@ -12,8 +12,8 @@ import {
   type Lienzo,
   type MarcasDeEje,
   type AreaDeTrazado
-} from '../../../../domain/services/GeometriaDeGraficos';
-import type { MatrizCorrelacion } from '../../../../domain/services/CorrelacionGenerico';
+} from '../../../../domain/services/graphs/GeometriaDeGraficos';
+import type { MatrizCorrelacion } from '../../../../domain/services/descriptive-statistics/CorrelacionGenerico';
 
 // Fase 1: dibuja los gráficos del informe con la API de dibujo vectorial de
 // pdfkit (rect/moveTo-lineTo/path/circle) sobre la geometría YA calculada

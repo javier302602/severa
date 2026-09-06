@@ -1,6 +1,6 @@
 import { CalcularMatrizCorrelacionGenericoUseCase } from '../ports/in/CalcularMatrizCorrelacionGenericoUseCase';
 import { SesionAnalisisStore } from '../ports/out/SesionAnalisisStore';
-import { MatrizCorrelacion, calcularMatrizCorrelacion } from '../../domain/services/CorrelacionGenerico';
+import { MatrizCorrelacion, calcularMatrizCorrelacion } from '../../domain/services/descriptive-statistics/CorrelacionGenerico';
 import { SesionAnalisisNoEncontradaError } from '../../domain/errors/SesionAnalisisNoEncontradaError';
 
 // Mejora 4 (Análisis de Datos General) — Fase 4.

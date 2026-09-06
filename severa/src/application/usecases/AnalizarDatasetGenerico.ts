@@ -1,6 +1,6 @@
 import { LectorDatasetGenerico } from '../../infrastructure/adapters/out/dataset-generico/LectorDatasetGenerico';
 import { AnalizarDatasetGenericoUseCase, ResultadoAnalisisDataset } from '../ports/in/AnalizarDatasetGenericoUseCase';
-import { analizarDataset } from '../../domain/services/CalidadDeDatosGenerico';
+import { analizarDataset } from '../../domain/services/data-cleaning/CalidadDeDatosGenerico';
 import { SesionAnalisisStore } from '../ports/out/SesionAnalisisStore';
 
 // Mejora 4 — Fase 2. Mismo patrón que ImportarDatasetDesdeArchivo.ts: el

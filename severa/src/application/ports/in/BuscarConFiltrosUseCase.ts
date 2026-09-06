@@ -1,5 +1,5 @@
 import { Vulnerabilidad } from '../../../domain/entities/Vulnerabilidad';
-import { FiltroVulnerabilidad } from '../../../domain/value-objects/FiltroVulnerabilidad';
+import { FiltroVulnerabilidad } from '../../../domain/shared/value-objects/FiltroVulnerabilidad';
 import { Paginacion } from '../out/VulnerabilidadRepository';
 
 export interface BuscarConFiltrosUseCase {

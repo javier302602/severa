@@ -2,7 +2,7 @@ import { Vulnerabilidad } from '../../domain/entities/Vulnerabilidad';
 import { GenerarRankingUrgenciaUseCase } from '../ports/in/GenerarRankingUrgenciaUseCase';
 import { VulnerabilidadRepository } from '../ports/out/VulnerabilidadRepository';
 import { ServicioDeNotificaciones } from '../ports/out/ServicioDeNotificaciones';
-import { generarRanking, estaPlazoExcedido, EntradaRanking } from '../../domain/services/MotorDePriorizacion';
+import { generarRanking, estaPlazoExcedido, EntradaRanking } from '../../domain/services/classification/MotorDePriorizacion';
 
 // Tamaño de lote para las notificaciones de plazo excedido (2026-07-19) —
 // mismo criterio que ImportarDataset.ts/guardarLote: antes esto disparaba

@@ -1,4 +1,4 @@
-import { ResultadoDeteccionOutliers } from '../../../domain/services/DeteccionOutliersGenerico';
+import { ResultadoDeteccionOutliers } from '../../../domain/services/data-cleaning/DeteccionOutliersGenerico';
 
 export interface DetectarOutliersGenericoUseCase {
   // Mismo criterio: analistaId siempre del token.

@@ -1,7 +1,7 @@
 import { Vulnerabilidad } from '../../domain/entities/Vulnerabilidad';
 import { CompararPorSoftwareUseCase } from '../ports/in/CompararPorSoftwareUseCase';
 import { VulnerabilidadRepository } from '../ports/out/VulnerabilidadRepository';
-import { compararGrupos } from '../../domain/services/ComparadorDeCategorias';
+import { compararGrupos } from '../../domain/services/inferential-statistics/ComparadorDeCategorias';
 
 // Coincidencia parcial, no exacta (2026-07-19, bug real reportado: "Apache
 // Log4j" vs "log4j" no comparaban) — mismo criterio que la consulta real
