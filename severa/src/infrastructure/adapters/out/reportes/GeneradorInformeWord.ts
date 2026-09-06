@@ -1,6 +1,6 @@
 import { Document, Packer, Paragraph, HeadingLevel, Table, TableRow, TableCell, TextRun, WidthType, TableOfContents, ImageRun, AlignmentType } from 'docx';
 import { generarImagenesDeGraficosInforme, ANCHO_IMAGEN_GRAFICO, ALTO_IMAGEN_GRAFICO } from './RasterizadorDeGraficosWord';
-import { DatosInforme, DatosInformeDataset } from '../../../../application/ports/out/GeneradorDeInformes';
+import { DatosInforme, DatosInformeDataset } from '../../../../application/ports/out/reportes/GeneradorDeInformes';
 import {
   interpretarComposicionDataset,
   interpretarCalidadDatos,

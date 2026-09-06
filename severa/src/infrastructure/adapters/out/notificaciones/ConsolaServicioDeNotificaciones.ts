@@ -1,8 +1,8 @@
 import { randomUUID } from 'crypto';
 import { Vulnerabilidad } from '../../../../domain/entities/Vulnerabilidad';
 import { Notificacion } from '../../../../domain/entities/Notificacion';
-import { ServicioDeNotificaciones } from '../../../../application/ports/out/ServicioDeNotificaciones';
-import { NotificacionRepository } from '../../../../application/ports/out/NotificacionRepository';
+import { ServicioDeNotificaciones } from '../../../../application/ports/out/notificaciones/ServicioDeNotificaciones';
+import { NotificacionRepository } from '../../../../application/ports/out/persistencia/repositorios/NotificacionRepository';
 
 // Stub de Sprint 09 (RF-76), ampliado en Sprint 13 (RF-99 a RF-102): el envío
 // real (correo/Slack/etc.) sigue pendiente, pero ahora además de escribir en

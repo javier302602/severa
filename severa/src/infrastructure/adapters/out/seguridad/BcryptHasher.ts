@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt';
-import { HasherDeContrasenas } from '../../../../application/ports/out/HasherDeContrasenas';
+import { HasherDeContrasenas } from '../../../../application/ports/out/seguridad/HasherDeContrasenas';
 
 export class BcryptHasher implements HasherDeContrasenas {
   async generarHash(contrasena: string): Promise<string> {

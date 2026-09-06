@@ -1,5 +1,5 @@
 import PDFDocument from 'pdfkit';
-import { GeneradorDeInformes, DatosInforme, DatosInformeDataset } from '../../../../application/ports/out/GeneradorDeInformes';
+import { GeneradorDeInformes, DatosInforme, DatosInformeDataset } from '../../../../application/ports/out/reportes/GeneradorDeInformes';
 import { GeneradorInformeWord } from './GeneradorInformeWord';
 import {
   dibujarBarras,

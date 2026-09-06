@@ -1,5 +1,5 @@
 import sharp from 'sharp';
-import { DatosInforme } from '../../../../application/ports/out/GeneradorDeInformes';
+import { DatosInforme } from '../../../../application/ports/out/reportes/GeneradorDeInformes';
 import {
   dibujarBarras,
   dibujarBarrasHorizontales,

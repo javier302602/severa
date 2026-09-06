@@ -1,5 +1,5 @@
 import * as cron from 'node-cron';
-import { ProgramadorDeTareas } from '../../../../application/ports/out/ProgramadorDeTareas';
+import { ProgramadorDeTareas } from '../../../../application/ports/out/scheduler/ProgramadorDeTareas';
 
 // RF-83: adaptador real del puerto ProgramadorDeTareas (Sprint 10 dejó el
 // puerto listo, sin implementación — hueco reportado en Sprints 12/13).
