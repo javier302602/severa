@@ -1,6 +1,6 @@
 import { Vulnerabilidad } from '../entities/Vulnerabilidad';
-import { clasificar } from './ClasificadorDeRiesgo';
-import { ETIQUETA_POR_NIVEL } from './GraficosEstadisticos';
+import { clasificar } from './classification/ClasificadorDeRiesgo';
+import { ETIQUETA_POR_NIVEL } from './graphs/GraficosEstadisticos';
 
 // Bug real reportado: la descarga de vulnerabilidades era una lista plana
 // sin encabezado ni orden, difícil de trabajar (RF-90/Sprint 03 solo definía

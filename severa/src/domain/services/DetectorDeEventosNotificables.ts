@@ -1,5 +1,5 @@
 import { Vulnerabilidad } from '../entities/Vulnerabilidad';
-import { clasificar } from './ClasificadorDeRiesgo';
+import { clasificar } from './classification/ClasificadorDeRiesgo';
 
 // RF-99: una vulnerabilidad es notificable como "crítica" cuando su nivel de
 // riesgo es 'Crítico'. Deliberadamente NO redefine el umbral CVSS >= 9.0 aquí:

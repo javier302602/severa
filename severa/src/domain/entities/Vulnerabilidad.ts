@@ -1,7 +1,7 @@
-import { CvssScore } from '../value-objects/CvssScore';
-import { IdentificadorCVE } from '../value-objects/IdentificadorCVE';
-import { TipoAccesoValue } from '../value-objects/TipoAcceso';
-import { EstadoRemediacion, EstadoRemediacionValue } from '../value-objects/EstadoRemediacion';
+import { CvssScore } from '../shared/value-objects/CvssScore';
+import { IdentificadorCVE } from '../shared/value-objects/IdentificadorCVE';
+import { TipoAccesoValue } from '../shared/value-objects/TipoAcceso';
+import { EstadoRemediacion, EstadoRemediacionValue } from '../shared/value-objects/EstadoRemediacion';
 
 export class Vulnerabilidad {
   public readonly software: string;

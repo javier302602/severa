@@ -1,6 +1,6 @@
-import { DiagnosticoDataset } from './CalidadDeDatosGenerico';
-import { MatrizCorrelacion } from './CorrelacionGenerico';
-import { ResultadoDeteccionOutliers } from './DeteccionOutliersGenerico';
+import { DiagnosticoDataset } from './data-cleaning/CalidadDeDatosGenerico';
+import { MatrizCorrelacion } from './descriptive-statistics/CorrelacionGenerico';
+import { ResultadoDeteccionOutliers } from './data-cleaning/DeteccionOutliersGenerico';
 
 // Mejora 4 (Análisis de Datos General) — Fase 5. Mismo rol que
 // InterpretadorDeResultados.ts (RF-81) pero para el módulo de dataset

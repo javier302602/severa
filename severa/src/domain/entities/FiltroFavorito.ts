@@ -1,4 +1,4 @@
-import { CriteriosFiltroVulnerabilidad } from '../value-objects/FiltroVulnerabilidad';
+import { CriteriosFiltroVulnerabilidad } from '../shared/value-objects/FiltroVulnerabilidad';
 
 // RF-89: combinación de filtros guardada y nombrada por un analista para
 // reutilizarla. `criterios` se guarda como el DTO plano (serializable a JSON),

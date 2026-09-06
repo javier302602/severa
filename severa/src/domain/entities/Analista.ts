@@ -1,4 +1,4 @@
-import { Correo } from '../value-objects/Correo';
+import { Correo } from '../shared/value-objects/Correo';
 
 export type RolAnalista = 'analista' | 'administrador';
 

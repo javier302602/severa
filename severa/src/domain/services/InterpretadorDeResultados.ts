@@ -1,7 +1,7 @@
-import { CvssScore } from '../value-objects/CvssScore';
-import { clasificar } from './ClasificadorDeRiesgo';
-import { ComparacionGrupos, formatearEstadistico } from './ComparadorDeCategorias';
-import { EntradaRanking, estimarPlazoRecomendado } from './MotorDePriorizacion';
+import { CvssScore } from '../shared/value-objects/CvssScore';
+import { clasificar } from './classification/ClasificadorDeRiesgo';
+import { ComparacionGrupos, formatearEstadistico } from './inferential-statistics/ComparadorDeCategorias';
+import { EntradaRanking, estimarPlazoRecomendado } from './classification/MotorDePriorizacion';
 
 // RF-81: genera texto, no un cálculo numérico puro, pero se deja en el
 // dominio (no en application/) porque es una función pura sin dependencias
