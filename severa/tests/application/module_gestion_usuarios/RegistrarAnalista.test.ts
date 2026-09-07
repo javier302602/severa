@@ -107,4 +107,27 @@ describe('RegistrarAnalista', () => {
 
     expect(analista.rol).toBe('analista');
   });
+
+  // RF-07: SEVERA no restringe el registro por dominio de correo (decisión de
+  // producto) — cualquier investigador debe poder registrarse sin importar
+  // si usa un correo institucional, gratuito o de cualquier otro dominio.
+  test.each([
+    ['gmail.com', 'ana@gmail.com'],
+    ['.edu.pe', 'ana@unas.edu.pe'],
+    ['otro dominio cualquiera', 'ana@empresa-cualquiera.io']
+  ])('acepta el registro con correo de %s', async (_descripcion, correo) => {
+    const repository = repositorioFalso();
+    const hasher = hasherFalso();
+    const usecase = new RegistrarAnalista(repository, hasher);
+
+    const analista = await usecase.ejecutar({
+      id: '1',
+      nombre: 'Ana',
+      correo,
+      contrasena: 'secreta123'
+    });
+
+    expect(analista.correo.valor).toBe(correo);
+    expect(repository.guardar).toHaveBeenCalled();
+  });
 });

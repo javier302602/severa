@@ -5,12 +5,17 @@ import { PostgresVulnerabilidadRepository } from '../adapters/out/persistencia/r
 import { PostgresFiltroFavoritoRepository } from '../adapters/out/persistencia/repositorios/PostgresFiltroFavoritoRepository';
 import { PostgresAuditoriaRepository } from '../adapters/out/persistencia/repositorios/PostgresAuditoriaRepository';
 import { PostgresNotificacionRepository } from '../adapters/out/persistencia/repositorios/PostgresNotificacionRepository';
+import { PostgresTokenRecuperacionRepository } from '../adapters/out/persistencia/repositorios/PostgresTokenRecuperacionRepository';
+import { ConsolaEnviadorDeCorreo } from '../adapters/out/notificaciones/ConsolaEnviadorDeCorreo';
 import { BcryptHasher } from '../adapters/out/seguridad/BcryptHasher';
 import { RegistrarAnalista } from '../../application/usecases/module_gestion_usuarios/RegistrarAnalista';
 import { IniciarSesion } from '../../application/usecases/module_gestion_usuarios/IniciarSesion';
+import { RecuperarContrasena } from '../../application/usecases/module_gestion_usuarios/RecuperarContrasena';
+import { RestablecerContrasena } from '../../application/usecases/module_gestion_usuarios/RestablecerContrasena';
 import { EditarPerfil } from '../../application/usecases/module_perfil_analista/EditarPerfil';
 import { VerPerfil } from '../../application/usecases/module_perfil_analista/VerPerfil';
 import { EliminarCuenta } from '../../application/usecases/module_gestion_usuarios/EliminarCuenta';
+import { AsignarRol } from '../../application/usecases/module_gestion_usuarios/AsignarRol';
 import { ConsultarVulnerabilidadPorCVE } from '../../application/usecases/module_priorizacion_clasificacion/ConsultarVulnerabilidadPorCVE';
 import { FiltrarPorRangoDeVariable } from '../../application/usecases/module_priorizacion_clasificacion/FiltrarPorRangoDeVariable';
 import { FiltrarPorCategoriaClasificacion } from '../../application/usecases/module_priorizacion_clasificacion/FiltrarPorCategoriaClasificacion';
@@ -53,6 +58,9 @@ import { EliminarNotificaciones } from '../../application/usecases/module_notifi
 import { IniciarSesionConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/IniciarSesionConAuditoria';
 import { ImportarDatasetConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/ImportarDatasetConAuditoria';
 import { MarcarEnProcesoDeRemediacionConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/MarcarEnProcesoDeRemediacionConAuditoria';
+import { AsignarRolConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/AsignarRolConAuditoria';
+import { RecuperarContrasenaConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/RecuperarContrasenaConAuditoria';
+import { RestablecerContrasenaConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/RestablecerContrasenaConAuditoria';
 import { MarcarComoRemediadaConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/MarcarComoRemediadaConAuditoria';
 import { GenerarInformeConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/GenerarInformeConAuditoria';
 import { GenerarResumenEjecutivoConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/GenerarResumenEjecutivoConAuditoria';
@@ -74,7 +82,11 @@ const vulnerabilidadRepository = new PostgresVulnerabilidadRepository(pool);
 const filtroFavoritoRepository = new PostgresFiltroFavoritoRepository(pool);
 const auditoriaRepository = new PostgresAuditoriaRepository(pool);
 const notificacionRepository = new PostgresNotificacionRepository(pool);
+const tokenRecuperacionRepository = new PostgresTokenRecuperacionRepository(pool);
 const hasher = new BcryptHasher();
+// RF-03: adaptador simulado (consola), mismo criterio que
+// ConsolaServicioDeNotificaciones — no hay infraestructura SMTP real.
+const enviadorDeCorreo = new ConsolaEnviadorDeCorreo();
 const lectorExcelDataset = new LectorExcelDataset();
 const nvdApiClient = new NvdApiClientHttp();
 const graficosOutputPort = new SvgGraficosAdapter();
@@ -127,9 +139,27 @@ export const container = {
     new IniciarSesion(analistaRepository, hasher, config.jwtSecret),
     auditoriaRepository
   ),
+  // RF-03/RNF-33: decorados con auditoría — queda registrado quién solicitó
+  // una recuperación (solo si el correo existe) y quién efectivamente
+  // restableció su contraseña.
+  recuperarContrasenaUseCase: new RecuperarContrasenaConAuditoria(
+    new RecuperarContrasena(analistaRepository, tokenRecuperacionRepository, enviadorDeCorreo),
+    auditoriaRepository
+  ),
+  restablecerContrasenaUseCase: new RestablecerContrasenaConAuditoria(
+    new RestablecerContrasena(analistaRepository, tokenRecuperacionRepository, hasher),
+    auditoriaRepository
+  ),
   editarPerfilUseCase: new EditarPerfil(analistaRepository),
   verPerfilUseCase: new VerPerfil(analistaRepository),
   eliminarCuentaUseCase: new EliminarCuenta(analistaRepository),
+  // RF-04/RNF-33: decorado con auditoría — queda registrado quién asignó qué
+  // rol a quién y cuál era el rol anterior.
+  asignarRolUseCase: new AsignarRolConAuditoria(
+    new AsignarRol(analistaRepository),
+    analistaRepository,
+    auditoriaRepository
+  ),
   consultarVulnerabilidadPorCveUseCase: new ConsultarVulnerabilidadPorCVE(vulnerabilidadRepository),
   filtrarPorRangoDeVariableUseCase: new FiltrarPorRangoDeVariable(vulnerabilidadRepository),
   filtrarPorCategoriaClasificacionUseCase: new FiltrarPorCategoriaClasificacion(vulnerabilidadRepository),

@@ -14,7 +14,8 @@ auditoriaRouter.get('/auditoria', requiereRol('administrador'), async (_req, res
       usuario: registro.usuario,
       accion: registro.accion,
       detalle: registro.detalle,
-      fechaHora: registro.fechaHora
+      fechaHora: registro.fechaHora,
+      ip: registro.ip
     }))
   );
 });
