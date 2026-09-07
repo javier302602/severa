@@ -6,6 +6,7 @@ import fs from 'fs';
 import { randomUUID } from 'crypto';
 import { container } from '../../../../../../config/container';
 import { MapeoColumnas } from '../../../../../out/dataset/parsers/LectorExcelDataset';
+import { sanearNombreDeArchivo } from '../../../shared/sanearNombreDeArchivo';
 
 // RF-17/RF-24: separado de VulnerabilidadController (M-09, priorización y
 // framework de clasificación configurable — ver sección V del doc de
@@ -107,13 +108,6 @@ function parseMapeoColumnas(raw: unknown): MapeoColumnas | undefined {
   }
 
   return extraerMapeoColumnasValido(parseado);
-}
-
-const LARGO_MAXIMO_NOMBRE_ARCHIVO = 200;
-
-function sanearNombreDeArchivo(nombre: string): string {
-  const sinSaltosDeLinea = nombre.replace(/[\r\n]+/g, ' ').trim();
-  return sinSaltosDeLinea.slice(0, LARGO_MAXIMO_NOMBRE_ARCHIVO);
 }
 
 // RF-14 (Vertical Slicing, sección IV/V del doc de arquitectura): la ruta

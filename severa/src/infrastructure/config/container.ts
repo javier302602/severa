@@ -7,6 +7,7 @@ import { PostgresAuditoriaRepository } from '../adapters/out/persistencia/reposi
 import { PostgresNotificacionRepository } from '../adapters/out/persistencia/repositorios/PostgresNotificacionRepository';
 import { PostgresTokenRecuperacionRepository } from '../adapters/out/persistencia/repositorios/PostgresTokenRecuperacionRepository';
 import { PostgresHistorialAnalisisRepository } from '../adapters/out/persistencia/repositorios/PostgresHistorialAnalisisRepository';
+import { PostgresDatasetGenericoRepository } from '../adapters/out/persistencia/repositorios/PostgresDatasetGenericoRepository';
 import { ConsolaEnviadorDeCorreo } from '../adapters/out/notificaciones/ConsolaEnviadorDeCorreo';
 import { BcryptHasher } from '../adapters/out/seguridad/BcryptHasher';
 import { RegistrarAnalista } from '../../application/usecases/module_gestion_usuarios/RegistrarAnalista';
@@ -80,6 +81,8 @@ import { GenerarInformeDataset } from '../../application/usecases/module_reporte
 import { ReiniciarDataset } from '../../application/usecases/module_carga_gestion_datasets/ReiniciarDataset';
 import { ReiniciarDatasetConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/ReiniciarDatasetConAuditoria';
 import { ConvertirUrlAExcel } from '../../application/usecases/module_carga_gestion_datasets/ConvertirUrlAExcel';
+import { ExportarDatasetGenerico } from '../../application/usecases/module_carga_gestion_datasets/ExportarDatasetGenerico';
+import { AnalizarDatasetGenericoConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/AnalizarDatasetGenericoConAuditoria';
 
 const pool = new Pool({ connectionString: config.databaseUrl });
 const analistaRepository = new PostgresAnalistaRepository(pool);
@@ -89,6 +92,7 @@ const auditoriaRepository = new PostgresAuditoriaRepository(pool);
 const notificacionRepository = new PostgresNotificacionRepository(pool);
 const tokenRecuperacionRepository = new PostgresTokenRecuperacionRepository(pool);
 const historialAnalisisRepository = new PostgresHistorialAnalisisRepository(pool);
+const datasetGenericoRepository = new PostgresDatasetGenericoRepository(pool);
 const hasher = new BcryptHasher();
 // RF-03: adaptador simulado (consola), mismo criterio que
 // ConsolaServicioDeNotificaciones — no hay infraestructura SMTP real.
@@ -257,7 +261,16 @@ export const container = {
   // Mejora 4 (Análisis de Datos General) — Fase 2: módulo nuevo y separado,
   // sin ninguna dependencia de los repositorios/casos de uso de
   // vulnerabilidades de arriba.
-  analizarDatasetGenericoUseCase: new AnalizarDatasetGenerico(new LectorDatasetGenerico(), sesionAnalisisStore),
+  // Generalización de M-03 (RF-17/18/21/23): además de la sesión efímera de
+  // siempre, ahora persiste en datasets_genericos/registros_datasets_genericos
+  // — decorado con auditoría (RNF-49), sin notificación (ver el decorador).
+  analizarDatasetGenericoUseCase: new AnalizarDatasetGenericoConAuditoria(
+    new AnalizarDatasetGenerico(new LectorDatasetGenerico(), sesionAnalisisStore, datasetGenericoRepository),
+    auditoriaRepository
+  ),
+  // RF-24 generalizado: exporta el dataset genérico persistido tal cual, sin
+  // agrupar por severidad (eso sigue siendo exclusivo de exportarDatasetValidadoUseCase).
+  exportarDatasetGenericoUseCase: new ExportarDatasetGenerico(datasetGenericoRepository),
   // Fase 3: reciben sesionId en vez de un archivo — leen del mismo
   // sesionAnalisisStore que acaba de poblar analizarDatasetGenericoUseCase.
   calcularEstadisticasDescriptivasGenericoUseCase: new CalcularEstadisticasDescriptivasGenerico(sesionAnalisisStore),

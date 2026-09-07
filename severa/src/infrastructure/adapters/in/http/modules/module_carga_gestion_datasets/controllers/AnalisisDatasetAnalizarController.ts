@@ -5,6 +5,8 @@ import path from 'path';
 import fs from 'fs';
 import { randomUUID } from 'crypto';
 import { container } from '../../../../../../config/container';
+import { sanearNombreDeArchivo } from '../../../shared/sanearNombreDeArchivo';
+import { DatasetGenericoNoEncontradoError } from '../../../../../../../domain/errors/DatasetGenericoNoEncontradoError';
 
 // Mejora 4 (Análisis de Datos General) — Fase 2. RF-14 (Vertical Slicing,
 // sección IV/V del doc de arquitectura): extraído de AnalisisDatasetController.ts
@@ -74,13 +76,41 @@ analisisDatasetAnalizarRouter.post('/analisis-datos/analizar', manejarSubida, as
   // Del token, nunca del body — la sesión creada queda atada a este id (ver
   // SesionAnalisisStoreEnMemoria.ts), mismo criterio IDOR de Sprint 11/12.
   const analistaId = req.analistaAutenticado!.id;
+  // RF-21: se sanea antes de que llegue a auditoría/al DatasetGenerico
+  // persistido — mismo motivo y misma función que DatasetController.ts.
+  const nombreArchivoOriginal = sanearNombreDeArchivo(req.file.originalname);
 
   try {
-    const { diagnostico, sesionId } = await container.analizarDatasetGenericoUseCase.ejecutar(req.file.path, analistaId);
-    res.json({ ...diagnostico, sesionId });
+    const { diagnostico, sesionId, datasetId } = await container.analizarDatasetGenericoUseCase.ejecutar(
+      req.file.path,
+      analistaId,
+      nombreArchivoOriginal
+    );
+    res.json({ ...diagnostico, sesionId, datasetId });
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : 'Error desconocido' });
   } finally {
     fs.unlink(req.file.path, () => {});
+  }
+});
+
+// RF-24 generalizado: exporta el dataset genérico persistido (RF-17/18/21/23)
+// tal cual fue importado, sin agrupar por severidad ni ningún otro criterio
+// de dominio. datasetId siempre se valida contra analistaId (ver
+// ExportarDatasetGenerico.ts) — un id de otro analista responde 404, igual
+// que uno inexistente.
+analisisDatasetAnalizarRouter.get('/analisis-datos/:datasetId/exportar', async (req, res) => {
+  const analistaId = req.analistaAutenticado!.id;
+
+  try {
+    const buffer = await container.exportarDatasetGenericoUseCase.ejecutar(req.params.datasetId, analistaId);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buffer);
+  } catch (error) {
+    if (error instanceof DatasetGenericoNoEncontradoError) {
+      res.status(404).json({ error: error.message });
+      return;
+    }
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Error desconocido' });
   }
 });

@@ -6,6 +6,7 @@ import path from 'path';
 import * as XLSX from 'xlsx';
 import { createApp } from '../../../../../../../../src/infrastructure/config/app';
 import { config } from '../../../../../../../../src/infrastructure/config/env';
+import { container } from '../../../../../../../../src/infrastructure/config/container';
 
 // Mejora 4 (Análisis de Datos General) — Fase 3/4/5. A diferencia de
 // AnalisisDatasetController.test.ts (que mockea todo el container para
@@ -15,10 +16,31 @@ import { config } from '../../../../../../../../src/infrastructure/config/env';
 // outliers con ese sesionId) porque lo que hay que probar es precisamente
 // que el store real aplica la verificación de dueño (IDOR) de punta a punta
 // a través de la API HTTP, no solo a nivel unitario del store o del caso de
-// uso. Nada acá toca la base de datos (mismo motivo que Cors.test.ts: Pool
-// de pg es perezoso, no conecta hasta la primera query, y estas rutas no
-// hacen ninguna).
+// uso. El resto de estas rutas sigue sin tocar la base de datos (Pool de pg
+// es perezoso, no conecta hasta la primera query).
+//
+// Generalización de M-03 (RF-17/21/23): AnalizarDatasetGenerico ahora
+// TAMBIÉN persiste en datasets_genericos/registros_datasets_genericos (ver
+// PostgresDatasetGenericoRepository), y su decorador de auditoría
+// (AnalizarDatasetGenericoConAuditoria) escribe en registros_auditoria —
+// ambas cosas requerirían una base de datos real. Se reemplazan SOLO esas
+// dos dependencias por fakes en memoria (`as any` porque son campos
+// privados a nivel de TypeScript, no en runtime), dejando intacta la cadena
+// real que este archivo necesita probar (mismo sesionAnalisisStore
+// compartido con las demás rutas de Fase 3/4/5).
 const app = createApp();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(container.analizarDatasetGenericoUseCase as any).usecase.datasetGenericoRepository = {
+  guardar: jest.fn().mockResolvedValue(undefined),
+  guardarRegistros: jest.fn().mockResolvedValue(undefined),
+  buscarPorId: jest.fn().mockResolvedValue(null),
+  listarRegistros: jest.fn().mockResolvedValue([])
+};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(container.analizarDatasetGenericoUseCase as any).auditoriaRepository = {
+  registrar: jest.fn().mockResolvedValue(undefined),
+  listar: jest.fn().mockResolvedValue([])
+};
 
 function tokenPara(id: string): string {
   return jwt.sign({ sub: id, rol: 'analista' }, config.jwtSecret, { expiresIn: '1h' });

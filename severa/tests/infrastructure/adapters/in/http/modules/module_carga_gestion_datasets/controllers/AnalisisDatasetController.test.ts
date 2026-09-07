@@ -4,6 +4,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import * as XLSX from 'xlsx';
+import { DatasetGenericoNoEncontradoError } from '../../../../../../../../src/domain/errors/DatasetGenericoNoEncontradoError';
 
 jest.mock('../../../../../../../../src/infrastructure/config/container', () => ({
   container: {
@@ -14,8 +15,12 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => (
           filasDuplicadas: 0,
           columnas: [{ nombre: 'Producto', tipo: 'categorica', valoresFaltantes: 0, porcentajeFaltante: 0, valoresUnicos: 2, valoresInconsistentes: 0 }]
         },
-        sesionId: 'sesion-mock-123'
+        sesionId: 'sesion-mock-123',
+        datasetId: 'dataset-mock-123'
       })
+    },
+    exportarDatasetGenericoUseCase: {
+      ejecutar: jest.fn()
     },
     calcularEstadisticasDescriptivasGenericoUseCase: {
       ejecutar: jest.fn()
@@ -67,7 +72,12 @@ describe('AnalisisDatasetController — Mejora 4 (Análisis de Datos General) Fa
     expect(res.status).toBe(200);
     expect(res.body.totalFilas).toBe(2);
     expect(res.body.sesionId).toBe('sesion-mock-123');
-    expect(container.analizarDatasetGenericoUseCase.ejecutar).toHaveBeenCalledWith(expect.any(String), 'analista-A');
+    expect(res.body.datasetId).toBe('dataset-mock-123');
+    expect(container.analizarDatasetGenericoUseCase.ejecutar).toHaveBeenCalledWith(
+      expect.any(String),
+      'analista-A',
+      expect.any(String)
+    );
   });
 
   test('POST /analisis-datos/analizar sin archivo devuelve 400', async () => {
@@ -109,5 +119,36 @@ describe('AnalisisDatasetController — Mejora 4 (Análisis de Datos General) Fa
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('El archivo está corrupto o no es un Excel/CSV válido');
+  });
+});
+
+describe('GET /analisis-datos/:datasetId/exportar — RF-24 generalizado', () => {
+  const token = tokenPara('analista-A');
+
+  test('exporta con éxito y responde con un .xlsx', async () => {
+    (container.exportarDatasetGenericoUseCase.ejecutar as jest.Mock).mockResolvedValueOnce(Buffer.from('PK-xlsx-fake'));
+
+    const res = await conHttps(
+      request(app).get('/analisis-datos/dataset-1/exportar').set('Authorization', `Bearer ${token}`)
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    expect(container.exportarDatasetGenericoUseCase.ejecutar).toHaveBeenCalledWith('dataset-1', 'analista-A');
+  });
+
+  test('responde 404 si el dataset no existe o pertenece a otro analista', async () => {
+    (container.exportarDatasetGenericoUseCase.ejecutar as jest.Mock).mockRejectedValueOnce(new DatasetGenericoNoEncontradoError());
+
+    const res = await conHttps(
+      request(app).get('/analisis-datos/dataset-ajeno/exportar').set('Authorization', `Bearer ${token}`)
+    );
+
+    expect(res.status).toBe(404);
+  });
+
+  test('sin autenticar devuelve 401', async () => {
+    const res = await conHttps(request(app).get('/analisis-datos/dataset-1/exportar'));
+    expect(res.status).toBe(401);
   });
 });
