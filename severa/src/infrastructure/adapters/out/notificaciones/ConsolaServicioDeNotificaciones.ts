@@ -68,4 +68,12 @@ export class ConsolaServicioDeNotificaciones implements ServicioDeNotificaciones
       new Notificacion(randomUUID(), 'ActualizacionNVD', analistaId, false, new Date(), mensaje)
     );
   }
+
+  async notificarPerfilActualizado(analistaId: string, camposModificados: string[]): Promise<void> {
+    const mensaje = `Tu perfil fue actualizado: se modificó ${camposModificados.join(' y ')}.`;
+    console.log(`[RF-16] ${mensaje} (analista ${analistaId})`);
+    await this.notificacionRepository.guardar(
+      new Notificacion(randomUUID(), 'PerfilActualizado', analistaId, false, new Date(), mensaje)
+    );
+  }
 }

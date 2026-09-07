@@ -16,6 +16,7 @@ function servicioDeNotificacionesFalso(): ServicioDeNotificaciones {
     notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
     notificarInformeListo: jest.fn().mockResolvedValue(undefined),
     notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
+    notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
   notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
   };
 }

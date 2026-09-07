@@ -6,6 +6,7 @@ import { PostgresFiltroFavoritoRepository } from '../adapters/out/persistencia/r
 import { PostgresAuditoriaRepository } from '../adapters/out/persistencia/repositorios/PostgresAuditoriaRepository';
 import { PostgresNotificacionRepository } from '../adapters/out/persistencia/repositorios/PostgresNotificacionRepository';
 import { PostgresTokenRecuperacionRepository } from '../adapters/out/persistencia/repositorios/PostgresTokenRecuperacionRepository';
+import { PostgresHistorialAnalisisRepository } from '../adapters/out/persistencia/repositorios/PostgresHistorialAnalisisRepository';
 import { ConsolaEnviadorDeCorreo } from '../adapters/out/notificaciones/ConsolaEnviadorDeCorreo';
 import { BcryptHasher } from '../adapters/out/seguridad/BcryptHasher';
 import { RegistrarAnalista } from '../../application/usecases/module_gestion_usuarios/RegistrarAnalista';
@@ -14,6 +15,8 @@ import { RecuperarContrasena } from '../../application/usecases/module_gestion_u
 import { RestablecerContrasena } from '../../application/usecases/module_gestion_usuarios/RestablecerContrasena';
 import { EditarPerfil } from '../../application/usecases/module_perfil_analista/EditarPerfil';
 import { VerPerfil } from '../../application/usecases/module_perfil_analista/VerPerfil';
+import { ObtenerHistorialAnalisis } from '../../application/usecases/module_perfil_analista/ObtenerHistorialAnalisis';
+import { RegistrarAnalisisRealizado } from '../../application/usecases/module_perfil_analista/RegistrarAnalisisRealizado';
 import { EliminarCuenta } from '../../application/usecases/module_gestion_usuarios/EliminarCuenta';
 import { AsignarRol } from '../../application/usecases/module_gestion_usuarios/AsignarRol';
 import { ConsultarVulnerabilidadPorCVE } from '../../application/usecases/module_priorizacion_clasificacion/ConsultarVulnerabilidadPorCVE';
@@ -61,6 +64,8 @@ import { MarcarEnProcesoDeRemediacionConAuditoria } from '../../application/usec
 import { AsignarRolConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/AsignarRolConAuditoria';
 import { RecuperarContrasenaConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/RecuperarContrasenaConAuditoria';
 import { RestablecerContrasenaConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/RestablecerContrasenaConAuditoria';
+import { EliminarCuentaConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/EliminarCuentaConAuditoria';
+import { EditarPerfilConAuditoriaYNotificacion } from '../../application/usecases/module_seguridad_auditoria/decoradores/EditarPerfilConAuditoriaYNotificacion';
 import { MarcarComoRemediadaConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/MarcarComoRemediadaConAuditoria';
 import { GenerarInformeConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/GenerarInformeConAuditoria';
 import { GenerarResumenEjecutivoConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/GenerarResumenEjecutivoConAuditoria';
@@ -83,6 +88,7 @@ const filtroFavoritoRepository = new PostgresFiltroFavoritoRepository(pool);
 const auditoriaRepository = new PostgresAuditoriaRepository(pool);
 const notificacionRepository = new PostgresNotificacionRepository(pool);
 const tokenRecuperacionRepository = new PostgresTokenRecuperacionRepository(pool);
+const historialAnalisisRepository = new PostgresHistorialAnalisisRepository(pool);
 const hasher = new BcryptHasher();
 // RF-03: adaptador simulado (consola), mismo criterio que
 // ConsolaServicioDeNotificaciones — no hay infraestructura SMTP real.
@@ -150,9 +156,31 @@ export const container = {
     new RestablecerContrasena(analistaRepository, tokenRecuperacionRepository, hasher),
     auditoriaRepository
   ),
-  editarPerfilUseCase: new EditarPerfil(analistaRepository),
+  // RF-10/RNF-41 + RF-16: decorado con auditoría y notificación — antes
+  // quedaba "pelado" (sin auditar) y EditarPerfil.ts no disparaba ninguna
+  // notificación de cambio de perfil.
+  editarPerfilUseCase: new EditarPerfilConAuditoriaYNotificacion(
+    new EditarPerfil(analistaRepository),
+    analistaRepository,
+    auditoriaRepository,
+    servicioDeNotificaciones
+  ),
   verPerfilUseCase: new VerPerfil(analistaRepository),
-  eliminarCuentaUseCase: new EliminarCuenta(analistaRepository),
+  // RF-15/RNF-41: decorado con auditoría — una eliminación de cuenta exitosa
+  // (previa confirmación con contraseña, ver EliminarCuenta.ts) queda
+  // registrada. No se audita un intento con contraseña incorrecta (ver
+  // EliminarCuentaConAuditoria).
+  eliminarCuentaUseCase: new EliminarCuentaConAuditoria(
+    new EliminarCuenta(analistaRepository, hasher),
+    analistaRepository,
+    auditoriaRepository
+  ),
+  // RF-11: solo infraestructura de consulta/escritura del historial de
+  // análisis. registrarAnalisisRealizadoUseCase queda dado de alta para que
+  // los módulos que generan análisis reales lo invoquen más adelante (M-05 a
+  // M-09) — deliberadamente sin conectar a ningún productor todavía.
+  obtenerHistorialAnalisisUseCase: new ObtenerHistorialAnalisis(historialAnalisisRepository),
+  registrarAnalisisRealizadoUseCase: new RegistrarAnalisisRealizado(historialAnalisisRepository),
   // RF-04/RNF-33: decorado con auditoría — queda registrado quién asignó qué
   // rol a quién y cuál era el rol anterior.
   asignarRolUseCase: new AsignarRolConAuditoria(

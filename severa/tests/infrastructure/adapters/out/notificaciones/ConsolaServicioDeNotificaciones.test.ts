@@ -75,3 +75,27 @@ describe('ConsolaServicioDeNotificaciones — notificarImportacionCompletada (RF
     expect(propias[0].mensaje).toBe('Importación completada: 10 importados, 0 rechazados');
   });
 });
+
+describe('ConsolaServicioDeNotificaciones — notificarPerfilActualizado (RF-16)', () => {
+  test('persiste una notificación que solo menciona los campos modificados, sin valores', async () => {
+    const notificacionRepository = notificacionRepositoryEnMemoria();
+    const servicio = new ConsolaServicioDeNotificaciones(notificacionRepository);
+
+    await servicio.notificarPerfilActualizado('analista-7', ['correo']);
+
+    const propias = await notificacionRepository.listarPorAnalista('analista-7');
+    expect(propias).toHaveLength(1);
+    expect(propias[0].tipo).toBe('PerfilActualizado');
+    expect(propias[0].mensaje).toBe('Tu perfil fue actualizado: se modificó correo.');
+  });
+
+  test('con varios campos, los une en el mensaje', async () => {
+    const notificacionRepository = notificacionRepositoryEnMemoria();
+    const servicio = new ConsolaServicioDeNotificaciones(notificacionRepository);
+
+    await servicio.notificarPerfilActualizado('analista-7', ['nombre', 'correo']);
+
+    const propias = await notificacionRepository.listarPorAnalista('analista-7');
+    expect(propias[0].mensaje).toBe('Tu perfil fue actualizado: se modificó nombre y correo.');
+  });
+});

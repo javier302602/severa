@@ -39,4 +39,9 @@ export interface ServicioDeNotificaciones {
     analistaId: string,
     resumen: { importados: number; rechazados: number }
   ): Promise<void>;
+  // RF-16: cambio en el propio perfil (nombre y/o correo), para que el
+  // analista pueda detectar una edición no autorizada. `camposModificados`
+  // solo dice QUÉ campo cambió ('nombre'/'correo'), nunca el valor viejo ni
+  // el nuevo — y nunca incluye la contraseña, que este flujo ni siquiera toca.
+  notificarPerfilActualizado(analistaId: string, camposModificados: string[]): Promise<void>;
 }

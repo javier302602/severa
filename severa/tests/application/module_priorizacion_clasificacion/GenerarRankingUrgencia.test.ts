@@ -40,6 +40,7 @@ describe('GenerarRankingUrgencia', () => {
       notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
       notificarInformeListo: jest.fn().mockResolvedValue(undefined),
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
+      notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
     notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
     };
     const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
@@ -78,6 +79,7 @@ describe('GenerarRankingUrgencia', () => {
       notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
       notificarInformeListo: jest.fn().mockResolvedValue(undefined),
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
+      notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
     notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
     };
     const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
@@ -103,6 +105,7 @@ describe('GenerarRankingUrgencia', () => {
       notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
       notificarInformeListo: jest.fn().mockResolvedValue(undefined),
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
+      notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
     notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
     };
     const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
@@ -127,6 +130,7 @@ describe('GenerarRankingUrgencia', () => {
       notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
       notificarInformeListo: jest.fn().mockResolvedValue(undefined),
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
+      notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
     notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
     };
     const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
@@ -146,6 +150,7 @@ describe('GenerarRankingUrgencia', () => {
       notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
       notificarInformeListo: jest.fn().mockResolvedValue(undefined),
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
+      notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
     notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
     };
     const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
@@ -192,6 +197,7 @@ describe('GenerarRankingUrgencia', () => {
       notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
       notificarInformeListo: jest.fn().mockResolvedValue(undefined),
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
+      notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
     notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
     };
     const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);

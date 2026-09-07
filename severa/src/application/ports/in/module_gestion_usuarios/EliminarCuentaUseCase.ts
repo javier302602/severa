@@ -1,3 +1,3 @@
 export interface EliminarCuentaUseCase {
-  ejecutar(id: string): Promise<void>;
+  ejecutar(id: string, contrasena: string): Promise<void>;
 }

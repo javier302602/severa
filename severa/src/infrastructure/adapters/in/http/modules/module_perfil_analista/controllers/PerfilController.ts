@@ -26,3 +26,27 @@ perfilRouter.put('/perfil', async (req, res) => {
 // DELETE /analistas/me se movió a CuentaController.ts (module_gestion_usuarios,
 // M-01) — EliminarCuentaUseCase pertenece a ese módulo, no a M-02. Mismo
 // comportamiento, solo cambia el archivo.
+
+// RF-11: historial de análisis del analista autenticado, más reciente
+// primero. Igual que arriba, el id sale exclusivamente de
+// req.analistaAutenticado.id. `limite`/`offset` son opcionales (mismo
+// contrato que Paginacion en VulnerabilidadRepository) — sin ellos se
+// devuelve el historial completo.
+perfilRouter.get('/perfil/historial', async (req, res) => {
+  const analistaId = req.analistaAutenticado!.id;
+  const { limite, offset } = req.query;
+  const paginacion =
+    typeof limite === 'string' && typeof offset === 'string'
+      ? { limite: Number(limite), offset: Number(offset) }
+      : undefined;
+
+  const eventos = await container.obtenerHistorialAnalisisUseCase.ejecutar(analistaId, paginacion);
+  res.json(
+    eventos.map((evento) => ({
+      id: evento.id,
+      tipoEvento: evento.tipoEvento,
+      payload: evento.payload,
+      fechaHora: evento.fechaHora
+    }))
+  );
+});
