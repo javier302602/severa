@@ -8,7 +8,8 @@ function datasetGenericoRepositoryFalso(): jest.Mocked<DatasetGenericoRepository
     guardar: jest.fn().mockResolvedValue(undefined),
     guardarRegistros: jest.fn().mockResolvedValue(undefined),
     buscarPorId: jest.fn(),
-    listarRegistros: jest.fn()
+    listarRegistros: jest.fn(),
+    actualizarCriterioClasificacion: jest.fn().mockResolvedValue(undefined)
   };
 }
 

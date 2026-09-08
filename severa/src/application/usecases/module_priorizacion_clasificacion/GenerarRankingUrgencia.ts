@@ -1,5 +1,5 @@
 import { Vulnerabilidad } from '../../../domain/entities/Vulnerabilidad';
-import { GenerarRankingUrgenciaUseCase } from '../../ports/in/module_priorizacion_clasificacion/GenerarRankingUrgenciaUseCase';
+import { GenerarRankingUrgenciaUseCase, OpcionesGenerarRankingUrgencia } from '../../ports/in/module_priorizacion_clasificacion/GenerarRankingUrgenciaUseCase';
 import { VulnerabilidadRepository } from '../../ports/out/persistencia/repositorios/VulnerabilidadRepository';
 import { ServicioDeNotificaciones } from '../../ports/out/notificaciones/ServicioDeNotificaciones';
 import { generarRanking, estaPlazoExcedido, EntradaRanking } from '../../../domain/services/classification/MotorDePriorizacion';
@@ -27,15 +27,23 @@ export class GenerarRankingUrgencia implements GenerarRankingUrgenciaUseCase {
   // decidió enganchar la alerta aquí (en vez de crear un caso de uso "in"
   // aparte) porque generar el ranking ya recorre todas las vulnerabilidades
   // activas, que es exactamente el conjunto que RF-76 necesita revisar.
-  async ejecutar(analistaId: string, vulnerabilidades?: Vulnerabilidad[], severidad?: string): Promise<EntradaRanking[]> {
+  async ejecutar(
+    analistaId: string,
+    vulnerabilidades?: Vulnerabilidad[],
+    severidad?: string,
+    opciones: OpcionesGenerarRankingUrgencia = {}
+  ): Promise<EntradaRanking[]> {
     const lista =
       vulnerabilidades ??
       (severidad
         ? await this.vulnerabilidadRepository.filtrarPorSeveridad(severidad, analistaId)
         : await this.vulnerabilidadRepository.listar(analistaId));
-    const ranking = generarRanking(lista);
+    const ranking = generarRanking(lista, { pesoCriterio: opciones.pesoCriterio, pesoUrgencia: opciones.pesoUrgencia });
 
-    const vencidas = ranking.filter((entrada) => estaPlazoExcedido(entrada.vulnerabilidad));
+    // RF-71: plazosPersonalizados también decide el umbral de RF-76 — con
+    // plazos más estrictos/laxos configurados por el analista, la alerta de
+    // plazo excedido debe seguir ese mismo umbral, no el default fijo.
+    const vencidas = ranking.filter((entrada) => estaPlazoExcedido(entrada.vulnerabilidad, new Date(), opciones.plazosPersonalizados));
     for (let inicio = 0; inicio < vencidas.length; inicio += TAMANO_DE_LOTE_NOTIFICACIONES) {
       const lote = vencidas.slice(inicio, inicio + TAMANO_DE_LOTE_NOTIFICACIONES);
       await Promise.all(lote.map((entrada) => this.servicioDeNotificaciones.notificarPlazoExcedido(entrada.vulnerabilidad, analistaId)));

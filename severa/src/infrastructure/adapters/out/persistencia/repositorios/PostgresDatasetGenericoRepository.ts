@@ -2,14 +2,15 @@ import { Pool } from 'pg';
 import { DatasetGenerico } from '../../../../../domain/entities/DatasetGenerico';
 import { RegistroDatasetGenerico } from '../../../../../domain/entities/RegistroDatasetGenerico';
 import { DatasetGenericoRepository } from '../../../../../application/ports/out/persistencia/repositorios/DatasetGenericoRepository';
+import { CriterioDeClasificacionValue } from '../../../../../domain/shared/value-objects/CriterioDeClasificacion';
 
 export class PostgresDatasetGenericoRepository implements DatasetGenericoRepository {
   constructor(private readonly pool: Pool) {}
 
   async guardar(dataset: DatasetGenerico): Promise<void> {
     await this.pool.query(
-      `INSERT INTO datasets_genericos (id, analista_id, nombre_archivo, columnas, fuente, preset, filas_duplicadas, fecha_carga)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      `INSERT INTO datasets_genericos (id, analista_id, nombre_archivo, columnas, fuente, preset, filas_duplicadas, fecha_carga, criterio_clasificacion, columna_clave)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         dataset.id,
         dataset.analistaId,
@@ -18,8 +19,22 @@ export class PostgresDatasetGenericoRepository implements DatasetGenericoReposit
         dataset.fuente,
         dataset.preset,
         dataset.filasDuplicadas,
-        dataset.fechaCarga
+        dataset.fechaCarga,
+        dataset.criterioClasificacion ? JSON.stringify(dataset.criterioClasificacion.toJSON()) : null,
+        dataset.columnaClave
       ]
+    );
+  }
+
+  async actualizarCriterioClasificacion(
+    id: string,
+    analistaId: string,
+    criterioClasificacion: CriterioDeClasificacionValue,
+    columnaClave: string | null
+  ): Promise<void> {
+    await this.pool.query(
+      `UPDATE datasets_genericos SET criterio_clasificacion = $1, columna_clave = $2 WHERE id = $3 AND analista_id = $4`,
+      [JSON.stringify(criterioClasificacion.toJSON()), columnaClave, id, analistaId]
     );
   }
 
@@ -72,7 +87,11 @@ export class PostgresDatasetGenericoRepository implements DatasetGenericoReposit
       String(row.fuente),
       row.preset === null || row.preset === undefined ? null : String(row.preset),
       Number(row.filas_duplicadas),
-      new Date(row.fecha_carga as string)
+      new Date(row.fecha_carga as string),
+      row.criterio_clasificacion
+        ? CriterioDeClasificacionValue.desdeJSON(row.criterio_clasificacion as ReturnType<CriterioDeClasificacionValue['toJSON']>)
+        : null,
+      row.columna_clave === null || row.columna_clave === undefined ? null : String(row.columna_clave)
     );
   }
 }

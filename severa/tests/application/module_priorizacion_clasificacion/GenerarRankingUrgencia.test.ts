@@ -27,6 +27,11 @@ function repoFalso(vulnerabilidades: Vulnerabilidad[]): VulnerabilidadRepository
 }
 
 describe('GenerarRankingUrgencia', () => {
+  // RF-73 (auditoría M-09): reverificado a mano igual que en
+  // MotorDePriorizacion.test.ts — los 3 ítems de este test caen en 3 buckets
+  // de nivel de riesgo distintos (Crítico/Alto/Moderado), un solo elemento
+  // por bucket, así que el puntaje ponderado nunca decide acá y el orden es
+  // idéntico al de antes de RF-73.
   test('genera el ranking ordenado por nivel de riesgo y CVSS con datos reales del dataset', async () => {
     const dataset = [
       new Vulnerabilidad('1', new IdentificadorCVE('CVE-2021-20021'), new CvssScore(5.5), 'Nginx', new TipoAccesoValue('No'), 45),
@@ -206,5 +211,57 @@ describe('GenerarRankingUrgencia', () => {
 
     expect(servicioDeNotificaciones.notificarPlazoExcedido).toHaveBeenCalledTimes(TOTAL);
     expect(maximoEnParalelo).toBeLessThanOrEqual(200);
+  });
+
+  // RF-71 (auditoría M-09, frente B): plazosPersonalizados llega hasta
+  // estaPlazoExcedido, no solo hasta el display — decide si RF-76 dispara.
+  test('con plazosPersonalizados más estricto, dispara la alerta de plazo excedido antes que el default', async () => {
+    const fechaCarga = new Date('2026-01-01T00:00:00Z');
+    // Crítico, cargada hace 2 días — dentro del plazo default (7 días), pero
+    // fuera de un plazo personalizado de 1 día.
+    jest.useFakeTimers().setSystemTime(new Date('2026-01-03T00:00:00Z'));
+    const vulnerabilidad = new Vulnerabilidad(
+      '1', new IdentificadorCVE('CVE-2021-44228'), new CvssScore(9.5), 'Apache Log4j',
+      new TipoAccesoValue('Sí'), 5, undefined, undefined, undefined, fechaCarga
+    );
+
+    const repo = repoFalso([vulnerabilidad]);
+    const servicioDeNotificaciones: ServicioDeNotificaciones = {
+      notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
+      notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
+      notificarInformeListo: jest.fn().mockResolvedValue(undefined),
+      notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
+      notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
+      notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
+    };
+    const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
+
+    await usecase.ejecutar('analista-1', undefined, undefined, { plazosPersonalizados: { Crítico: 1, Alto: 30, Moderado: 90, Bajo: 180 } });
+
+    expect(servicioDeNotificaciones.notificarPlazoExcedido).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
+  });
+
+  // RF-73: pesoCriterio/pesoUrgencia llegan hasta generarRanking — se
+  // ejercita con el mismo par de vulnerabilidades (CVSS y días en
+  // direcciones opuestas) que MotorDePriorizacion.test.ts para comprobar
+  // que la opción realmente viaja desde el caso de uso hasta el motor.
+  test('propaga pesoCriterio/pesoUrgencia a generarRanking (puede cambiar el orden dentro de un nivel de riesgo)', async () => {
+    const masCvssMenosDias = new Vulnerabilidad('1', new IdentificadorCVE('CVE-2021-34527'), new CvssScore(7.8), 'Microsoft Windows', new TipoAccesoValue('Sí'), 12);
+    const menosCvssMasDias = new Vulnerabilidad('2', new IdentificadorCVE('CVE-2014-0160'), new CvssScore(7.5), 'OpenSSL', new TipoAccesoValue('Remoto'), 20);
+    const repo = repoFalso([menosCvssMasDias, masCvssMenosDias]);
+    const servicioDeNotificaciones: ServicioDeNotificaciones = {
+      notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
+      notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
+      notificarInformeListo: jest.fn().mockResolvedValue(undefined),
+      notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
+      notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
+      notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
+    };
+    const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
+
+    const ranking = await usecase.ejecutar('analista-1', undefined, undefined, { pesoCriterio: 0.3, pesoUrgencia: 0.7 });
+
+    expect(ranking.map((entrada) => entrada.vulnerabilidad.cve.valor)).toEqual(['CVE-2014-0160', 'CVE-2021-34527']);
   });
 });

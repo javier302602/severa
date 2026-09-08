@@ -1,5 +1,15 @@
 import { Vulnerabilidad } from '../../../../domain/entities/Vulnerabilidad';
-import { EntradaRanking } from '../../../../domain/services/classification/MotorDePriorizacion';
+import { EntradaRanking, PlazosPersonalizados } from '../../../../domain/services/classification/MotorDePriorizacion';
+
+// RF-71/RF-73 (auditoría M-09, frente B): configuración opcional por
+// llamada, sin persistencia — mismo criterio de "menor fricción" que
+// `severidad` en este mismo puerto. Si no vienen, el comportamiento es el
+// default (PLAZOS_RECOMENDADOS_EN_DIAS, pesos 0.7/0.3).
+export interface OpcionesGenerarRankingUrgencia {
+  plazosPersonalizados?: PlazosPersonalizados;
+  pesoCriterio?: number;
+  pesoUrgencia?: number;
+}
 
 export interface GenerarRankingUrgenciaUseCase {
   // analistaId ahora cumple doble función: (1) aísla el ranking al catálogo
@@ -13,5 +23,10 @@ export interface GenerarRankingUrgenciaUseCase {
   // VulnerabilidadRepository.filtrarPorSeveridad, ya usado por
   // FiltrarPorCategoriaClasificacion/BuscarConFiltros, no un mecanismo nuevo), en vez de
   // traer TODO el catálogo del analista de una sola vez.
-  ejecutar(analistaId: string, vulnerabilidades?: Vulnerabilidad[], severidad?: string): Promise<EntradaRanking[]>;
+  ejecutar(
+    analistaId: string,
+    vulnerabilidades?: Vulnerabilidad[],
+    severidad?: string,
+    opciones?: OpcionesGenerarRankingUrgencia
+  ): Promise<EntradaRanking[]>;
 }

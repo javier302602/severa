@@ -9,7 +9,8 @@ function repositorioFalso(dataset: DatasetGenerico | null, registros: RegistroDa
     guardar: jest.fn().mockResolvedValue(undefined),
     guardarRegistros: jest.fn().mockResolvedValue(undefined),
     buscarPorId: jest.fn().mockResolvedValue(dataset),
-    listarRegistros: jest.fn().mockResolvedValue(registros)
+    listarRegistros: jest.fn().mockResolvedValue(registros),
+    actualizarCriterioClasificacion: jest.fn().mockResolvedValue(undefined)
   };
 }
 

@@ -1,5 +1,6 @@
 import { DatasetGenerico } from '../../../../../domain/entities/DatasetGenerico';
 import { RegistroDatasetGenerico } from '../../../../../domain/entities/RegistroDatasetGenerico';
+import { CriterioDeClasificacionValue } from '../../../../../domain/shared/value-objects/CriterioDeClasificacion';
 
 // Multi-tenancy a nivel de dueño (mismo criterio que VulnerabilidadRepository):
 // buscarPorId/listarRegistros SIEMPRE reciben analistaId y filtran por él en
@@ -13,4 +14,15 @@ export interface DatasetGenericoRepository {
   guardarRegistros(registros: RegistroDatasetGenerico[]): Promise<void>;
   buscarPorId(id: string, analistaId: string): Promise<DatasetGenerico | null>;
   listarRegistros(datasetId: string, analistaId: string): Promise<RegistroDatasetGenerico[]>;
+  // RF-139 + pendiente de M-03 (migración 012): método dedicado, mismo
+  // criterio que VulnerabilidadRepository.actualizarEstado — un update
+  // acotado a estos dos campos, no un guardar() genérico que reescriba todo
+  // el dataset. columnaClave viaja aparte de criterioClasificacion porque el
+  // caso de uso puede recibir uno solo de los dos en el PATCH.
+  actualizarCriterioClasificacion(
+    id: string,
+    analistaId: string,
+    criterioClasificacion: CriterioDeClasificacionValue,
+    columnaClave: string | null
+  ): Promise<void>;
 }

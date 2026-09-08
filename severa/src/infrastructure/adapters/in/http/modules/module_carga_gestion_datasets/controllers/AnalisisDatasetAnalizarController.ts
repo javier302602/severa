@@ -7,6 +7,7 @@ import { randomUUID } from 'crypto';
 import { container } from '../../../../../../config/container';
 import { sanearNombreDeArchivo } from '../../../shared/sanearNombreDeArchivo';
 import { DatasetGenericoNoEncontradoError } from '../../../../../../../domain/errors/DatasetGenericoNoEncontradoError';
+import { ColumnaDeDatasetInvalidaError } from '../../../../../../../domain/errors/ColumnaDeDatasetInvalidaError';
 
 // Mejora 4 (Análisis de Datos General) — Fase 2. RF-14 (Vertical Slicing,
 // sección IV/V del doc de arquitectura): extraído de AnalisisDatasetController.ts
@@ -109,6 +110,52 @@ analisisDatasetAnalizarRouter.get('/analisis-datos/:datasetId/exportar', async (
   } catch (error) {
     if (error instanceof DatasetGenericoNoEncontradoError) {
       res.status(404).json({ error: error.message });
+      return;
+    }
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Error desconocido' });
+  }
+});
+
+// RF-139 (M-09, pieza habilitadora): el analista elige la columna a usar como
+// criterio de clasificación (y, opcionalmente, la columna clave — pendiente
+// de M-03, comparte esta misma ruta/plomería). Valida que la columna exista
+// y que su tipo real (DetectorDeTipoDeColumna) sea apto — ver
+// ConfigurarCriterioDeClasificacion.ts. No genera ranking ni filtra nada
+// todavía, eso queda para una ronda futura que consuma este criterio.
+analisisDatasetAnalizarRouter.patch('/analisis-datos/:datasetId/criterio-clasificacion', async (req, res) => {
+  const analistaId = req.analistaAutenticado!.id;
+  const { nombreColumna, tipo, umbrales, ordenCategorias, columnaClave } = req.body;
+
+  if (typeof nombreColumna !== 'string' || nombreColumna.trim() === '') {
+    res.status(400).json({ error: 'Debe indicar "nombreColumna"' });
+    return;
+  }
+  if (tipo !== 'numerica' && tipo !== 'ordinal') {
+    res.status(400).json({ error: 'El campo "tipo" debe ser "numerica" u "ordinal"' });
+    return;
+  }
+
+  try {
+    const dataset = await container.configurarCriterioDeClasificacionUseCase.ejecutar(req.params.datasetId, analistaId, {
+      nombreColumna,
+      tipo,
+      umbrales,
+      ordenCategorias,
+      columnaClave: typeof columnaClave === 'string' ? columnaClave : undefined
+    });
+
+    res.json({
+      id: dataset.id,
+      criterioClasificacion: dataset.criterioClasificacion?.toJSON() ?? null,
+      columnaClave: dataset.columnaClave
+    });
+  } catch (error) {
+    if (error instanceof DatasetGenericoNoEncontradoError) {
+      res.status(404).json({ error: error.message });
+      return;
+    }
+    if (error instanceof ColumnaDeDatasetInvalidaError) {
+      res.status(400).json({ error: error.message });
       return;
     }
     res.status(400).json({ error: error instanceof Error ? error.message : 'Error desconocido' });

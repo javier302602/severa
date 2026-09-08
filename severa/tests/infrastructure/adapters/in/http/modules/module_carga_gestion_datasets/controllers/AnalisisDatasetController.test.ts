@@ -5,6 +5,9 @@ import os from 'os';
 import path from 'path';
 import * as XLSX from 'xlsx';
 import { DatasetGenericoNoEncontradoError } from '../../../../../../../../src/domain/errors/DatasetGenericoNoEncontradoError';
+import { ColumnaDeDatasetInvalidaError } from '../../../../../../../../src/domain/errors/ColumnaDeDatasetInvalidaError';
+import { DatasetGenerico } from '../../../../../../../../src/domain/entities/DatasetGenerico';
+import { CriterioDeClasificacionValue } from '../../../../../../../../src/domain/shared/value-objects/CriterioDeClasificacion';
 
 jest.mock('../../../../../../../../src/infrastructure/config/container', () => ({
   container: {
@@ -26,6 +29,9 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => (
       ejecutar: jest.fn()
     },
     analizarColumnaUnivariadoGenericoUseCase: {
+      ejecutar: jest.fn()
+    },
+    configurarCriterioDeClasificacionUseCase: {
       ejecutar: jest.fn()
     }
   }
@@ -149,6 +155,93 @@ describe('GET /analisis-datos/:datasetId/exportar — RF-24 generalizado', () =>
 
   test('sin autenticar devuelve 401', async () => {
     const res = await conHttps(request(app).get('/analisis-datos/dataset-1/exportar'));
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('PATCH /analisis-datos/:datasetId/criterio-clasificacion — RF-139', () => {
+  const token = tokenPara('analista-A');
+
+  test('configura un criterio numérico y responde 200 con el criterio ya persistido', async () => {
+    const criterio = CriterioDeClasificacionValue.numerica('Puntaje', [{ minimo: 0, etiqueta: 'Bajo' }]);
+    const datasetActualizado = new DatasetGenerico(
+      'dataset-1', 'analista-A', 'riesgos.xlsx', ['Producto', 'Puntaje'], 'archivo', null, 0, new Date(), criterio, null
+    );
+    (container.configurarCriterioDeClasificacionUseCase.ejecutar as jest.Mock).mockResolvedValueOnce(datasetActualizado);
+
+    const res = await conHttps(
+      request(app)
+        .patch('/analisis-datos/dataset-1/criterio-clasificacion')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nombreColumna: 'Puntaje', tipo: 'numerica', umbrales: [{ minimo: 0, etiqueta: 'Bajo' }] })
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.criterioClasificacion).toMatchObject({ nombreColumna: 'Puntaje', tipo: 'numerica' });
+    expect(container.configurarCriterioDeClasificacionUseCase.ejecutar).toHaveBeenCalledWith(
+      'dataset-1',
+      'analista-A',
+      expect.objectContaining({ nombreColumna: 'Puntaje', tipo: 'numerica' })
+    );
+  });
+
+  test('sin nombreColumna responde 400 sin llamar al caso de uso', async () => {
+    const res = await conHttps(
+      request(app)
+        .patch('/analisis-datos/dataset-1/criterio-clasificacion')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ tipo: 'numerica' })
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  test('con un tipo no soportado responde 400', async () => {
+    const res = await conHttps(
+      request(app)
+        .patch('/analisis-datos/dataset-1/criterio-clasificacion')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nombreColumna: 'Puntaje', tipo: 'texto' })
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  test('responde 404 si el dataset no existe o pertenece a otro analista', async () => {
+    (container.configurarCriterioDeClasificacionUseCase.ejecutar as jest.Mock).mockRejectedValueOnce(
+      new DatasetGenericoNoEncontradoError()
+    );
+
+    const res = await conHttps(
+      request(app)
+        .patch('/analisis-datos/dataset-ajeno/criterio-clasificacion')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nombreColumna: 'Puntaje', tipo: 'numerica', umbrales: [{ minimo: 0, etiqueta: 'Bajo' }] })
+    );
+
+    expect(res.status).toBe(404);
+  });
+
+  test('responde 400 cuando la columna elegida no es apta (ColumnaDeDatasetInvalidaError)', async () => {
+    (container.configurarCriterioDeClasificacionUseCase.ejecutar as jest.Mock).mockRejectedValueOnce(
+      new ColumnaDeDatasetInvalidaError('La columna "Descripcion" no es apta para clasificación (tipo detectado: texto)')
+    );
+
+    const res = await conHttps(
+      request(app)
+        .patch('/analisis-datos/dataset-1/criterio-clasificacion')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nombreColumna: 'Descripcion', tipo: 'ordinal', ordenCategorias: ['a'] })
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('no es apta para clasificación');
+  });
+
+  test('sin autenticar devuelve 401', async () => {
+    const res = await conHttps(
+      request(app).patch('/analisis-datos/dataset-1/criterio-clasificacion').send({ nombreColumna: 'Puntaje', tipo: 'numerica' })
+    );
     expect(res.status).toBe(401);
   });
 });

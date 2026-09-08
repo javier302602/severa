@@ -84,6 +84,7 @@ import { ReiniciarDatasetConAuditoria } from '../../application/usecases/module_
 import { ConvertirUrlAExcel } from '../../application/usecases/module_carga_gestion_datasets/ConvertirUrlAExcel';
 import { ExportarDatasetGenerico } from '../../application/usecases/module_carga_gestion_datasets/ExportarDatasetGenerico';
 import { AnalizarDatasetGenericoConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/AnalizarDatasetGenericoConAuditoria';
+import { ConfigurarCriterioDeClasificacion } from '../../application/usecases/module_carga_gestion_datasets/ConfigurarCriterioDeClasificacion';
 
 const pool = new Pool({ connectionString: config.databaseUrl });
 const analistaRepository = new PostgresAnalistaRepository(pool);
@@ -276,6 +277,11 @@ export const container = {
   // RF-24 generalizado: exporta el dataset genérico persistido tal cual, sin
   // agrupar por severidad (eso sigue siendo exclusivo de exportarDatasetValidadoUseCase).
   exportarDatasetGenericoUseCase: new ExportarDatasetGenerico(datasetGenericoRepository),
+  // RF-139 (M-09, pieza habilitadora): sin decorador de auditoría — mismo
+  // criterio que exportarDatasetGenericoUseCase (lectura/configuración, no
+  // una acción que el SDS pida auditar como sí pide RF-94 para escritura de
+  // vulnerabilidades).
+  configurarCriterioDeClasificacionUseCase: new ConfigurarCriterioDeClasificacion(datasetGenericoRepository),
   // Fase 3: reciben sesionId en vez de un archivo — leen del mismo
   // sesionAnalisisStore que acaba de poblar analizarDatasetGenericoUseCase.
   calcularEstadisticasDescriptivasGenericoUseCase: new CalcularEstadisticasDescriptivasGenerico(sesionAnalisisStore),
