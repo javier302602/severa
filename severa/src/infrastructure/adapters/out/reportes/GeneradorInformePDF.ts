@@ -595,9 +595,43 @@ function dibujarDistribucionDeDatos(doc: PDFKit.PDFDocument, datos: DatosInforme
 // incluyen 3 gráficos clave (histograma, boxplot, pastel).
 // ---------------------------------------------------------------------
 
+// RF-131: distingue visualmente qué contenido es descriptivo puro de qué es
+// una comparación entre grupos — hoy son tipográficamente idénticos pese a
+// ser conceptualmente distintos (una comparación de medias entre Remoto y
+// Local, aunque sin pruebas de hipótesis, no es lo mismo que describir un
+// único conjunto). Deliberadamente sin 'Predictivo': M-16 sigue bloqueado
+// (ver IMotorPrediccion.ts), no se menciona predicción en ningún lado del
+// informe.
+type TipoDeAnalisis = 'Descriptivo' | 'Comparación entre grupos';
+
+const COLOR_ETIQUETA_TIPO_ANALISIS: Record<TipoDeAnalisis, string> = {
+  Descriptivo: '#0369a1',
+  'Comparación entre grupos': '#7c3aed'
+};
+
+// Badge en miniatura, mismo lenguaje visual que el encabezado de dibujarTabla
+// (rect de color + texto claro encima), en una paleta deliberadamente
+// distinta de las de severidad (rojo/naranja/ámbar/verde) para no generar
+// confusión semántica con "Crítico/Alto/Moderado/Bajo".
+function dibujarEtiquetaTipoAnalisis(doc: PDFKit.PDFDocument, tipo: TipoDeAnalisis): void {
+  doc.fontSize(7.5).font('Times-Bold');
+  const anchoTexto = doc.widthOfString(tipo);
+  const relleno = 6;
+  const alto = 14;
+  const x = doc.page.margins.left;
+  const y = doc.y;
+
+  doc.roundedRect(x, y, anchoTexto + relleno * 2, alto, 3).fill(COLOR_ETIQUETA_TIPO_ANALISIS[tipo]);
+  doc.fillColor('#ffffff').text(tipo, x + relleno, y + 3, { lineBreak: false });
+
+  doc.x = doc.page.margins.left;
+  doc.y = y + alto + 4;
+}
+
 interface DefinicionGrafico {
   numero: number;
   titulo: string;
+  tipo: TipoDeAnalisis;
   objetivo: string;
   fundamento: string;
   relacion: string;
@@ -617,6 +651,7 @@ function construirDefinicionesGraficos(datos: DatosInforme): DefinicionGrafico[]
     {
       numero: 1,
       titulo: 'Histograma de CVSS Score (distribución sin agrupar)',
+      tipo: 'Descriptivo',
       objetivo: 'representar visualmente la forma completa de la distribución de CVSS Score.',
       fundamento: 'un histograma agrupa los valores continuos en clases y representa su frecuencia como la altura de cada barra.',
       relacion: 'las líneas de media y mediana coinciden con las calculadas en la sección 5; las barras reflejan la Tabla de la sección 7.',
@@ -626,6 +661,7 @@ function construirDefinicionesGraficos(datos: DatosInforme): DefinicionGrafico[]
     {
       numero: 2,
       titulo: 'Distribución por severidad (barras)',
+      tipo: 'Descriptivo',
       objetivo: 'comparar cuántas vulnerabilidades hay en cada categoría de severidad.',
       fundamento: 'un gráfico de barras representa la frecuencia absoluta de una variable cualitativa ordinal.',
       relacion: 'los conteos son los mismos usados para calcular el porcentaje "Crítica+Alta" de la sección de Aplicación práctica.',
@@ -635,6 +671,7 @@ function construirDefinicionesGraficos(datos: DatosInforme): DefinicionGrafico[]
     {
       numero: 3,
       titulo: 'Composición por severidad (pastel)',
+      tipo: 'Descriptivo',
       objetivo: 'mostrar la proporción de cada categoría de severidad sobre el total, de un solo vistazo.',
       fundamento: 'mismos datos del Gráfico 2, expresados como porcentaje del total en vez de conteo absoluto.',
       relacion: 'reutiliza exactamente los mismos conteos del Gráfico 2 — no se recalcula nada nuevo.',
@@ -644,6 +681,7 @@ function construirDefinicionesGraficos(datos: DatosInforme): DefinicionGrafico[]
     {
       numero: 4,
       titulo: 'Boxplot de CVSS Score',
+      tipo: 'Descriptivo',
       objetivo: 'visualizar mediana, dispersión y posibles valores atípicos en un solo gráfico.',
       fundamento: 'la caja cubre el rango intercuartílico (Q1-Q3); los bigotes llegan hasta el mínimo y el máximo.',
       relacion: `los valores de la caja son los mismos Q1=${r.q1.toFixed(2)} y Q3=${r.q3.toFixed(2)} de la sección 5.`,
@@ -653,6 +691,7 @@ function construirDefinicionesGraficos(datos: DatosInforme): DefinicionGrafico[]
     {
       numero: 5,
       titulo: 'Histograma con intervalos agrupados',
+      tipo: 'Descriptivo',
       objetivo: 'facilitar la lectura de en qué tramo de severidad se concentran las vulnerabilidades, con menos barras que el Gráfico 1.',
       fundamento: 'mismos datos del Gráfico 1, agrupados en intervalos de amplitud fija (ver sección 7).',
       relacion: 'los conteos por intervalo son los mismos de la tabla agrupada de la sección 7.',
@@ -662,6 +701,7 @@ function construirDefinicionesGraficos(datos: DatosInforme): DefinicionGrafico[]
     {
       numero: 6,
       titulo: 'Comparación de CVSS por tipo de acceso',
+      tipo: 'Comparación entre grupos',
       objetivo: 'comparar la severidad entre vulnerabilidades de acceso remoto y de acceso local.',
       fundamento: 'dos boxplots lado a lado permiten comparar mediana, dispersión y atípicos de cada grupo sin una prueba estadística formal.',
       relacion: `las medias (remoto=${formatearEstadistico(remotoVsLocal.mediaA)}, local=${formatearEstadistico(remotoVsLocal.mediaB)}) son las mismas de la Comparación acceso remoto/local.`,
@@ -677,6 +717,7 @@ function construirDefinicionesGraficos(datos: DatosInforme): DefinicionGrafico[]
     {
       numero: 7,
       titulo: 'Relación entre CVSS Score y Días para Parche',
+      tipo: 'Descriptivo',
       objetivo: 'explorar si existe relación entre la severidad y el tiempo que tarda en estar disponible un parche.',
       fundamento: 'un diagrama de dispersión ubica cada vulnerabilidad como un punto; la línea de tendencia resume esa nube por regresión lineal simple, y la correlación de Pearson (sección 3) resume el grado y dirección de esa relación en un solo número.',
       relacion: 'primera vez que se presenta este resultado — no hay tabla previa equivalente.',
@@ -686,6 +727,7 @@ function construirDefinicionesGraficos(datos: DatosInforme): DefinicionGrafico[]
     {
       numero: 8,
       titulo: 'Distribución de Días para Parche',
+      tipo: 'Descriptivo',
       objetivo: 'mostrar cómo se distribuyen los tiempos de espera hasta que un parche está disponible.',
       fundamento: 'al ser una variable cuantitativa discreta, un histograma sigue siendo la herramienta adecuada.',
       relacion: 'complementa al Gráfico 7, que solo usaba esta variable en conjunto con CVSS Score.',
@@ -695,6 +737,7 @@ function construirDefinicionesGraficos(datos: DatosInforme): DefinicionGrafico[]
     {
       numero: 9,
       titulo: 'Tipos de vulnerabilidad más frecuentes (Top 10)',
+      tipo: 'Descriptivo',
       objetivo: 'identificar los tipos técnicos de vulnerabilidad más frecuentes en la muestra.',
       fundamento: 'tabla de frecuencias sobre una variable cualitativa nominal (Tipo de Vulnerabilidad), ordenada de mayor a menor.',
       relacion: 'primera vez que se analiza esta variable de forma individual en el informe.',
@@ -704,6 +747,7 @@ function construirDefinicionesGraficos(datos: DatosInforme): DefinicionGrafico[]
     {
       numero: 10,
       titulo: 'Software más afectado (Top 10)',
+      tipo: 'Descriptivo',
       objetivo: 'identificar qué software o plataformas concentran más vulnerabilidades reportadas.',
       fundamento: 'tabla de frecuencias sobre la variable Software, ordenada de mayor a menor.',
       relacion: 'complementa al Gráfico 9 con una dimensión distinta: no de qué tipo son las vulnerabilidades, sino a qué sistema afectan.',
@@ -722,6 +766,7 @@ function dibujarGraficos(doc: PDFKit.PDFDocument, datos: DatosInforme, resumido:
     doc.addPage();
     doc.fontSize(12).font('Times-Bold').fillColor('#0f172a').text(`8.${definicion.numero} Gráfico ${definicion.numero}: ${definicion.titulo}`);
     doc.moveDown(0.3);
+    dibujarEtiquetaTipoAnalisis(doc, definicion.tipo);
 
     doc.fontSize(9.5).font('Times-Bold').fillColor('#1e293b').text('Objetivo del gráfico: ', { continued: true });
     doc.font('Times-Roman').fillColor('#334155').text(definicion.objetivo);
@@ -763,12 +808,15 @@ function dibujarAplicacionPractica(doc: PDFKit.PDFDocument, datos: DatosInforme,
   nuevaSeccion(doc, '9', 'Aplicación práctica: priorización de remediación');
 
   subseccion(doc, '¿Cuál es el nivel típico de riesgo?');
+  dibujarEtiquetaTipoAnalisis(doc, 'Descriptivo');
   parrafo(doc, `Media CVSS = ${r.media.toFixed(2)}, mediana = ${r.mediana.toFixed(2)} — riesgo típico "${nivelDeRiesgoDesdeCvss(r.media)}".`);
 
   subseccion(doc, '¿Qué proporción requiere atención urgente?');
+  dibujarEtiquetaTipoAnalisis(doc, 'Descriptivo');
   parrafo(doc, `${criticasYAltas} de ${datos.totalVulnerabilidades} vulnerabilidades (${porcentajeUrgente.toFixed(1)}%) son Crítica o Alta.`);
 
   subseccion(doc, '¿Influye el acceso remoto en la severidad?');
+  dibujarEtiquetaTipoAnalisis(doc, 'Comparación entre grupos');
   parrafo(
     doc,
     `Media CVSS remoto = ${formatearEstadistico(remotoVsLocal.mediaA)}, local = ${formatearEstadistico(remotoVsLocal.mediaB)} ` +
@@ -776,6 +824,7 @@ function dibujarAplicacionPractica(doc: PDFKit.PDFDocument, datos: DatosInforme,
   );
 
   subseccion(doc, '¿Cuánto tiempo toma en promedio disponer de un parche?');
+  dibujarEtiquetaTipoAnalisis(doc, 'Descriptivo');
   parrafo(
     doc,
     datos.graficos.histogramaDiasParche.bins.length === 0

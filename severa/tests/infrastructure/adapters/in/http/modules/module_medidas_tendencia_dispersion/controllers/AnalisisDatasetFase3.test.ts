@@ -41,6 +41,28 @@ const app = createApp();
   registrar: jest.fn().mockResolvedValue(undefined),
   listar: jest.fn().mockResolvedValue([])
 };
+// Bug real encontrado auditando M-10 (no era "una limitación de LibreOffice/
+// soffice" como se venía asumiendo — esa explicación era incorrecta: no hay
+// ninguna dependencia de soffice en todo el proyecto). La causa real: los dos
+// tests de "Fase 5 (informe por sesionId)" de más abajo pasan por
+// GenerarInformeDataset.ejecutar -> resolverNombreAnalistaParaInforme ->
+// PostgresAnalistaRepository.buscarPorId real — el único de los tres
+// repositorios de esa cadena que este archivo NO reemplazaba por un fake en
+// memoria (a diferencia de datasetGenericoRepository/auditoriaRepository de
+// arriba), así que sin una Postgres real corriendo fallaban con
+// ECONNREFUSED, envuelto en un 400 genérico ("Error desconocido") por el
+// catch-all de AnalisisDatasetInformeController.ts. Mismo criterio que los
+// otros dos: buscarPorId resuelve null a propósito (el nombre del analista
+// en la portada del PDF/Word no es lo que estos tests verifican) para que
+// resolverNombreAnalistaParaInforme caiga a su fallback ('Analista SEVERA')
+// sin tocar la base de datos.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(container.generarInformeDatasetUseCase as any).analistaRepository = {
+  guardar: jest.fn().mockResolvedValue(undefined),
+  buscarPorCorreo: jest.fn().mockResolvedValue(null),
+  buscarPorId: jest.fn().mockResolvedValue(null),
+  eliminar: jest.fn().mockResolvedValue(undefined)
+};
 
 function tokenPara(id: string): string {
   return jwt.sign({ sub: id, rol: 'analista' }, config.jwtSecret, { expiresIn: '1h' });
