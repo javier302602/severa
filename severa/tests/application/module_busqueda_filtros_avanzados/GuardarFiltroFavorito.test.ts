@@ -5,7 +5,8 @@ import { FiltroFavorito } from '../../../src/domain/entities/FiltroFavorito';
 function repositorioFalso(): FiltroFavoritoRepository {
   return {
     guardar: jest.fn().mockResolvedValue(undefined),
-    listarPorAnalista: jest.fn().mockResolvedValue([])
+    listarPorAnalista: jest.fn().mockResolvedValue([]),
+    eliminar: jest.fn().mockResolvedValue(false)
   };
 }
 

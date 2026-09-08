@@ -29,6 +29,11 @@ export class PostgresFiltroFavoritoRepository implements FiltroFavoritoRepositor
     return result.rows.map((row) => this.mapRow(row));
   }
 
+  async eliminar(id: string, analistaId: string): Promise<boolean> {
+    const result = await this.pool.query('DELETE FROM filtros_favoritos WHERE id = $1 AND analista_id = $2', [id, analistaId]);
+    return (result.rowCount ?? 0) > 0;
+  }
+
   private mapRow(row: {
     id: string;
     analista_id: string;

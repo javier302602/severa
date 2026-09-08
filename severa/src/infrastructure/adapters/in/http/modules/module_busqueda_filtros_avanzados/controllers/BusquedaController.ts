@@ -130,3 +130,20 @@ busquedaRouter.get('/filtros-favoritos', async (req, res) => {
     }))
   );
 });
+
+// RF-89: mismo criterio IDOR que el resto del módulo — analistaId SIEMPRE del
+// token, nunca de la URL/body. 404 tanto si el id no existe como si es de
+// otro analista (mismo mensaje, no distingue el motivo — no revela
+// existencia ajena), 204 sin cuerpo si se borró: es un recurso único por id,
+// no hay nada que resumir (mismo patrón que DELETE /analistas/me).
+busquedaRouter.delete('/filtros-favoritos/:id', async (req, res) => {
+  const analistaId = req.analistaAutenticado!.id;
+
+  const eliminado = await container.eliminarFiltroFavoritoUseCase.ejecutar(req.params.id, analistaId);
+  if (!eliminado) {
+    res.status(404).json({ error: 'Filtro favorito no encontrado' });
+    return;
+  }
+
+  res.status(204).send();
+});

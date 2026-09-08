@@ -53,6 +53,7 @@ import { NodeCronProgramadorDeTareas } from '../adapters/out/scheduler/NodeCronP
 import { GeneradorInformePDF } from '../adapters/out/reportes/GeneradorInformePDF';
 import { BuscarConFiltros } from '../../application/usecases/module_busqueda_filtros_avanzados/BuscarConFiltros';
 import { GuardarFiltroFavorito } from '../../application/usecases/module_busqueda_filtros_avanzados/GuardarFiltroFavorito';
+import { EliminarFiltroFavorito } from '../../application/usecases/module_busqueda_filtros_avanzados/EliminarFiltroFavorito';
 import { ListarFiltrosFavoritos } from '../../application/usecases/module_busqueda_filtros_avanzados/ListarFiltrosFavoritos';
 import { ExportarBusquedaFiltrada } from '../../application/usecases/module_busqueda_filtros_avanzados/ExportarBusquedaFiltrada';
 import { ConsultarAuditoria } from '../../application/usecases/module_seguridad_auditoria/ConsultarAuditoria';
@@ -258,6 +259,7 @@ export const container = {
   buscarConFiltrosUseCase: new BuscarConFiltros(vulnerabilidadRepository),
   guardarFiltroFavoritoUseCase: new GuardarFiltroFavorito(filtroFavoritoRepository),
   listarFiltrosFavoritosUseCase: new ListarFiltrosFavoritos(filtroFavoritoRepository),
+  eliminarFiltroFavoritoUseCase: new EliminarFiltroFavorito(filtroFavoritoRepository),
   exportarBusquedaFiltradaUseCase: new ExportarBusquedaFiltrada(vulnerabilidadRepository),
   consultarAuditoriaUseCase: new ConsultarAuditoria(auditoriaRepository),
   obtenerNotificacionesUseCase: new ObtenerNotificaciones(notificacionRepository),
