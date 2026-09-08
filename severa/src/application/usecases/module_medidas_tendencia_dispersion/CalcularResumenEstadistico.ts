@@ -9,7 +9,9 @@ import {
   calcularRango,
   calcularVarianzaMuestral,
   calcularDesviacionEstandarMuestral,
-  calcularCoeficienteVariacion
+  calcularCoeficienteVariacion,
+  calcularMediaGeometrica,
+  calcularMediaArmonica
 } from '../../../domain/services/descriptive-statistics/EstadisticaDescriptiva';
 
 export class CalcularResumenEstadistico implements CalcularResumenEstadisticoUseCase {
@@ -25,10 +27,16 @@ export class CalcularResumenEstadistico implements CalcularResumenEstadisticoUse
     varianza: number;
     desviacionEstandar: number;
     coeficienteVariacion: number;
+    mediaGeometrica: number | null;
+    mediaArmonica: number | null;
   }> {
     const lista = vulnerabilidades ?? await this.vulnerabilidadRepository.listar(analistaId);
     const scores = lista.map((item) => item.cvssScore.valor);
     const { q1, q3 } = calcularCuartiles(scores);
+    // RF-50: un CVSS Score de exactamente 0.0 es válido (aunque poco común)
+    // — misma guarda que en el pipeline genérico, media geométrica/armónica
+    // quedan en null si CUALQUIER score es <= 0.
+    const todosPositivos = scores.every((score) => score > 0);
 
     return {
       media: calcularMedia(scores),
@@ -39,7 +47,9 @@ export class CalcularResumenEstadistico implements CalcularResumenEstadisticoUse
       rango: calcularRango(scores),
       varianza: calcularVarianzaMuestral(scores),
       desviacionEstandar: calcularDesviacionEstandarMuestral(scores),
-      coeficienteVariacion: calcularCoeficienteVariacion(scores)
+      coeficienteVariacion: calcularCoeficienteVariacion(scores),
+      mediaGeometrica: todosPositivos ? calcularMediaGeometrica(scores) : null,
+      mediaArmonica: todosPositivos ? calcularMediaArmonica(scores) : null
     };
   }
 }

@@ -6,7 +6,10 @@ import {
   calcularCuartiles,
   calcularRango,
   calcularVarianzaMuestral,
-  calcularDesviacionEstandarMuestral
+  calcularDesviacionEstandarMuestral,
+  calcularCoeficienteVariacion,
+  calcularMediaGeometrica,
+  calcularMediaArmonica
 } from './EstadisticaDescriptiva';
 
 // Mejora 4 (Análisis de Datos General) — Fase 3. Resumen liviano de TODAS
@@ -33,6 +36,9 @@ export interface ResumenColumnaNumerica {
   rango: number;
   varianza: number | null;
   desviacionEstandar: number | null;
+  coeficienteVariacion: number | null;
+  mediaGeometrica: number | null;
+  mediaArmonica: number | null;
 }
 
 export interface ResumenColumnaCategorica {
@@ -74,16 +80,22 @@ function contarFrecuencias(valores: unknown[]): Map<string, number> {
 // ValorEstadisticoError en EstadisticaDescriptiva.ts) — a diferencia del CVSS
 // Score (siempre hay al menos 1 vulnerabilidad cargada para calcular esto),
 // una columna genérica perfectamente puede tener un solo valor no vacío, y
-// eso no debería tirar un error, solo degradar a null.
+// eso no debería tirar un error, solo degradar a null. Mismo criterio para
+// media geométrica/armónica (RF-50): no están definidas si CUALQUIER valor
+// de la columna es <= 0 — calcularMediaGeometrica/calcularMediaArmonica
+// filtran solo los positivos y calculan sobre ese subconjunto sin avisarlo,
+// así que la guarda va acá (en el llamador), no dentro de esas funciones.
 function resumirNumerica(nombre: string, valores: number[]): ResumenColumnaNumerica {
   const ordenados = [...valores].sort((a, b) => a - b);
   const { q1, q3 } = calcularCuartiles(valores);
+  const media = calcularMedia(valores);
+  const todosPositivos = valores.every((valor) => valor > 0);
 
   return {
     tipo: 'numerica',
     nombre,
     valoresValidos: valores.length,
-    media: calcularMedia(valores),
+    media,
     mediana: calcularMediana(valores),
     moda: calcularModa(valores),
     minimo: ordenados[0],
@@ -92,7 +104,10 @@ function resumirNumerica(nombre: string, valores: number[]): ResumenColumnaNumer
     q3,
     rango: calcularRango(valores),
     varianza: valores.length >= 2 ? calcularVarianzaMuestral(valores) : null,
-    desviacionEstandar: valores.length >= 2 ? calcularDesviacionEstandarMuestral(valores) : null
+    desviacionEstandar: valores.length >= 2 ? calcularDesviacionEstandarMuestral(valores) : null,
+    coeficienteVariacion: valores.length >= 2 && media !== 0 ? calcularCoeficienteVariacion(valores) : null,
+    mediaGeometrica: todosPositivos ? calcularMediaGeometrica(valores) : null,
+    mediaArmonica: todosPositivos ? calcularMediaArmonica(valores) : null
   };
 }
 

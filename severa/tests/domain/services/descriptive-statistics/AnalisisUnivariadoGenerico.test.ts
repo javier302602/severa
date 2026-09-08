@@ -132,6 +132,28 @@ describe('AnalisisUnivariadoGenerico — Mejora 4 (Análisis de Datos General) F
     }
   );
 
+  // RF-45/RF-48/RF-50: valores de referencia reutilizando el mismo
+  // subconjunto ya verificado en EstadisticaDescriptiva.test.ts (los 12
+  // valores positivos del fixture de 13 CVSS Score, sin el 0.0).
+  test('rango, media geométrica y media armónica: valores de referencia', () => {
+    const filas = [2.1, 2.4, 3.6, 4.0, 4.0, 4.9, 5.5, 6.7, 7.2, 8.8, 9.0, 10.0].map((precio) => ({ precio }));
+
+    const analisis = analizarColumnaUnivariado('precio', ['precio'], filas) as AnalisisUnivariadoNumerico;
+
+    expect(analisis.rango).toBeCloseTo(10.0 - 2.1, 6);
+    expect(analisis.mediaGeometrica).toBeCloseTo(5.0850515017, 4);
+    expect(analisis.mediaArmonica).toBeCloseTo(4.4953504084, 4);
+  });
+
+  test('media geométrica y armónica quedan en null si la columna tiene un valor negativo', () => {
+    const filas = [-1, 2.1, 2.4, 3.6, 4.0].map((precio) => ({ precio }));
+
+    const analisis = analizarColumnaUnivariado('precio', ['precio'], filas) as AnalisisUnivariadoNumerico;
+
+    expect(analisis.mediaGeometrica).toBeNull();
+    expect(analisis.mediaArmonica).toBeNull();
+  });
+
   test('sin numeroDeIntervalos, el comportamiento automático (Sturges) sigue sin cambios', () => {
     const filas = [10, 20, 20, 30, 40, 50, 60, 70, 80, 90].map((precio) => ({ precio }));
 

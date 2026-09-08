@@ -5,6 +5,8 @@ import {
   calcularDesviacionEstandarMuestral,
   calcularCoeficienteVariacion,
   calcularResumenCincoNumeros,
+  calcularMediaGeometrica,
+  calcularMediaArmonica,
   ResumenCincoNumeros
 } from './EstadisticaDescriptiva';
 import { generarTablaAgrupada, generarIntervalosEquiespaciados, validarNumeroDeIntervalos, TablaFrecuencia } from './DistribucionFrecuencias';
@@ -30,9 +32,12 @@ export interface AnalisisUnivariadoNumerico {
   valoresFaltantes: number;
   resumenCincoNumeros: ResumenCincoNumeros;
   moda: number[];
+  rango: number;
   varianza: number | null;
   desviacionEstandar: number | null;
   coeficienteVariacion: number | null;
+  mediaGeometrica: number | null;
+  mediaArmonica: number | null;
   distribucion: TablaFrecuencia[];
 }
 
@@ -123,6 +128,14 @@ function analizarNumerica(
   // filtro tampoco lo está.
   const numeros = noVacios.filter(esNumerico).map(aNumero);
   const resumen = calcularResumenCincoNumeros(numeros);
+  // rango derivado del resumen ya calculado (max-min), en vez de llamar a
+  // calcularRango (que volvería a ordenar el array) — mismos valores,
+  // sin trabajo redundante.
+  const rango = resumen.maximo - resumen.minimo;
+  // RF-50: media geométrica/armónica no están definidas si CUALQUIER valor
+  // de la columna es <= 0 (mismo criterio que EstadisticasDescriptivasGenerico.ts
+  // — la guarda vive acá, no dentro de calcularMediaGeometrica/calcularMediaArmonica).
+  const todosPositivos = numeros.every((numero) => numero > 0);
 
   return {
     tipo: 'numerica',
@@ -131,9 +144,12 @@ function analizarNumerica(
     valoresFaltantes,
     resumenCincoNumeros: resumen,
     moda: calcularModa(numeros),
+    rango,
     varianza: numeros.length >= 2 ? calcularVarianzaMuestral(numeros) : null,
     desviacionEstandar: numeros.length >= 2 ? calcularDesviacionEstandarMuestral(numeros) : null,
     coeficienteVariacion: numeros.length >= 2 && resumen.media !== 0 ? calcularCoeficienteVariacion(numeros) : null,
+    mediaGeometrica: todosPositivos ? calcularMediaGeometrica(numeros) : null,
+    mediaArmonica: todosPositivos ? calcularMediaArmonica(numeros) : null,
     distribucion: generarTablaAgrupada(numeros, generarIntervalosAutomaticos(numeros, numeroDeIntervalos), nombre)
   };
 }

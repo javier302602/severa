@@ -28,6 +28,26 @@ describe('EstadisticasDescriptivasGenerico — Mejora 4 (Análisis de Datos Gene
     expect(resumen.media).toBe(10);
   });
 
+  // RF-48/RF-50: valores de referencia reutilizando el mismo subconjunto ya
+  // verificado en EstadisticaDescriptiva.test.ts (los 12 valores positivos
+  // del fixture de 13 CVSS Score, sin el 0.0) — no se inventan números nuevos.
+  test('coeficiente de variación, media geométrica y armónica: valores de referencia', () => {
+    const precios = [2.1, 2.4, 3.6, 4.0, 4.0, 4.9, 5.5, 6.7, 7.2, 8.8, 9.0, 10.0];
+    const resumen = calcularEstadisticasDescriptivas(['precio'], precios.map((precio) => ({ precio })))[0] as ResumenColumnaNumerica;
+
+    expect(resumen.coeficienteVariacion).not.toBeNull();
+    expect(resumen.mediaGeometrica).toBeCloseTo(5.0850515017, 4);
+    expect(resumen.mediaArmonica).toBeCloseTo(4.4953504084, 4);
+  });
+
+  test('media geométrica y armónica quedan en null si la columna tiene un cero (no están definidas)', () => {
+    const precios = [0.0, 2.1, 2.4, 3.6, 4.0, 4.0, 4.9, 5.5, 6.7, 7.2, 8.8, 9.0, 10.0];
+    const resumen = calcularEstadisticasDescriptivas(['precio'], precios.map((precio) => ({ precio })))[0] as ResumenColumnaNumerica;
+
+    expect(resumen.mediaGeometrica).toBeNull();
+    expect(resumen.mediaArmonica).toBeNull();
+  });
+
   test('columna categórica: cuenta valores únicos y devuelve el top de más frecuentes', () => {
     const filas = ['Lima', 'Cusco', 'Lima', 'Lima', 'Cusco', 'Lima', 'Arequipa', 'Lima'].map((ciudad) => ({ ciudad }));
 

@@ -11,5 +11,7 @@ export interface CalcularResumenEstadisticoUseCase {
     varianza: number;
     desviacionEstandar: number;
     coeficienteVariacion: number;
+    mediaGeometrica: number | null;
+    mediaArmonica: number | null;
   }>;
 }
