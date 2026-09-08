@@ -33,7 +33,7 @@ const MIGRATIONS_DIR = path.join(
   'infrastructure',
   'adapters',
   'out',
-  'persistence',
+  'persistencia',
   'migrations'
 );
 
