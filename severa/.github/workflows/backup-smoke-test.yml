@@ -1,0 +1,89 @@
+name: Smoke test de scripts/backup.sh
+
+# A diferencia de backup.yml (RF-96, respaldo real — inactivo hasta que haya
+# una base de producción alcanzable), esto NO protege datos reales: corre
+# contra un Postgres efímero y descartable, propio de este workflow, que se
+# destruye al terminar el job. Solo prueba que el script en sí funciona
+# (pg_dump corre, produce un archivo no vacío, la limpieza por retención no
+# rompe nada) — así un cambio futuro en scripts/backup.sh que lo rompa se
+# detecta en el PR, en vez de recién el día que backup.yml intente correr
+# contra una base real.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/backup.sh'
+      - 'src/infrastructure/adapters/out/persistencia/migrations/**'
+      - '.github/workflows/backup-smoke-test.yml'
+  pull_request:
+    paths:
+      - 'scripts/backup.sh'
+      - 'src/infrastructure/adapters/out/persistencia/migrations/**'
+      - '.github/workflows/backup-smoke-test.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    # Mismas credenciales/nombre de base que docker-compose.yml (postgres/
+    # postgres/severa_dev) — no porque importen los valores en sí (es una
+    # base descartable que dura lo que dura el job), sino para que
+    # DATABASE_URL de este workflow sea consistente con la del resto del
+    # proyecto, si algún día hace falta compararlas.
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: severa_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d severa_dev"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/severa_dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Aplicar migraciones (para que el dump tenga el esquema real, no una base vacía)
+        run: npm run migrate
+
+      - name: Instalar cliente de PostgreSQL 15
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-15
+
+      - name: Correr scripts/backup.sh
+        env:
+          BACKUP_DIR: ${{ github.workspace }}/backups
+        run: bash scripts/backup.sh
+
+      - name: Verificar que el .dump se generó y no está vacío
+        run: |
+          ARCHIVO=$(ls backups/severa_*.dump 2>/dev/null | head -n 1)
+          if [ -z "$ARCHIVO" ]; then
+            echo "No se generó ningún archivo .dump" >&2
+            exit 1
+          fi
+          TAMANO=$(stat -c%s "$ARCHIVO")
+          echo "Archivo generado: $ARCHIVO ($TAMANO bytes)"
+          if [ "$TAMANO" -eq 0 ]; then
+            echo "El archivo .dump está vacío" >&2
+            exit 1
+          fi
+
+      - name: Verificar que pg_restore reconoce el .dump como un dump válido (no solo "no vacío")
+        run: |
+          ARCHIVO=$(ls backups/severa_*.dump 2>/dev/null | head -n 1)
+          pg_restore --list "$ARCHIVO" > /dev/null

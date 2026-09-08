@@ -1,0 +1,61 @@
+name: Respaldo diario de la base de datos (RF-96)
+
+# ESTADO: inactivo hasta que exista un despliegue real con una base de datos
+# alcanzable desde internet. Confirmado durante la auditoría M-12: este
+# repositorio hoy NO tiene ningún despliegue de producción (ver README.md,
+# sección "Autenticación y roles" — docker-compose.yml es un despliegue
+# básico sin TLS, explícitamente documentado como no apto para producción).
+# El único Postgres que existe en cualquier entorno visto hasta ahora es un
+# contenedor local, alcanzable solo desde la máquina que lo levanta — nunca
+# desde los runners de GitHub Actions.
+#
+# Este workflow queda correctamente armado y listo para activarse: en cuanto
+# haya un despliegue real, basta con configurar el secret DATABASE_URL del
+# repositorio (Settings > Secrets and variables > Actions) apuntando a esa
+# base. Sin ese secret configurado, esta tarea FALLA limpio todos los días
+# (scripts/backup.sh corta con exit 1 y un mensaje claro si DATABASE_URL no
+# está definido) — es el comportamiento esperado, no un bug: preferible a
+# fingir un respaldo que no protege nada real.
+on:
+  schedule:
+    # 03:00 UTC a diario. Hora de bajo tráfico esperado, sin relación con
+    # ninguna zona horaria específica de despliegue (no hay una todavía).
+    - cron: '0 3 * * *'
+  # Para poder probar el workflow a mano desde la pestaña Actions sin
+  # esperar al cron, una vez que el secret ya esté configurado.
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # pg_dump del runner debe poder hablar con la versión real del
+      # Postgres de destino (postgres:15 en docker-compose.yml) — se instala
+      # explícito en vez de confiar en lo que ubuntu-latest traiga por
+      # defecto, que puede no coincidir.
+      - name: Instalar cliente de PostgreSQL 15
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-15
+
+      - name: Ejecutar scripts/backup.sh
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BACKUP_DIR: ${{ github.workspace }}/backups
+        run: bash scripts/backup.sh
+
+      # No hay ningún storage externo (S3, etc.) configurado en este
+      # proyecto todavía — el artifact de Actions es el único destino
+      # razonable hoy. Retención corta: es un respaldo de paso, no el
+      # almacenamiento a largo plazo (para eso, BACKUP_RETENTION_DAYS ya
+      # gestiona la limpieza de respaldos locales, y un storage externo real
+      # sería la extensión natural de este workflow el día que haga falta).
+      - name: Subir el .dump como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: severa-backup-${{ github.run_id }}
+          path: ${{ github.workspace }}/backups/*.dump
+          retention-days: 14
+          if-no-files-found: error
