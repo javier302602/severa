@@ -29,8 +29,18 @@ const MIME_TYPES_PERMITIDOS = new Set([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
   'application/vnd.ms-excel', // .xls (y algunos navegadores mandan .csv así)
   'text/csv',
-  'application/csv'
+  'application/csv',
+  // M-14 (RF-105): TSV/JSON no tienen un MIME estandarizado que todos los
+  // navegadores/herramientas manden igual (TSV en particular: a veces
+  // text/tab-separated-values, a veces text/plain, a veces
+  // application/octet-stream) — por eso el filtro de abajo también acepta
+  // por EXTENSIÓN, no solo por MIME. Estos MIME quedan igual en la lista
+  // para los casos donde sí vienen bien formados.
+  'text/tab-separated-values',
+  'application/json'
 ]);
+
+const EXTENSIONES_PERMITIDAS = new Set(['.xlsx', '.xls', '.csv', '.tsv', '.json']);
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -39,8 +49,15 @@ const upload = multer({
   }),
   limits: { fileSize: TAMANO_MAXIMO_BYTES },
   fileFilter: (_req, file, cb) => {
-    if (!MIME_TYPES_PERMITIDOS.has(file.mimetype)) {
-      cb(new Error('Tipo de archivo no permitido. Solo se aceptan .xlsx, .xls o .csv'));
+    // M-14 (RF-105): pasa si el MIME es uno de los conocidos O si la
+    // extensión del nombre original es una de las permitidas — la validación
+    // de contenido real (LectorDatasetGenerico.leerArchivo) es la red de
+    // seguridad de verdad para lo que este filtro deje pasar de más (un
+    // archivo con extensión .csv que en realidad no es texto delimitado
+    // válido cae en DatasetInvalidoError al parsear, no acá).
+    const extension = path.extname(file.originalname).toLowerCase();
+    if (!MIME_TYPES_PERMITIDOS.has(file.mimetype) && !EXTENSIONES_PERMITIDAS.has(extension)) {
+      cb(new Error('Tipo de archivo no permitido. Solo se aceptan .xlsx, .xls, .csv, .tsv o .json'));
       return;
     }
     cb(null, true);
@@ -70,7 +87,7 @@ function manejarSubida(req: express.Request, res: express.Response, next: expres
 // no requieran volver a subir el archivo.
 analisisDatasetAnalizarRouter.post('/analisis-datos/analizar', manejarSubida, async (req, res) => {
   if (!req.file) {
-    res.status(400).json({ error: 'Debe subir un archivo .xlsx, .xls o .csv en el campo "archivo"' });
+    res.status(400).json({ error: 'Debe subir un archivo .xlsx, .xls, .csv, .tsv o .json en el campo "archivo"' });
     return;
   }
 
@@ -82,12 +99,16 @@ analisisDatasetAnalizarRouter.post('/analisis-datos/analizar', manejarSubida, as
   const nombreArchivoOriginal = sanearNombreDeArchivo(req.file.originalname);
 
   try {
-    const { diagnostico, sesionId, datasetId } = await container.analizarDatasetGenericoUseCase.ejecutar(
+    // RF-112: perfilVariables se agrega a la misma respuesta de siempre —
+    // ampliación del endpoint existente, no una ruta nueva (el reporte
+    // consolidado queda "generado automáticamente tras la carga", tal como
+    // pide el RF, en vez de requerir una segunda llamada aparte).
+    const { diagnostico, perfilVariables, sesionId, datasetId } = await container.analizarDatasetGenericoUseCase.ejecutar(
       req.file.path,
       analistaId,
       nombreArchivoOriginal
     );
-    res.json({ ...diagnostico, sesionId, datasetId });
+    res.json({ ...diagnostico, perfilVariables, sesionId, datasetId });
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : 'Error desconocido' });
   } finally {
@@ -125,7 +146,7 @@ analisisDatasetAnalizarRouter.get('/analisis-datos/:datasetId/exportar', async (
 // (mismo límite de tamaño, mismos tipos permitidos).
 analisisDatasetAnalizarRouter.post('/analisis-datos/:datasetId/verificar-integridad', manejarSubida, async (req, res) => {
   if (!req.file) {
-    res.status(400).json({ error: 'Debe subir un archivo .xlsx, .xls o .csv en el campo "archivo"' });
+    res.status(400).json({ error: 'Debe subir un archivo .xlsx, .xls, .csv, .tsv o .json en el campo "archivo"' });
     return;
   }
 

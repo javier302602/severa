@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { LectorDatasetGenerico } from '../../../infrastructure/adapters/out/dataset/parsers/LectorDatasetGenerico';
 import { AnalizarDatasetGenericoUseCase, ResultadoAnalisisDataset } from '../../ports/in/module_carga_gestion_datasets/AnalizarDatasetGenericoUseCase';
 import { analizarDataset } from '../../../domain/services/data-cleaning/CalidadDeDatosGenerico';
+import { calcularEstadisticasDescriptivas } from '../../../domain/services/descriptive-statistics/EstadisticasDescriptivasGenerico';
 import { SesionAnalisisStore } from '../../ports/out/dataset/SesionAnalisisStore';
 import { DatasetGenericoRepository } from '../../ports/out/persistencia/repositorios/DatasetGenericoRepository';
 import { DatasetGenerico } from '../../../domain/entities/DatasetGenerico';
@@ -34,6 +35,10 @@ export class AnalizarDatasetGenerico implements AnalizarDatasetGenericoUseCase {
     const hashOriginalSha256 = await calcularHashSha256Archivo(rutaArchivo);
     const { columnas, filas } = this.lectorDatasetGenerico.leerArchivo(rutaArchivo);
     const diagnostico = analizarDataset(columnas, filas);
+    // RF-112: mismo cálculo que ya corría GET /estadisticas-descriptivas, acá
+    // se hace con las mismas columnas/filas ya en memoria (sin releer nada)
+    // para consolidarlo en la respuesta de /analizar.
+    const perfilVariables = calcularEstadisticasDescriptivas(columnas, filas);
     const sesionId = this.sesionAnalisisStore.crear(analistaId, { columnas, filas });
 
     const datasetId = randomUUID();
@@ -51,6 +56,6 @@ export class AnalizarDatasetGenerico implements AnalizarDatasetGenericoUseCase {
       await this.datasetGenericoRepository.guardarRegistros(lote);
     }
 
-    return { diagnostico, sesionId, datasetId };
+    return { diagnostico, perfilVariables, sesionId, datasetId };
   }
 }

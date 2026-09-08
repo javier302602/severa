@@ -23,9 +23,16 @@ export const analisisDatasetRouter = express.Router();
 // 404 sin distinguir el motivo (SesionAnalisisNoEncontradaError), nunca 403.
 analisisDatasetRouter.get('/analisis-datos/:sesionId/estadisticas-descriptivas', async (req, res) => {
   const analistaId = req.analistaAutenticado!.id;
+  // RF-109: por defecto (sin el query param, o con cualquier valor que no
+  // sea literalmente "true") se excluyen las columnas identificador.
+  const incluirIdentificadores = req.query.incluirIdentificadores === 'true';
 
   try {
-    const columnas = await container.calcularEstadisticasDescriptivasGenericoUseCase.ejecutar(analistaId, req.params.sesionId);
+    const columnas = await container.calcularEstadisticasDescriptivasGenericoUseCase.ejecutar(
+      analistaId,
+      req.params.sesionId,
+      incluirIdentificadores
+    );
     res.json({ columnas });
   } catch (error) {
     if (error instanceof SesionAnalisisNoEncontradaError) {

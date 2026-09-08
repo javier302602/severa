@@ -27,4 +27,48 @@ describe('CalcularEstadisticasDescriptivasGenerico — Mejora 4 (Análisis de Da
 
     await expect(useCase.ejecutar('analista-A', 'sesion-de-otro')).rejects.toThrow(SesionAnalisisNoEncontradaError);
   });
+
+  // M-14 (RF-109): por defecto, las columnas identificador quedan afuera.
+  describe('RF-109 — incluirIdentificadores', () => {
+    function datosConIdentificadorYNormal() {
+      const filas = Array.from({ length: 10 }, (_, i) => ({ id: `EMP-${i}`, edad: 20 + i }));
+      return { columnas: ['id', 'edad'], filas };
+    }
+
+    test('por defecto (sin pasar el parámetro), excluye las columnas identificador del resultado', async () => {
+      const store = storeFalso(datosConIdentificadorYNormal());
+      const useCase = new CalcularEstadisticasDescriptivasGenerico(store);
+
+      const resultado = await useCase.ejecutar('analista-A', 'sesion-1');
+
+      expect(resultado.map((r) => r.nombre)).toEqual(['edad']);
+    });
+
+    test('con incluirIdentificadores=false explícito, mismo comportamiento que el default', async () => {
+      const store = storeFalso(datosConIdentificadorYNormal());
+      const useCase = new CalcularEstadisticasDescriptivasGenerico(store);
+
+      const resultado = await useCase.ejecutar('analista-A', 'sesion-1', false);
+
+      expect(resultado.map((r) => r.nombre)).toEqual(['edad']);
+    });
+
+    test('con incluirIdentificadores=true, la columna identificador vuelve a aparecer', async () => {
+      const store = storeFalso(datosConIdentificadorYNormal());
+      const useCase = new CalcularEstadisticasDescriptivasGenerico(store);
+
+      const resultado = await useCase.ejecutar('analista-A', 'sesion-1', true);
+
+      expect(resultado.map((r) => r.nombre).sort()).toEqual(['edad', 'id']);
+    });
+
+    test('sin ninguna columna identificador, incluirIdentificadores=false no descarta nada', async () => {
+      const store = storeFalso({ columnas: ['precio'], filas: [{ precio: 10 }, { precio: 20 }] });
+      const useCase = new CalcularEstadisticasDescriptivasGenerico(store);
+
+      const resultado = await useCase.ejecutar('analista-A', 'sesion-1', false);
+
+      expect(resultado.map((r) => r.nombre)).toEqual(['precio']);
+    });
+  });
 });

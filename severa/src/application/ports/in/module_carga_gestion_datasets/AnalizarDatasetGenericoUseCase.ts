@@ -1,7 +1,14 @@
 import { DiagnosticoDataset } from '../../../../domain/services/data-cleaning/CalidadDeDatosGenerico';
+import { ResumenColumna } from '../../../../domain/services/descriptive-statistics/EstadisticasDescriptivasGenerico';
 
 export interface ResultadoAnalisisDataset {
   diagnostico: DiagnosticoDataset;
+  // RF-112 (M-14): reporte de perfilado consolidado por variable — mismo
+  // cálculo que ya usaba GET /analisis-datos/:sesionId/estadisticas-descriptivas
+  // (Fase 3), pero acá disponible de una sola vez, en el mismo momento en
+  // que se genera `diagnostico`, en vez de requerir una segunda llamada
+  // aparte después de subir el archivo.
+  perfilVariables: ResumenColumna[];
   sesionId: string;
   // Generalización de M-03: id del DatasetGenerico persistido (tablas
   // datasets_genericos/registros_datasets_genericos), distinto de sesionId

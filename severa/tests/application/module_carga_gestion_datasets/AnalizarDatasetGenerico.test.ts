@@ -126,4 +126,24 @@ describe('AnalizarDatasetGenerico — Mejora 4 (Análisis de Datos General) Fase
       expect.objectContaining({ hashOriginalSha256: hashEsperado })
     );
   });
+
+  // RF-112
+  test('devuelve perfilVariables (resumen min/max/moda por columna) junto al diagnóstico, en la misma respuesta', async () => {
+    const rutaArchivo = crearArchivoTemporal('contenido de prueba');
+    const datos = { columnas: ['Precio'], filas: [{ Precio: 10 }, { Precio: 20 }, { Precio: 30 }] };
+    const lector: jest.Mocked<Pick<LectorDatasetGenerico, 'leerArchivo'>> = {
+      leerArchivo: jest.fn().mockReturnValue(datos)
+    };
+    const store: jest.Mocked<SesionAnalisisStore> = {
+      crear: jest.fn().mockReturnValue('sesion-nueva-123'),
+      obtener: jest.fn()
+    };
+    const datasetGenericoRepository = datasetGenericoRepositoryFalso();
+
+    const useCase = new AnalizarDatasetGenerico(lector as unknown as LectorDatasetGenerico, store, datasetGenericoRepository);
+    const resultado = await useCase.ejecutar(rutaArchivo, 'analista-A', 'ventas.xlsx');
+
+    expect(resultado.perfilVariables).toHaveLength(1);
+    expect(resultado.perfilVariables[0]).toMatchObject({ tipo: 'numerica', nombre: 'Precio', minimo: 10, maximo: 30 });
+  });
 });

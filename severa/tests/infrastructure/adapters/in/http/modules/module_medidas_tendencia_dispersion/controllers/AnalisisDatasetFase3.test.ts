@@ -95,6 +95,34 @@ async function subirArchivoYObtenerSesionId(token: string): Promise<string> {
   return res.body.sesionId;
 }
 
+// M-14 (RF-109): SKU es una columna con valores únicos por fila (5 filas,
+// suficiente para superar MINIMO_MUESTRA_IDENTIFICADOR) — sirve para probar
+// de punta a punta que /estadisticas-descriptivas la excluye por defecto.
+function crearXlsxConIdentificador(): string {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'severa-analisis-fase3-id-'));
+  const filePath = path.join(tempDir, 'con-id.xlsx');
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['SKU', 'Precio'],
+    ['SKU-0001', 1200],
+    ['SKU-0002', 25],
+    ['SKU-0003', 45],
+    ['SKU-0004', 300],
+    ['SKU-0005', 150]
+  ]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  XLSX.writeFile(wb, filePath);
+  return filePath;
+}
+
+async function subirArchivoConIdentificadorYObtenerSesionId(token: string): Promise<string> {
+  const filePath = crearXlsxConIdentificador();
+  const res = await conHttps(
+    request(app).post('/analisis-datos/analizar').set('Authorization', `Bearer ${token}`).attach('archivo', filePath)
+  );
+  return res.body.sesionId;
+}
+
 // Fase 4: dataset propio con DOS columnas numéricas en relación lineal
 // exacta (Cantidad = 10×Precio) — correlación de Pearson debe dar 1 sin
 // importar la magnitud de los valores, así que el mismo dataset sirve para
@@ -142,6 +170,34 @@ describe('Rutas de Fase 3 (estadísticas descriptivas / univariado por sesionId)
     expect(res.body.columnas).toHaveLength(2);
     const precio = res.body.columnas.find((c: { nombre: string }) => c.nombre === 'Precio');
     expect(precio.tipo).toBe('numerica');
+  });
+
+  // M-14 (RF-109): de punta a punta, sin mockear nada — el flujo real
+  // subir -> pedir estadísticas descriptivas realmente excluye/incluye SKU
+  // según el query param.
+  test('RF-109: por defecto excluye la columna identificador (SKU) de las estadísticas descriptivas', async () => {
+    const sesionId = await subirArchivoConIdentificadorYObtenerSesionId(tokenA);
+
+    const res = await conHttps(
+      request(app).get(`/analisis-datos/${sesionId}/estadisticas-descriptivas`).set('Authorization', `Bearer ${tokenA}`)
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.columnas.map((c: { nombre: string }) => c.nombre)).toEqual(['Precio']);
+  });
+
+  test('RF-109: con incluirIdentificadores=true, SKU vuelve a aparecer', async () => {
+    const sesionId = await subirArchivoConIdentificadorYObtenerSesionId(tokenA);
+
+    const res = await conHttps(
+      request(app)
+        .get(`/analisis-datos/${sesionId}/estadisticas-descriptivas`)
+        .query({ incluirIdentificadores: 'true' })
+        .set('Authorization', `Bearer ${tokenA}`)
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.columnas.map((c: { nombre: string }) => c.nombre).sort()).toEqual(['Precio', 'SKU']);
   });
 
   test('IDOR: otro analista con un token válido no puede leer la sesión de analista A (404, no 403)', async () => {

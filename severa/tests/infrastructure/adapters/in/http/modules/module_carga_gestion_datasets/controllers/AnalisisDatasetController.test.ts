@@ -16,8 +16,10 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => (
         diagnostico: {
           totalFilas: 2,
           filasDuplicadas: 0,
-          columnas: [{ nombre: 'Producto', tipo: 'categorica', valoresFaltantes: 0, porcentajeFaltante: 0, valoresUnicos: 2, valoresInconsistentes: 0 }]
+          columnas: [{ nombre: 'Producto', tipo: 'categorica', valoresFaltantes: 0, porcentajeFaltante: 0, valoresUnicos: 2, valoresInconsistentes: 0 }],
+          completitudGeneral: 100
         },
+        perfilVariables: [{ tipo: 'categorica', nombre: 'Producto', valoresValidos: 2, valoresUnicos: 2, masFrecuente: [] }],
         sesionId: 'sesion-mock-123',
         datasetId: 'dataset-mock-123'
       })
@@ -82,6 +84,10 @@ describe('AnalisisDatasetController — Mejora 4 (Análisis de Datos General) Fa
     expect(res.body.totalFilas).toBe(2);
     expect(res.body.sesionId).toBe('sesion-mock-123');
     expect(res.body.datasetId).toBe('dataset-mock-123');
+    // RF-106/RF-112: completitudGeneral (del diagnóstico) y perfilVariables
+    // (resumen consolidado) viajan en la misma respuesta.
+    expect(res.body.completitudGeneral).toBe(100);
+    expect(res.body.perfilVariables).toEqual([{ tipo: 'categorica', nombre: 'Producto', valoresValidos: 2, valoresUnicos: 2, masFrecuente: [] }]);
     expect(container.analizarDatasetGenericoUseCase.ejecutar).toHaveBeenCalledWith(
       expect.any(String),
       'analista-A',
@@ -114,6 +120,39 @@ describe('AnalisisDatasetController — Mejora 4 (Análisis de Datos General) Fa
     );
 
     expect(res.status).toBe(400);
+  });
+
+  // M-14 (RF-105): el filtro de multer pasa por extensión aunque el cliente
+  // mande un MIME que no está en la lista conocida (supertest .attach() usa
+  // la librería `mime` para adivinar el Content-Type por extensión — para
+  // .tsv puede no coincidir con ninguno de los MIME "conocidos" explícitos,
+  // que es justo el caso real que este filtro tiene que cubrir).
+  describe('RF-105 — TSV y JSON pasan el filtro de multer', () => {
+    test('un .tsv real llega al caso de uso (no lo bloquea el filtro)', async () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'severa-analisis-controller-'));
+      const filePath = path.join(tempDir, 'ventas.tsv');
+      fs.writeFileSync(filePath, 'Producto\tPrecio\nLaptop\t1200\nMouse\t25\n');
+
+      const res = await conHttps(
+        request(app).post('/analisis-datos/analizar').set('Authorization', `Bearer ${token}`).attach('archivo', filePath)
+      );
+
+      expect(res.status).toBe(200);
+      expect(container.analizarDatasetGenericoUseCase.ejecutar).toHaveBeenCalled();
+    });
+
+    test('un .json real llega al caso de uso (no lo bloquea el filtro)', async () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'severa-analisis-controller-'));
+      const filePath = path.join(tempDir, 'ventas.json');
+      fs.writeFileSync(filePath, JSON.stringify([{ Producto: 'Laptop', Precio: 1200 }]));
+
+      const res = await conHttps(
+        request(app).post('/analisis-datos/analizar').set('Authorization', `Bearer ${token}`).attach('archivo', filePath)
+      );
+
+      expect(res.status).toBe(200);
+      expect(container.analizarDatasetGenericoUseCase.ejecutar).toHaveBeenCalled();
+    });
   });
 
   test('cuando el caso de uso rechaza (archivo corrupto) responde 400 con el mensaje claro, no 500', async () => {
