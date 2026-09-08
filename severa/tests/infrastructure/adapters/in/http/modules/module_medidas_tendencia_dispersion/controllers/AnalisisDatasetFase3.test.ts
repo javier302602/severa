@@ -175,6 +175,34 @@ describe('Rutas de Fase 3 (estadísticas descriptivas / univariado por sesionId)
     expect(res.status).toBe(400);
   });
 
+  // RF-39: override manual del número de intervalos vía query param.
+  test('univariado con numeroDeIntervalos manual válido devuelve esa cantidad de bins', async () => {
+    const sesionId = await subirArchivoYObtenerSesionId(tokenA);
+
+    const res = await conHttps(
+      request(app)
+        .get(`/analisis-datos/${sesionId}/univariado/Precio`)
+        .query({ numeroDeIntervalos: 2 })
+        .set('Authorization', `Bearer ${tokenA}`)
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.distribucion).toHaveLength(2);
+  });
+
+  test('univariado con numeroDeIntervalos inválido responde 400, no 500', async () => {
+    const sesionId = await subirArchivoYObtenerSesionId(tokenA);
+
+    const res = await conHttps(
+      request(app)
+        .get(`/analisis-datos/${sesionId}/univariado/Precio`)
+        .query({ numeroDeIntervalos: 0 })
+        .set('Authorization', `Bearer ${tokenA}`)
+    );
+
+    expect(res.status).toBe(400);
+  });
+
   test('sin autenticar, ambas rutas devuelven 401', async () => {
     const resEstadisticas = await conHttps(request(app).get('/analisis-datos/cualquier-sesion/estadisticas-descriptivas'));
     const resUnivariado = await conHttps(request(app).get('/analisis-datos/cualquier-sesion/univariado/Precio'));

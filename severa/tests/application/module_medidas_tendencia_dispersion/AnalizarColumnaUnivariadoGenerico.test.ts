@@ -35,4 +35,17 @@ describe('AnalizarColumnaUnivariadoGenerico — Mejora 4 (Análisis de Datos Gen
 
     await expect(useCase.ejecutar('analista-A', 'sesion-1', 'noExiste')).rejects.toThrow(DatasetInvalidoError);
   });
+
+  test('propaga numeroDeIntervalos al análisis de dominio (RF-39)', async () => {
+    const filas = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((precio) => ({ precio }));
+    const store = storeFalso({ columnas: ['precio'], filas });
+    const useCase = new AnalizarColumnaUnivariadoGenerico(store);
+
+    const resultado = await useCase.ejecutar('analista-A', 'sesion-1', 'precio', 4);
+
+    expect(resultado.tipo).toBe('numerica');
+    if (resultado.tipo === 'numerica') {
+      expect(resultado.distribucion).toHaveLength(4);
+    }
+  });
 });

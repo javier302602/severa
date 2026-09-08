@@ -8,8 +8,18 @@ import { container } from '../../../../../../config/container';
 // en app.ts. Mismo comportamiento, mismo endpoint, solo cambia el archivo.
 export const distribucionFrecuenciasRouter = express.Router();
 
+// numeroDeIntervalos (RF-39): override manual y opcional para tipo=agrupada
+// — sin él, se mantienen las 5 bandas oficiales de CVSS de siempre. Un valor
+// inválido (NumeroDeIntervalosInvalidoError) cae al error-handler global de
+// app.ts, que responde 400 con mensaje claro, igual que el resto de la API.
 distribucionFrecuenciasRouter.get('/frecuencias', async (req, res) => {
   const tipo = req.query.tipo === 'agrupada' ? 'agrupada' : 'sinAgrupar';
-  const resultado = await container.generarDistribucionFrecuenciasUseCase.ejecutar(tipo, req.analistaAutenticado!.id);
+  const numeroDeIntervalos = req.query.numeroDeIntervalos !== undefined ? Number(req.query.numeroDeIntervalos) : undefined;
+  const resultado = await container.generarDistribucionFrecuenciasUseCase.ejecutar(
+    tipo,
+    req.analistaAutenticado!.id,
+    undefined,
+    numeroDeIntervalos
+  );
   res.json(resultado);
 });

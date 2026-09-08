@@ -7,12 +7,17 @@ import { SesionAnalisisNoEncontradaError } from '../../../domain/errors/SesionAn
 export class AnalizarColumnaUnivariadoGenerico implements AnalizarColumnaUnivariadoGenericoUseCase {
   constructor(private readonly sesionAnalisisStore: SesionAnalisisStore) {}
 
-  async ejecutar(analistaId: string, sesionId: string, nombreColumna: string): Promise<AnalisisUnivariado> {
+  async ejecutar(
+    analistaId: string,
+    sesionId: string,
+    nombreColumna: string,
+    numeroDeIntervalos?: number
+  ): Promise<AnalisisUnivariado> {
     const datos = this.sesionAnalisisStore.obtener(analistaId, sesionId);
     if (!datos) {
       throw new SesionAnalisisNoEncontradaError();
     }
 
-    return analizarColumnaUnivariado(nombreColumna, datos.columnas, datos.filas);
+    return analizarColumnaUnivariado(nombreColumna, datos.columnas, datos.filas, numeroDeIntervalos);
   }
 }

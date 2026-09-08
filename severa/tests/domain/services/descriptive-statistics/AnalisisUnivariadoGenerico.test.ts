@@ -1,5 +1,6 @@
 import { analizarColumnaUnivariado, AnalisisUnivariadoNumerico, AnalisisUnivariadoCategorico, AnalisisUnivariadoFecha } from '../../../../src/domain/services/descriptive-statistics/AnalisisUnivariadoGenerico';
 import { DatasetInvalidoError } from '../../../../src/domain/errors/DatasetInvalidoError';
+import { NumeroDeIntervalosInvalidoError } from '../../../../src/domain/errors/NumeroDeIntervalosInvalidoError';
 
 describe('AnalisisUnivariadoGenerico — Mejora 4 (Análisis de Datos General) Fase 3', () => {
   test('columna inexistente tira DatasetInvalidoError con mensaje claro', () => {
@@ -107,5 +108,36 @@ describe('AnalisisUnivariadoGenerico — Mejora 4 (Análisis de Datos General) F
 
     const analisis = analizarColumnaUnivariado('valor', ['valor'], filas) as AnalisisUnivariadoNumerico;
     expect(analisis.valoresValidos).toBe(200_000);
+  });
+
+  // RF-39: override manual del número de intervalos, en vez del cálculo
+  // automático por Sturges.
+  test('con numeroDeIntervalos manual, usa exactamente esa cantidad de intervalos (no Sturges)', () => {
+    const filas = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((precio) => ({ precio }));
+
+    const analisis = analizarColumnaUnivariado('precio', ['precio'], filas, 4) as AnalisisUnivariadoNumerico;
+
+    expect(analisis.distribucion).toHaveLength(4);
+    const totalEnDistribucion = analisis.distribucion.reduce((acumulado, bin) => acumulado + bin.frecuenciaAbsoluta, 0);
+    expect(totalEnDistribucion).toBe(10);
+  });
+
+  test.each([0, 1, -3, 31])(
+    'numeroDeIntervalos inválido (%i) tira NumeroDeIntervalosInvalidoError',
+    (numeroDeIntervalos) => {
+      const filas = [10, 20, 30].map((precio) => ({ precio }));
+      expect(() => analizarColumnaUnivariado('precio', ['precio'], filas, numeroDeIntervalos)).toThrow(
+        NumeroDeIntervalosInvalidoError
+      );
+    }
+  );
+
+  test('sin numeroDeIntervalos, el comportamiento automático (Sturges) sigue sin cambios', () => {
+    const filas = [10, 20, 20, 30, 40, 50, 60, 70, 80, 90].map((precio) => ({ precio }));
+
+    const analisis = analizarColumnaUnivariado('precio', ['precio'], filas) as AnalisisUnivariadoNumerico;
+
+    // Sturges para n=10: ceil(log2(10)+1) = ceil(4.32) = 5, dentro de [3,10].
+    expect(analisis.distribucion).toHaveLength(5);
   });
 });

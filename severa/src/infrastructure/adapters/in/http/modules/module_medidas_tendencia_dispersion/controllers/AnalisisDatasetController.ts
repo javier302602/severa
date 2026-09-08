@@ -40,14 +40,21 @@ analisisDatasetRouter.get('/analisis-datos/:sesionId/estadisticas-descriptivas',
 // identifica un recurso ("la columna X de esta sesión"); el frontend debe
 // codificarlo con encodeURIComponent porque los nombres de columna de un
 // dataset real suelen tener espacios u otros caracteres no válidos en una URL.
+// numeroDeIntervalos (RF-39): override manual y opcional del número de
+// intervalos de la distribución agrupada, en vez del cálculo automático por
+// Sturges. Un valor inválido (no entero, fuera de [2,30]) cae en el mismo
+// catch de abajo — NumeroDeIntervalosInvalidoError responde 400 con mensaje
+// claro, igual que cualquier otro error de dominio de esta ruta.
 analisisDatasetRouter.get('/analisis-datos/:sesionId/univariado/:nombreColumna', async (req, res) => {
   const analistaId = req.analistaAutenticado!.id;
+  const numeroDeIntervalos = req.query.numeroDeIntervalos !== undefined ? Number(req.query.numeroDeIntervalos) : undefined;
 
   try {
     const analisis = await container.analizarColumnaUnivariadoGenericoUseCase.ejecutar(
       analistaId,
       req.params.sesionId,
-      req.params.nombreColumna
+      req.params.nombreColumna,
+      numeroDeIntervalos
     );
     res.json(analisis);
   } catch (error) {

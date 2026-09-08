@@ -7,7 +7,7 @@ import {
   calcularResumenCincoNumeros,
   ResumenCincoNumeros
 } from './EstadisticaDescriptiva';
-import { generarTablaAgrupada, TablaFrecuencia } from './DistribucionFrecuencias';
+import { generarTablaAgrupada, generarIntervalosEquiespaciados, validarNumeroDeIntervalos, TablaFrecuencia } from './DistribucionFrecuencias';
 import { DatasetInvalidoError } from '../../errors/DatasetInvalidoError';
 import { minimoDe, maximoDe } from '../MinMax';
 
@@ -68,9 +68,14 @@ function aFecha(valor: unknown): Date {
 
 // Regla de Sturges (k = ceil(log2(n) + 1)), acotada entre 3 y 10 intervalos
 // para que la tabla siga siendo legible tanto con pocos valores como con
-// miles. Si todos los valores son idénticos no hay ancho que repartir: un
-// único intervalo que los contiene a todos.
-function generarIntervalosAutomaticos(valores: number[]): Array<{ inferior: number; superior: number }> {
+// miles — solo cuando el analista no pide un número de intervalos manual
+// (RF-39). El reparto real (incluido el redondeo de límites) vive en
+// generarIntervalosEquiespaciados (DistribucionFrecuencias.ts), compartido
+// con el pipeline de ciberseguridad.
+function generarIntervalosAutomaticos(
+  valores: number[],
+  numeroDeIntervalos?: number
+): Array<{ inferior: number; superior: number }> {
   const minimo = minimoDe(valores);
   const maximo = maximoDe(valores);
 
@@ -78,27 +83,16 @@ function generarIntervalosAutomaticos(valores: number[]): Array<{ inferior: numb
     return [{ inferior: minimo, superior: maximo }];
   }
 
+  if (numeroDeIntervalos !== undefined) {
+    validarNumeroDeIntervalos(numeroDeIntervalos);
+    return generarIntervalosEquiespaciados(minimo, maximo, numeroDeIntervalos);
+  }
+
   const cantidadIntervalos = Math.min(
     CANTIDAD_MAXIMA_INTERVALOS,
     Math.max(CANTIDAD_MINIMA_INTERVALOS, Math.ceil(Math.log2(valores.length) + 1))
   );
-  const ancho = (maximo - minimo) / cantidadIntervalos;
-
-  return Array.from({ length: cantidadIntervalos }, (_, indice) => ({
-    inferior: redondear(minimo + indice * ancho),
-    superior: indice === cantidadIntervalos - 1 ? maximo : redondear(minimo + (indice + 1) * ancho)
-  }));
-}
-
-// Sin esto, dividir un rango arbitrario en N partes iguales deja restos de
-// coma flotante en los límites (ej. 36.400000000000006 en vez de 36.4) —
-// visible en la tabla de distribución del informe (Fase 5), confirmado
-// generando el informe real. Los intervalos con límites fijos de CVSS
-// (DistribucionFrecuencias.ts) nunca lo sufren porque sus límites ya son
-// enteros exactos; acá sí hace falta porque el ancho de cada intervalo se
-// calcula en el momento a partir de min/max de la columna.
-function redondear(valor: number): number {
-  return Math.round(valor * 1e6) / 1e6;
+  return generarIntervalosEquiespaciados(minimo, maximo, cantidadIntervalos);
 }
 
 function generarDistribucionCategorica(
@@ -118,7 +112,12 @@ function generarDistribucionCategorica(
     }));
 }
 
-function analizarNumerica(nombre: string, noVacios: unknown[], valoresFaltantes: number): AnalisisUnivariadoNumerico {
+function analizarNumerica(
+  nombre: string,
+  noVacios: unknown[],
+  valoresFaltantes: number,
+  numeroDeIntervalos?: number
+): AnalisisUnivariadoNumerico {
   // Invariante de inferirTipoColumna: tipo 'numerica' implica que al menos
   // el 80% de noVacios pasa esNumerico, así que con noVacios no vacío este
   // filtro tampoco lo está.
@@ -135,7 +134,7 @@ function analizarNumerica(nombre: string, noVacios: unknown[], valoresFaltantes:
     varianza: numeros.length >= 2 ? calcularVarianzaMuestral(numeros) : null,
     desviacionEstandar: numeros.length >= 2 ? calcularDesviacionEstandarMuestral(numeros) : null,
     coeficienteVariacion: numeros.length >= 2 && resumen.media !== 0 ? calcularCoeficienteVariacion(numeros) : null,
-    distribucion: generarTablaAgrupada(numeros, generarIntervalosAutomaticos(numeros), nombre)
+    distribucion: generarTablaAgrupada(numeros, generarIntervalosAutomaticos(numeros, numeroDeIntervalos), nombre)
   };
 }
 
@@ -186,7 +185,8 @@ function analizarCategorica(
 export function analizarColumnaUnivariado(
   nombreColumna: string,
   columnas: string[],
-  filas: Array<Record<string, unknown>>
+  filas: Array<Record<string, unknown>>,
+  numeroDeIntervalos?: number
 ): AnalisisUnivariado {
   if (!columnas.includes(nombreColumna)) {
     throw new DatasetInvalidoError(`La columna "${nombreColumna}" no existe en este dataset`);
@@ -197,7 +197,7 @@ export function analizarColumnaUnivariado(
   const tipo: TipoColumna = inferirTipoColumna(valoresCrudos);
   const valoresFaltantes = valoresCrudos.length - noVacios.length;
 
-  if (tipo === 'numerica') return analizarNumerica(nombreColumna, noVacios, valoresFaltantes);
+  if (tipo === 'numerica') return analizarNumerica(nombreColumna, noVacios, valoresFaltantes, numeroDeIntervalos);
   if (tipo === 'fecha') return analizarFecha(nombreColumna, noVacios, valoresFaltantes);
   return analizarCategorica(nombreColumna, tipo, noVacios, valoresFaltantes);
 }
