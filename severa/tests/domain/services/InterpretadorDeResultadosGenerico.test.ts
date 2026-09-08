@@ -75,14 +75,31 @@ describe('InterpretadorDeResultadosGenerico — Mejora 4 (Análisis de Datos Gen
   });
 
   test('interpretarOutliers sin atípicos da un mensaje limpio', () => {
-    const resultado: ResultadoDeteccionOutliers = { columnas: [{ columna: 'precio', q1: 1, q3: 2, rangoIntercuartilico: 1, limiteInferior: -0.5, limiteSuperior: 3.5, cantidadValoresAtipicos: 0, valoresAtipicos: [] }], columnasExcluidas: [] };
+    const resultado: ResultadoDeteccionOutliers = {
+      columnas: [
+        {
+          columna: 'precio', q1: 1, q3: 2, rangoIntercuartilico: 1, limiteInferior: -0.5, limiteSuperior: 3.5,
+          media: 1.5, desviacionEstandar: 0.5, limiteInferiorSigma: 0, limiteSuperiorSigma: 3,
+          cantidadValoresAtipicos: 0, valoresAtipicos: []
+        }
+      ],
+      columnasExcluidas: []
+    };
     expect(interpretarOutliers(resultado)).toContain('No se detectaron valores atípicos');
   });
 
   test('interpretarOutliers con atípicos los cuenta y nombra la(s) columna(s)', () => {
     const resultado: ResultadoDeteccionOutliers = {
       columnas: [
-        { columna: 'precio', q1: 1, q3: 2, rangoIntercuartilico: 1, limiteInferior: -0.5, limiteSuperior: 3.5, cantidadValoresAtipicos: 2, valoresAtipicos: [{ filaIndice: 0, valor: 100 }, { filaIndice: 1, valor: -50 }] }
+        {
+          columna: 'precio', q1: 1, q3: 2, rangoIntercuartilico: 1, limiteInferior: -0.5, limiteSuperior: 3.5,
+          media: 1.5, desviacionEstandar: 40, limiteInferiorSigma: -118.5, limiteSuperiorSigma: 121.5,
+          cantidadValoresAtipicos: 2,
+          valoresAtipicos: [
+            { filaIndice: 0, valor: 100, detectadoPor: ['iqr'] },
+            { filaIndice: 1, valor: -50, detectadoPor: ['iqr'] }
+          ]
+        }
       ],
       columnasExcluidas: []
     };

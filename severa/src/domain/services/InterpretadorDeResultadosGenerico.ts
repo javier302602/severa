@@ -91,16 +91,20 @@ export function interpretarCorrelacionMasFuerte(matriz: MatrizCorrelacion): stri
   return `La relación lineal más fuerte encontrada es entre "${a}" y "${b}" (r = ${valor.toFixed(3)}), una correlación ${fuerza} y ${direccion}.`;
 }
 
+// M-15 (RF-119): el texto ya no dice "criterio 1.5×IQR" a secas — el conteo
+// ahora es la UNIÓN de lo que marca IQR y lo que marca desviación estándar
+// (ver DeteccionOutliersGenerico.ValorAtipico.detectadoPor), así que un valor
+// puede sumar al total por sigma aunque IQR no lo hubiera marcado.
 export function interpretarOutliers(resultado: ResultadoDeteccionOutliers): string {
   const total = resultado.columnas.reduce((acumulado, columna) => acumulado + columna.cantidadValoresAtipicos, 0);
 
   if (total === 0) {
-    return 'No se detectaron valores atípicos (criterio 1.5×IQR) en ninguna columna numérica.';
+    return 'No se detectaron valores atípicos (criterios IQR y desviación estándar) en ninguna columna numérica.';
   }
 
   const detalle = resultado.columnas
     .filter((columna) => columna.cantidadValoresAtipicos > 0)
     .map((columna) => `"${columna.columna}" (${columna.cantidadValoresAtipicos})`)
     .join(', ');
-  return `Se detectaron ${total} valor(es) atípico(s) en total (criterio 1.5×IQR), concentrados en: ${detalle}.`;
+  return `Se detectaron ${total} valor(es) atípico(s) en total (criterios IQR y desviación estándar), concentrados en: ${detalle}.`;
 }

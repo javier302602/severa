@@ -1,5 +1,5 @@
 import { esVacio, esNumerico, inferirTipoColumna } from '../variable-detection/DetectorDeTipoDeColumna';
-import { calcularCuartiles } from '../descriptive-statistics/EstadisticaDescriptiva';
+import { calcularCuartiles, calcularMedia, calcularDesviacionEstandarMuestral } from '../descriptive-statistics/EstadisticaDescriptiva';
 
 // Mejora 4 (Análisis de Datos General) — Fase 4. Detección de valores
 // atípicos por columna numérica con el criterio estándar de rango
@@ -8,12 +8,39 @@ import { calcularCuartiles } from '../descriptive-statistics/EstadisticaDescript
 // genérico desde Fase 0) en vez de recalcular percentiles a mano.
 const MULTIPLICADOR_IQR = 1.5;
 
+// M-15 (RF-119): segundo criterio, desviación estándar (regla de las 3
+// sigma: atípico si |x - media| > 3×desviación estándar muestral). 3 en vez
+// de 2 — más conservador, evita sobre-marcar en distribuciones con algo de
+// cola (decisión tomada al planear esta ronda, sin un valor fijado por el
+// RF). Ambos criterios corren SIEMPRE en paralelo, ninguno reemplaza al
+// otro ni "gana" si difieren — el RF solo pide mostrar ambos, nunca decidir
+// ni eliminar nada automáticamente; ver ValorAtipico.detectadoPor, que dice
+// cuál(es) de los dos marcó cada valor.
+const MULTIPLICADOR_SIGMA = 3;
+
 export interface ColumnaExcluidaDeOutliers {
   nombre: string;
   motivo: string;
 }
 
+export type CriterioDeteccionOutlier = 'iqr' | 'desviacion_estandar';
+
 export interface ValorAtipico {
+  filaIndice: number;
+  valor: number;
+  // Qué criterio(s) marcaron este valor — puede ser uno solo o ambos. Un
+  // valor marcado por ambos es un atípico "fuerte"; marcado por uno solo es
+  // más discutible, y es información real que antes de esta ronda no
+  // existía (con un único criterio, "atípico" era una etiqueta binaria).
+  detectadoPor: CriterioDeteccionOutlier[];
+}
+
+// Carrier intermedio de extraerValidosConIndice — deliberadamente SIN
+// detectadoPor: en esta etapa todavía no se decidió qué es atípico, es solo
+// "valor numérico válido con su índice de fila". Separarlo de ValorAtipico
+// evita tener que inventarle un detectadoPor vacío a algo que ni siquiera
+// se evaluó todavía.
+interface ValorConIndice {
   filaIndice: number;
   valor: number;
 }
@@ -25,6 +52,10 @@ export interface OutliersColumna {
   rangoIntercuartilico: number;
   limiteInferior: number;
   limiteSuperior: number;
+  media: number;
+  desviacionEstandar: number;
+  limiteInferiorSigma: number;
+  limiteSuperiorSigma: number;
   cantidadValoresAtipicos: number;
   valoresAtipicos: ValorAtipico[];
 }
@@ -41,7 +72,7 @@ function aNumero(valor: unknown): number {
 // filaIndice queda expuesto junto al valor para que el frontend pueda
 // señalar exactamente qué fila del dataset original es la atípica, no solo
 // "hay 3 valores raros" sin poder ubicarlos.
-function extraerValidosConIndice(filas: Array<Record<string, unknown>>, nombreColumna: string): ValorAtipico[] {
+function extraerValidosConIndice(filas: Array<Record<string, unknown>>, nombreColumna: string): ValorConIndice[] {
   return filas
     .map((fila, filaIndice) => ({ filaIndice, valorCrudo: fila[nombreColumna] }))
     .filter((entrada) => !esVacio(entrada.valorCrudo) && esNumerico(entrada.valorCrudo))
@@ -50,12 +81,27 @@ function extraerValidosConIndice(filas: Array<Record<string, unknown>>, nombreCo
 
 function detectarOutliersColumna(nombre: string, filas: Array<Record<string, unknown>>): OutliersColumna {
   const valores = extraerValidosConIndice(filas, nombre);
-  const { q1, q3 } = calcularCuartiles(valores.map((entrada) => entrada.valor));
+  const numeros = valores.map((entrada) => entrada.valor);
+
+  const { q1, q3 } = calcularCuartiles(numeros);
   const rangoIntercuartilico = q3 - q1;
   const limiteInferior = q1 - MULTIPLICADOR_IQR * rangoIntercuartilico;
   const limiteSuperior = q3 + MULTIPLICADOR_IQR * rangoIntercuartilico;
 
-  const valoresAtipicos = valores.filter((entrada) => entrada.valor < limiteInferior || entrada.valor > limiteSuperior);
+  const media = calcularMedia(numeros);
+  const desviacionEstandar = calcularDesviacionEstandarMuestral(numeros);
+  const limiteInferiorSigma = media - MULTIPLICADOR_SIGMA * desviacionEstandar;
+  const limiteSuperiorSigma = media + MULTIPLICADOR_SIGMA * desviacionEstandar;
+
+  const valoresAtipicos: ValorAtipico[] = [];
+  valores.forEach((entrada) => {
+    const detectadoPor: CriterioDeteccionOutlier[] = [];
+    if (entrada.valor < limiteInferior || entrada.valor > limiteSuperior) detectadoPor.push('iqr');
+    if (entrada.valor < limiteInferiorSigma || entrada.valor > limiteSuperiorSigma) detectadoPor.push('desviacion_estandar');
+    if (detectadoPor.length > 0) {
+      valoresAtipicos.push({ filaIndice: entrada.filaIndice, valor: entrada.valor, detectadoPor });
+    }
+  });
 
   return {
     columna: nombre,
@@ -64,6 +110,10 @@ function detectarOutliersColumna(nombre: string, filas: Array<Record<string, unk
     rangoIntercuartilico,
     limiteInferior,
     limiteSuperior,
+    media,
+    desviacionEstandar,
+    limiteInferiorSigma,
+    limiteSuperiorSigma,
     cantidadValoresAtipicos: valoresAtipicos.length,
     valoresAtipicos
   };

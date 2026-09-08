@@ -79,6 +79,7 @@ import { CalcularEstadisticasDescriptivasGenerico } from '../../application/usec
 import { AnalizarColumnaUnivariadoGenerico } from '../../application/usecases/module_medidas_tendencia_dispersion/AnalizarColumnaUnivariadoGenerico';
 import { CalcularMatrizCorrelacionGenerico } from '../../application/usecases/module_medidas_tendencia_dispersion/CalcularMatrizCorrelacionGenerico';
 import { DetectarOutliersGenerico } from '../../application/usecases/module_limpieza_calidad_datos/DetectarOutliersGenerico';
+import { AnalizarCalidadDatasetGenerico } from '../../application/usecases/module_limpieza_calidad_datos/AnalizarCalidadDatasetGenerico';
 import { GenerarInformeDataset } from '../../application/usecases/module_reportes_exportacion/GenerarInformeDataset';
 import { ReiniciarDataset } from '../../application/usecases/module_carga_gestion_datasets/ReiniciarDataset';
 import { ReiniciarDatasetConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/ReiniciarDatasetConAuditoria';
@@ -302,6 +303,9 @@ export const container = {
   // mismo sesionAnalisisStore, mismo criterio IDOR.
   calcularMatrizCorrelacionGenericoUseCase: new CalcularMatrizCorrelacionGenerico(sesionAnalisisStore),
   detectarOutliersGenericoUseCase: new DetectarOutliersGenerico(sesionAnalisisStore),
+  // M-15 (RF-114/RF-116/RF-117), Ronda 1: mismo sesionAnalisisStore, mismo
+  // criterio IDOR que el resto de la familia de endpoints de sesión.
+  analizarCalidadDatasetGenericoUseCase: new AnalizarCalidadDatasetGenerico(sesionAnalisisStore),
   // Fase 5: mismo geradorDeInformes (GeneradorInformePDF) ya compartido con
   // generarInformeUseCase/generarResumenEjecutivoUseCase — un "documento de
   // datos" distinto (DatosInformeDataset), mismo generador PDF/Word.

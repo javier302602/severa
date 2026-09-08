@@ -75,8 +75,12 @@ const UMBRAL_CARDINALIDAD_CATEGORICA = 0.5;
 const UMBRAL_IDENTIFICADOR = 0.9;
 const MINIMO_MUESTRA_IDENTIFICADOR = 5;
 
-const PATRON_FECHA_ISO = /^(\d{4})-(\d{1,2})-(\d{1,2})([T ]\d{1,2}:\d{2}(:\d{2})?)?$/;
-const PATRON_FECHA_DIA_MES_ANIO = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/;
+// Exportados (M-15, RF-118) para que CalidadDeDatosGenerico.ts pueda
+// clasificar POR QUÉ formato calza cada valor de fecha (detección de
+// formatos mezclados) reutilizando los mismos patrones, en vez de duplicar
+// las regex — ningún comportamiento de este archivo cambia por exportarlos.
+export const PATRON_FECHA_ISO = /^(\d{4})-(\d{1,2})-(\d{1,2})([T ]\d{1,2}:\d{2}(:\d{2})?)?$/;
+export const PATRON_FECHA_DIA_MES_ANIO = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/;
 
 // RF-107 (categórica ordinal): heurística de diccionario, deliberadamente NO
 // exhaustiva — no hay forma de saber por contenido si "Rojo/Verde/Azul"
@@ -160,7 +164,11 @@ function aNumeroSeguro(valor: unknown): number {
 // ESCALAS_ORDINALES_CONOCIDAS.
 const RANGO_DIACRITICOS_COMBINABLES = /[̀-ͯ]/g;
 
-function normalizarTexto(valor: string): string {
+// Exportada (M-15, RF-118): CalidadDeDatosGenerico.ts la reutiliza para
+// agrupar variantes de mayúsculas/minúsculas de una misma categoría — mismo
+// criterio de "no duplicar la normalización" que ya justificó exportar los
+// patrones de fecha de arriba.
+export function normalizarTexto(valor: string): string {
   return valor
     .trim()
     .toLowerCase()

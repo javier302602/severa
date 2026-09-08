@@ -333,7 +333,7 @@ describe('Rutas de Fase 4 (correlación / outliers por sesionId) — flujo real,
 
     const precio = res.body.columnas.find((c: { columna: string }) => c.columna === 'Precio');
     expect(precio.cantidadValoresAtipicos).toBe(1);
-    expect(precio.valoresAtipicos).toEqual([{ filaIndice: 5, valor: 100 }]);
+    expect(precio.valoresAtipicos).toEqual([{ filaIndice: 5, valor: 100, detectadoPor: ['iqr'] }]);
   });
 
   test('IDOR: otro analista no puede leer los outliers de la sesión de analista A', async () => {
@@ -350,6 +350,85 @@ describe('Rutas de Fase 4 (correlación / outliers por sesionId) — flujo real,
 
     expect(resCorrelacion.status).toBe(401);
     expect(resOutliers.status).toBe(401);
+  });
+
+  // M-15 (RF-114/RF-116/RF-117), Ronda 1: mismo flujo real de punta a punta
+  // (sin mockear el container) que el resto de este archivo.
+  describe('calidad (M-15, Ronda 1)', () => {
+    test('sin query params, usa los defaults (umbral 50, columnasClave = todas)', async () => {
+      const sesionId = await subirArchivoNumericoYObtenerSesionId(tokenA);
+
+      const res = await conHttps(request(app).get(`/analisis-datos/${sesionId}/calidad`).set('Authorization', `Bearer ${tokenA}`));
+
+      expect(res.status).toBe(200);
+      expect(res.body.diagnostico.totalFilas).toBe(6);
+      expect(res.body.filasIncompletas.umbralPorcentaje).toBe(50);
+      expect(res.body.duplicados.columnasClave).toEqual(['Producto', 'Precio', 'Cantidad']);
+      expect(res.body.duplicados.totalFilasDuplicadas).toBe(0);
+      expect(res.body.validacionRango).toBeUndefined();
+    });
+
+    test('umbralFilaIncompleta explícito por query param se respeta en la respuesta', async () => {
+      const sesionId = await subirArchivoNumericoYObtenerSesionId(tokenA);
+
+      const res = await conHttps(
+        request(app).get(`/analisis-datos/${sesionId}/calidad?umbralFilaIncompleta=10`).set('Authorization', `Bearer ${tokenA}`)
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.body.filasIncompletas.umbralPorcentaje).toBe(10);
+    });
+
+    test('columnasClave=Precio detecta el duplicado por esa sola columna (filas B y E, ambas Precio=12)', async () => {
+      const sesionId = await subirArchivoNumericoYObtenerSesionId(tokenA);
+
+      const res = await conHttps(
+        request(app).get(`/analisis-datos/${sesionId}/calidad?columnasClave=Precio`).set('Authorization', `Bearer ${tokenA}`)
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.body.duplicados.columnasClave).toEqual(['Precio']);
+      expect(res.body.duplicados.totalFilasDuplicadas).toBe(1);
+    });
+
+    test('rangoColumna/rangoMin/rangoMax valida el rango de una columna numérica', async () => {
+      const sesionId = await subirArchivoNumericoYObtenerSesionId(tokenA);
+
+      const res = await conHttps(
+        request(app)
+          .get(`/analisis-datos/${sesionId}/calidad?rangoColumna=Precio&rangoMin=0&rangoMax=50`)
+          .set('Authorization', `Bearer ${tokenA}`)
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.body.validacionRango.cantidadFueraDeRango).toBe(1);
+      expect(res.body.validacionRango.filasFueraDeRango).toEqual([{ indiceFila: 5, valor: 100 }]);
+    });
+
+    test('rangoColumna sobre una columna no numérica responde 400', async () => {
+      const sesionId = await subirArchivoNumericoYObtenerSesionId(tokenA);
+
+      const res = await conHttps(
+        request(app)
+          .get(`/analisis-datos/${sesionId}/calidad?rangoColumna=Producto&rangoMin=0&rangoMax=10`)
+          .set('Authorization', `Bearer ${tokenA}`)
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    test('IDOR: otro analista no puede leer la calidad de la sesión de analista A', async () => {
+      const sesionId = await subirArchivoNumericoYObtenerSesionId(tokenA);
+
+      const res = await conHttps(request(app).get(`/analisis-datos/${sesionId}/calidad`).set('Authorization', `Bearer ${tokenB}`));
+
+      expect(res.status).toBe(404);
+    });
+
+    test('sin autenticar, devuelve 401', async () => {
+      const res = await conHttps(request(app).get('/analisis-datos/cualquier-sesion/calidad'));
+      expect(res.status).toBe(401);
+    });
   });
 });
 

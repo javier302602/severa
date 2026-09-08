@@ -24,6 +24,7 @@ import { notificacionRouter } from '../adapters/in/http/modules/module_notificac
 import { analisisDatasetRouter } from '../adapters/in/http/modules/module_medidas_tendencia_dispersion/controllers/AnalisisDatasetController';
 import { analisisDatasetAnalizarRouter } from '../adapters/in/http/modules/module_carga_gestion_datasets/controllers/AnalisisDatasetAnalizarController';
 import { analisisDatasetOutliersRouter } from '../adapters/in/http/modules/module_limpieza_calidad_datos/controllers/AnalisisDatasetOutliersController';
+import { analisisDatasetCalidadRouter } from '../adapters/in/http/modules/module_limpieza_calidad_datos/controllers/AnalisisDatasetCalidadController';
 import { analisisDatasetInformeRouter } from '../adapters/in/http/modules/module_reportes_exportacion/controllers/AnalisisDatasetInformeController';
 import { analisisDatasetHistogramaTiempoRouter } from '../adapters/in/http/modules/module_visualizacion_grafica/controllers/AnalisisDatasetHistogramaTiempoController';
 import { exigirHttps } from '../adapters/in/http/middleware/HttpsMiddleware';
@@ -96,6 +97,7 @@ export function createApp(): express.Express {
   app.use(analisisDatasetAnalizarRouter);
   app.use(analisisDatasetRouter);
   app.use(analisisDatasetOutliersRouter);
+  app.use(analisisDatasetCalidadRouter);
   app.use(analisisDatasetInformeRouter);
   app.use(analisisDatasetHistogramaTiempoRouter);
 
