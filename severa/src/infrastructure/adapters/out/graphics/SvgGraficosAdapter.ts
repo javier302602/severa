@@ -112,6 +112,7 @@ export class SvgGraficosAdapter implements GraficosOutputPort {
   // confirmada: no se agrega una librería de rasterizado SVG→PNG/PDF solo
   // para esto) — el modo SVG en pantalla, que es el que de verdad usa
   // GraficosPage.tsx, es el que se arregla acá.
+  // Diferido — decisión de arquitectura, ver auditoría SDS M-07.
   private generarSvgPendiente(formato: 'png' | 'pdf', titulo: string): string {
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200"><rect width="400" height="200" fill="#fff"/><text x="20" y="30">${titulo}</text><text x="20" y="60">Exportación ${formato.toUpperCase()} pendiente de decidir librería de conversión SVG→${formato.toUpperCase()}.</text></svg>`;
   }

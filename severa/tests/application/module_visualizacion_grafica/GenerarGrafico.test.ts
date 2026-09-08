@@ -106,4 +106,89 @@ describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () =
       interpretacion: expect.stringContaining('Apache Log4j')
     });
   });
+
+  // Cobertura del resto del switch (antes sin ejercitar): histogramaCvss,
+  // histogramaCvssAgrupado, pastelSeveridad, cvssPorAcceso,
+  // histogramaDiasParche, topTipos, y el tipo no soportado.
+  test('histogramaCvss: delega en renderizarHistograma con bins reales de los CVSS del dataset', async () => {
+    const port = graficosOutputPortFalso();
+    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+
+    const resultado = await useCase.ejecutar('histogramaCvss', 'analista-1');
+
+    expect(port.renderizarHistograma).toHaveBeenCalled();
+    expect(resultado).toEqual({ svg: '<svg>histograma</svg>', interpretacion: expect.stringContaining('media') });
+  });
+
+  test('histogramaCvssAgrupado: delega en renderizarHistograma reutilizando generarTablaAgrupada (M-05)', async () => {
+    const port = graficosOutputPortFalso();
+    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+
+    const resultado = await useCase.ejecutar('histogramaCvssAgrupado', 'analista-1');
+
+    expect(port.renderizarHistograma).toHaveBeenCalled();
+    expect(resultado).toEqual({ svg: '<svg>histograma</svg>', interpretacion: expect.any(String) });
+  });
+
+  test('pastelSeveridad: delega en renderizarPastel con el mismo conteo por severidad que barrasSeveridad', async () => {
+    const port = graficosOutputPortFalso();
+    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+
+    const resultado = await useCase.ejecutar('pastelSeveridad', 'analista-1');
+
+    expect(port.renderizarPastel).toHaveBeenCalled();
+    expect(resultado).toEqual({ svg: '<svg>pastel</svg>', interpretacion: expect.any(String) });
+  });
+
+  test('cvssPorAcceso: delega en renderizarBarras con el promedio de CVSS por tipo de acceso', async () => {
+    const port = graficosOutputPortFalso();
+    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+
+    const resultado = await useCase.ejecutar('cvssPorAcceso', 'analista-1');
+
+    expect(port.renderizarBarras).toHaveBeenCalledWith(expect.any(Array), 'svg', 'CVSS por tipo de acceso', 'CVSS Score', 'Tipo de acceso');
+    expect(resultado).toEqual({ svg: '<svg>barras</svg>', interpretacion: expect.any(String) });
+  });
+
+  test('histogramaDiasParche: ninguna vulnerabilidad del dataset tiene diasParaParche registrado (degrada a 0, no rompe)', async () => {
+    const port = graficosOutputPortFalso();
+    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+
+    const resultado = await useCase.ejecutar('histogramaDiasParche', 'analista-1');
+
+    expect(port.renderizarHistograma).toHaveBeenCalled();
+    expect(resultado).toEqual({
+      svg: '<svg>histograma</svg>',
+      interpretacion: expect.stringContaining('tiempo promedio')
+    });
+  });
+
+  test('histogramaDiasParche: dataset vacío responde "no hay vulnerabilidades" (bins realmente vacíos, no solo en 0)', async () => {
+    const port = graficosOutputPortFalso();
+    const useCase = new GenerarGrafico(repoFalso([]), port);
+
+    const resultado = await useCase.ejecutar('histogramaDiasParche', 'analista-1');
+
+    expect(resultado).toEqual({
+      svg: '<svg>histograma</svg>',
+      interpretacion: expect.stringContaining('No hay vulnerabilidades')
+    });
+  });
+
+  test('topTipos: delega en renderizarBarrasHorizontales, excluyendo "Sin clasificar"/"N/A" del ranking', async () => {
+    const port = graficosOutputPortFalso();
+    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+
+    const resultado = await useCase.ejecutar('topTipos', 'analista-1');
+
+    expect(port.renderizarBarrasHorizontales).toHaveBeenCalled();
+    expect(resultado).toEqual({ svg: '<svg>barrasH</svg>', interpretacion: expect.any(String) });
+  });
+
+  test('tipo de gráfico no soportado lanza un error claro', async () => {
+    const port = graficosOutputPortFalso();
+    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+
+    await expect(useCase.ejecutar('noExiste' as never, 'analista-1')).rejects.toThrow('Tipo de gráfico no soportado');
+  });
 });

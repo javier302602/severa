@@ -35,6 +35,7 @@ import { ImportarDatasetDesdeUrl } from '../../application/usecases/module_carga
 import { DescargadorDeArchivosHttp } from '../adapters/out/dataset/DescargadorDeArchivosHttp';
 import { NvdApiClientHttp } from '../adapters/out/fuentes-externas/nvd/NvdApiClientHttp';
 import { GenerarGrafico } from '../../application/usecases/module_visualizacion_grafica/GenerarGrafico';
+import { GenerarHistogramaDeTiempoGenerico } from '../../application/usecases/module_visualizacion_grafica/GenerarHistogramaDeTiempoGenerico';
 import { SvgGraficosAdapter } from '../adapters/out/graphics/SvgGraficosAdapter';
 import { CompararPorTipoAcceso } from '../../application/usecases/module_comparacion_categorias/CompararPorTipoAcceso';
 import { CompararPorTipoDeVulnerabilidad } from '../../application/usecases/module_comparacion_categorias/CompararPorTipoDeVulnerabilidad';
@@ -223,6 +224,10 @@ export const container = {
   calcularResumenEstadisticoUseCase: new CalcularResumenEstadistico(vulnerabilidadRepository),
   generarDistribucionFrecuenciasUseCase: new GenerarDistribucionFrecuencias(vulnerabilidadRepository),
   generarGraficoUseCase: new GenerarGrafico(vulnerabilidadRepository, graficosOutputPort),
+  // RF-58 (M-07): separado a propósito de generarGraficoUseCase (CVSS) —
+  // reutiliza el mismo sesionAnalisisStore que las demás rutas de Fase 3/4
+  // genéricas de M-05/M-06, no vulnerabilidadRepository. Ver auditoría SDS M-07.
+  generarHistogramaDeTiempoGenericoUseCase: new GenerarHistogramaDeTiempoGenerico(sesionAnalisisStore),
   compararPorTipoAccesoUseCase: new CompararPorTipoAcceso(vulnerabilidadRepository),
   compararPorTipoDeVulnerabilidadUseCase: new CompararPorTipoDeVulnerabilidad(vulnerabilidadRepository),
   compararPorSoftwareUseCase: new CompararPorSoftware(vulnerabilidadRepository),

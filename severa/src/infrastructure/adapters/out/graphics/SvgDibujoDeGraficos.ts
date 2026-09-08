@@ -251,6 +251,33 @@ export function dibujarHistograma(
   return svgBarras.replace('</svg>', `${resumen}</svg>`);
 }
 
+// RF-58: histograma de una columna de tipo fecha/tiempo (dataset genérico,
+// M-03) — reutiliza dibujarBarras tal cual hace dibujarHistograma (cada día
+// calendario es una barra más), pero la anotación de esquina muestra el
+// rango de fechas en vez de media/mediana: un "promedio de fecha" no
+// significa nada, a diferencia del CVSS Score.
+export function dibujarHistogramaFecha(
+  bins: Array<{ intervalo: string; frecuencia: number }>,
+  minimo: string | null,
+  maximo: string | null,
+  opciones: OpcionesGraficoSvg
+): string {
+  const svgBarras = dibujarBarras(
+    bins.map((bin) => ({ etiqueta: bin.intervalo, valor: bin.frecuencia })),
+    opciones
+  );
+  const rango =
+    minimo && maximo
+      ? texto(ANCHO - 140, 16, `Rango: ${minimo.slice(0, 10)} a ${maximo.slice(0, 10)}`, {
+          tamano: 7,
+          color: COLOR_TEXTO_SECUNDARIO,
+          ancla: 'start'
+        })
+      : '';
+
+  return svgBarras.replace('</svg>', `${rango}</svg>`);
+}
+
 // Distancia mínima en Y entre dos etiquetas de valor consecutivas: sin esto,
 // un boxplot con Q1/mediana/Q3 muy cercanos entre sí (distribución poco
 // dispersa) dibuja los números superpuestos e ilegibles.

@@ -25,6 +25,7 @@ import { analisisDatasetRouter } from '../adapters/in/http/modules/module_medida
 import { analisisDatasetAnalizarRouter } from '../adapters/in/http/modules/module_carga_gestion_datasets/controllers/AnalisisDatasetAnalizarController';
 import { analisisDatasetOutliersRouter } from '../adapters/in/http/modules/module_limpieza_calidad_datos/controllers/AnalisisDatasetOutliersController';
 import { analisisDatasetInformeRouter } from '../adapters/in/http/modules/module_reportes_exportacion/controllers/AnalisisDatasetInformeController';
+import { analisisDatasetHistogramaTiempoRouter } from '../adapters/in/http/modules/module_visualizacion_grafica/controllers/AnalisisDatasetHistogramaTiempoController';
 import { exigirHttps } from '../adapters/in/http/middleware/HttpsMiddleware';
 import { autenticacion } from '../adapters/in/http/middleware/AutenticacionMiddleware';
 
@@ -87,15 +88,16 @@ export function createApp(): express.Express {
   app.use(auditoriaRouter);
   app.use(notificacionRouter);
   // Mejora 4 (Análisis de Datos General) — módulo nuevo y separado del resto
-  // de la API, rutas propias bajo /analisis-datos/... Repartido en 4 archivos
+  // de la API, rutas propias bajo /analisis-datos/... Repartido en 5 archivos
   // por módulo del SDS (ver sección IV/V del doc de arquitectura): Fase 2
   // (analizar, M-03), Fase 3/4 estadísticas/univariado/correlación (M-06,
   // este mismo analisisDatasetRouter), Fase 4 outliers (M-15), Fase 5
-  // informe (M-10).
+  // informe (M-10), histograma de tiempo (RF-58, M-07 — ver auditoría SDS M-07).
   app.use(analisisDatasetAnalizarRouter);
   app.use(analisisDatasetRouter);
   app.use(analisisDatasetOutliersRouter);
   app.use(analisisDatasetInformeRouter);
+  app.use(analisisDatasetHistogramaTiempoRouter);
 
   // Red de seguridad global: bug real encontrado en Sprint 15 — varios
   // controllers (EstadisticaController, InformeController, el gráfico
