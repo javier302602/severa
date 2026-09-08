@@ -20,7 +20,14 @@ function entradaRanking(posicion: number, cvss: number, nivelDeRiesgo: EntradaRa
 describe('InterpretadorDeResultados', () => {
   test('genera los 4 párrafos con datos fijos verificados a mano', () => {
     const resumen = { media: 7.5, mediana: 7.8, coeficienteVariacion: 28 };
-    const comparacion = { mediaA: 8.9, mediaB: 7.65, diferenciaMedias: 1.25, sdA: 1.5556349186104046, sdB: 3.040559159102155 };
+    const comparacion = {
+      mediaA: 8.9,
+      mediaB: 7.65,
+      diferenciaMedias: 1.25,
+      sdA: 1.5556349186104046,
+      sdB: 3.040559159102155,
+      categoriaConMayorPromedio: 'Remoto'
+    };
     const ranking = [
       entradaRanking(1, 9.8, 'Crítico'),
       entradaRanking(2, 9.0, 'Crítico'),
@@ -50,14 +57,14 @@ describe('InterpretadorDeResultados', () => {
   });
 
   test('interpretarComparacionAcceso indica "local" cuando la diferencia es negativa', () => {
-    const comparacion = { mediaA: 5.0, mediaB: 8.0, diferenciaMedias: -3.0, sdA: 0, sdB: 0 };
+    const comparacion = { mediaA: 5.0, mediaB: 8.0, diferenciaMedias: -3.0, sdA: 0, sdB: 0, categoriaConMayorPromedio: 'Local' };
     expect(interpretarComparacionAcceso(comparacion)).toBe(
       'Las vulnerabilidades de acceso local presentan, en promedio, una severidad 3.00 puntos mayor (remoto: 5.00, local: 8.00), lo que sugiere priorizar la remediación de accesos locales.'
     );
   });
 
   test('interpretarComparacionAcceso indica igualdad cuando la diferencia es despreciable', () => {
-    const comparacion = { mediaA: 7.0, mediaB: 7.02, diferenciaMedias: -0.02, sdA: 0, sdB: 0 };
+    const comparacion = { mediaA: 7.0, mediaB: 7.02, diferenciaMedias: -0.02, sdA: 0, sdB: 0, categoriaConMayorPromedio: 'Local' };
     expect(interpretarComparacionAcceso(comparacion)).toBe(
       'La severidad promedio entre vulnerabilidades de acceso remoto (7.00) y local (7.02) es prácticamente igual.'
     );

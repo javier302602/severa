@@ -10,12 +10,12 @@ export class CompararPorTipoDeVulnerabilidad implements CompararPorTipoDeVulnera
     if (vulnerabilidades) {
       const tipoA = vulnerabilidades.filter((item) => item.tipoVulnerabilidad === categoriaA).map((item) => item.cvssScore.valor);
       const tipoB = vulnerabilidades.filter((item) => item.tipoVulnerabilidad === categoriaB).map((item) => item.cvssScore.valor);
-      return compararGrupos(tipoA, tipoB);
+      return compararGrupos(tipoA, tipoB, categoriaA, categoriaB);
     }
 
     const tipoA = await this.vulnerabilidadRepository.listarPorTipoVulnerabilidad(categoriaA, analistaId);
     const tipoB = await this.vulnerabilidadRepository.listarPorTipoVulnerabilidad(categoriaB, analistaId);
 
-    return compararGrupos(tipoA.map((item) => item.cvssScore.valor), tipoB.map((item) => item.cvssScore.valor));
+    return compararGrupos(tipoA.map((item) => item.cvssScore.valor), tipoB.map((item) => item.cvssScore.valor), categoriaA, categoriaB);
   }
 }

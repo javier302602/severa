@@ -47,7 +47,14 @@ describe('ComparadorDeCategorias', () => {
 
     test('ambos grupos vacíos: todo en null, no tira', () => {
       const resultado = compararGrupos([], []);
-      expect(resultado).toEqual({ mediaA: null, mediaB: null, diferenciaMedias: null, sdA: null, sdB: null });
+      expect(resultado).toEqual({
+        mediaA: null,
+        mediaB: null,
+        diferenciaMedias: null,
+        sdA: null,
+        sdB: null,
+        categoriaConMayorPromedio: null
+      });
     });
 
     test('grupo con un solo valor: mediaA se puede calcular pero sdA queda en null (desviación muestral necesita al menos 2)', () => {
@@ -56,6 +63,37 @@ describe('ComparadorDeCategorias', () => {
       expect(resultado.sdA).toBeNull();
       expect(resultado.mediaB).toBe(5.5);
       expect(resultado.sdB).not.toBeNull();
+    });
+  });
+
+  // RF-68: etiquetaA/etiquetaB opcionales — el nombre real de la categoría
+  // con mayor promedio, o null si no se puede determinar (empate exacto, o
+  // algún lado sin datos).
+  describe('categoriaConMayorPromedio (RF-68)', () => {
+    test('grupo A con mayor media: devuelve la etiqueta de A', () => {
+      const resultado = compararGrupos([10.0, 9.0], [5.0, 6.0], 'Remoto', 'Local');
+      expect(resultado.categoriaConMayorPromedio).toBe('Remoto');
+    });
+
+    test('grupo B con mayor media: devuelve la etiqueta de B', () => {
+      const resultado = compararGrupos([5.0, 6.0], [10.0, 9.0], 'Remoto', 'Local');
+      expect(resultado.categoriaConMayorPromedio).toBe('Local');
+    });
+
+    test('empate exacto entre las dos medias: null, no elige arbitrariamente', () => {
+      const resultado = compararGrupos([5.0, 7.0], [6.0, 6.0], 'Remoto', 'Local');
+      expect(resultado.mediaA).toBe(resultado.mediaB);
+      expect(resultado.categoriaConMayorPromedio).toBeNull();
+    });
+
+    test('un lado sin datos: null, no se puede determinar "mayor" sin el otro lado', () => {
+      const resultado = compararGrupos([10.0, 9.0], [], 'Remoto', 'Local');
+      expect(resultado.categoriaConMayorPromedio).toBeNull();
+    });
+
+    test('sin etiquetas pasadas, usa los defaults \'A\'/\'B\' (RecopilarDatosDeInforme.ts las llama así y no lee este campo)', () => {
+      const resultado = compararGrupos([10.0, 9.0], [5.0, 6.0]);
+      expect(resultado.categoriaConMayorPromedio).toBe('A');
     });
   });
 });

@@ -6,6 +6,10 @@ export interface ComparacionGrupos {
   diferenciaMedias: number | null;
   sdA: number | null;
   sdB: number | null;
+  // RF-68: nombre del grupo (etiquetaA/etiquetaB) con mayor media, o null si
+  // cualquiera de los dos lados es null o hay empate exacto — sin umbral de
+  // tolerancia inventado, es "mayor" o no lo es.
+  categoriaConMayorPromedio: string | null;
 }
 
 // Bug real reproducido en vivo (2026-07-19): antes calcularMedia/
@@ -29,16 +33,27 @@ function desviacionSegura(grupo: number[]): number | null {
   return grupo.length >= 2 ? calcularDesviacionEstandarMuestral(grupo) : null;
 }
 
-export function compararGrupos(grupoA: number[], grupoB: number[]): ComparacionGrupos {
+// etiquetaA/etiquetaB (RF-68): opcionales, default 'A'/'B' — RecopilarDatosDeInforme.ts
+// (M-10) llama a esta función sin pasarlas y no lee categoriaConMayorPromedio,
+// así que el default no le cambia nada. Los 3 casos de uso de M-08 sí pasan
+// el nombre real de cada categoría (ej. 'Remoto'/'Local', o el software/tipo
+// tal cual lo escribió el analista).
+export function compararGrupos(grupoA: number[], grupoB: number[], etiquetaA = 'A', etiquetaB = 'B'): ComparacionGrupos {
   const mediaA = mediaSegura(grupoA);
   const mediaB = mediaSegura(grupoB);
+
+  let categoriaConMayorPromedio: string | null = null;
+  if (mediaA !== null && mediaB !== null && mediaA !== mediaB) {
+    categoriaConMayorPromedio = mediaA > mediaB ? etiquetaA : etiquetaB;
+  }
 
   return {
     mediaA,
     mediaB,
     diferenciaMedias: mediaA !== null && mediaB !== null ? mediaA - mediaB : null,
     sdA: desviacionSegura(grupoA),
-    sdB: desviacionSegura(grupoB)
+    sdB: desviacionSegura(grupoB),
+    categoriaConMayorPromedio
   };
 }
 

@@ -10,12 +10,12 @@ export class CompararPorTipoAcceso implements CompararPorTipoAccesoUseCase {
     if (vulnerabilidades) {
       const remoto = vulnerabilidades.filter((item) => item.tipoAcceso?.valor === 'Remoto').map((item) => item.cvssScore.valor);
       const local = vulnerabilidades.filter((item) => item.tipoAcceso?.valor === 'Local').map((item) => item.cvssScore.valor);
-      return compararGrupos(remoto, local);
+      return compararGrupos(remoto, local, 'Remoto', 'Local');
     }
 
     const remoto = await this.vulnerabilidadRepository.listarPorTipoAcceso('Remoto', analistaId);
     const local = await this.vulnerabilidadRepository.listarPorTipoAcceso('Local', analistaId);
 
-    return compararGrupos(remoto.map((item) => item.cvssScore.valor), local.map((item) => item.cvssScore.valor));
+    return compararGrupos(remoto.map((item) => item.cvssScore.valor), local.map((item) => item.cvssScore.valor), 'Remoto', 'Local');
   }
 }

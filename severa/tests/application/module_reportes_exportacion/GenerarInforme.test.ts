@@ -87,7 +87,11 @@ describe('GenerarInforme', () => {
       mediaB: 7.65,
       diferenciaMedias: 1.25,
       sdA: 1.5556349186104046,
-      sdB: 3.040559159102155
+      sdB: 3.040559159102155,
+      // RecopilarDatosDeInforme.ts llama a compararGrupos sin pasar
+      // etiquetas (fuera de alcance de M-08) — default 'A'/'B', campo que
+      // este flujo no lee (ver interpretarComparacionAcceso).
+      categoriaConMayorPromedio: 'A'
     });
     expect(datos.rankingUrgencia).toHaveLength(4);
     expect(datos.rankingUrgencia[0].vulnerabilidad.cve.valor).toBe('CVE-2021-44228');

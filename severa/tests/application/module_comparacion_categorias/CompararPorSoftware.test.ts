@@ -37,6 +37,7 @@ describe('CompararPorSoftware', () => {
     expect(resultado).toEqual({
       mediaA: 9.5,
       mediaB: 9.2,
+      categoriaConMayorPromedio: 'Apache Log4j',
       diferenciaMedias: 0.3000000000000007,
       sdA: 0.7071067811865476,
       sdB: 0.8485281374238578

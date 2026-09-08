@@ -18,12 +18,12 @@ export class CompararPorSoftware implements CompararPorSoftwareUseCase {
     if (vulnerabilidades) {
       const softwareA = vulnerabilidades.filter((item) => coincideSoftware(item, categoriaA)).map((item) => item.cvssScore.valor);
       const softwareB = vulnerabilidades.filter((item) => coincideSoftware(item, categoriaB)).map((item) => item.cvssScore.valor);
-      return compararGrupos(softwareA, softwareB);
+      return compararGrupos(softwareA, softwareB, categoriaA, categoriaB);
     }
 
     const softwareA = await this.vulnerabilidadRepository.listarPorSoftware(categoriaA, analistaId);
     const softwareB = await this.vulnerabilidadRepository.listarPorSoftware(categoriaB, analistaId);
 
-    return compararGrupos(softwareA.map((item) => item.cvssScore.valor), softwareB.map((item) => item.cvssScore.valor));
+    return compararGrupos(softwareA.map((item) => item.cvssScore.valor), softwareB.map((item) => item.cvssScore.valor), categoriaA, categoriaB);
   }
 }
