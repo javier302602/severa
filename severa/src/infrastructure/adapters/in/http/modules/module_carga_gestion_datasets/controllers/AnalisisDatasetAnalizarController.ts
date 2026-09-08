@@ -116,6 +116,35 @@ analisisDatasetAnalizarRouter.get('/analisis-datos/:datasetId/exportar', async (
   }
 });
 
+// RF-135: compara el hash SHA-256 del archivo re-subido acá contra el que se
+// calculó al momento de la carga original (AnalizarDatasetGenerico.ts). No
+// hay un archivo "canónico" guardado del lado del servidor para comparar
+// directamente — SEVERA nunca conservó blobs, ver DatasetGenerico.ts — así
+// que la verificación siempre requiere que el analista vuelva a aportar el
+// archivo que quiere comprobar. Reusa el mismo multer que /analisis-datos/analizar
+// (mismo límite de tamaño, mismos tipos permitidos).
+analisisDatasetAnalizarRouter.post('/analisis-datos/:datasetId/verificar-integridad', manejarSubida, async (req, res) => {
+  if (!req.file) {
+    res.status(400).json({ error: 'Debe subir un archivo .xlsx, .xls o .csv en el campo "archivo"' });
+    return;
+  }
+
+  const analistaId = req.analistaAutenticado!.id;
+
+  try {
+    const resultado = await container.verificarIntegridadDatasetUseCase.ejecutar(req.params.datasetId, analistaId, req.file.path);
+    res.json(resultado);
+  } catch (error) {
+    if (error instanceof DatasetGenericoNoEncontradoError) {
+      res.status(404).json({ error: error.message });
+      return;
+    }
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Error desconocido' });
+  } finally {
+    fs.unlink(req.file.path, () => {});
+  }
+});
+
 // RF-139 (M-09, pieza habilitadora): el analista elige la columna a usar como
 // criterio de clasificación (y, opcionalmente, la columna clave — pendiente
 // de M-03, comparte esta misma ruta/plomería). Valida que la columna exista

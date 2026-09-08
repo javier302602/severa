@@ -6,6 +6,7 @@ import { SesionAnalisisStore } from '../../ports/out/dataset/SesionAnalisisStore
 import { DatasetGenericoRepository } from '../../ports/out/persistencia/repositorios/DatasetGenericoRepository';
 import { DatasetGenerico } from '../../../domain/entities/DatasetGenerico';
 import { RegistroDatasetGenerico } from '../../../domain/entities/RegistroDatasetGenerico';
+import { calcularHashSha256Archivo } from '../../utils/CalcularHashSha256Archivo';
 
 // Tamaño de lote para guardarRegistros() — mismo criterio que ImportarDataset.ts
 // (TAMANO_DE_LOTE): con JSONB por fila hay incluso más margen (5 parámetros
@@ -27,13 +28,20 @@ export class AnalizarDatasetGenerico implements AnalizarDatasetGenericoUseCase {
   ) {}
 
   async ejecutar(rutaArchivo: string, analistaId: string, nombreArchivoOriginal: string): Promise<ResultadoAnalisisDataset> {
+    // RF-135: se calcula ANTES de parsear, sobre el archivo tal como llegó —
+    // el controller solo borra rutaArchivo en su finally, después de que este
+    // método termina, así que el archivo sigue existiendo en disco acá.
+    const hashOriginalSha256 = await calcularHashSha256Archivo(rutaArchivo);
     const { columnas, filas } = this.lectorDatasetGenerico.leerArchivo(rutaArchivo);
     const diagnostico = analizarDataset(columnas, filas);
     const sesionId = this.sesionAnalisisStore.crear(analistaId, { columnas, filas });
 
     const datasetId = randomUUID();
     await this.datasetGenericoRepository.guardar(
-      new DatasetGenerico(datasetId, analistaId, nombreArchivoOriginal, columnas, 'archivo', null, diagnostico.filasDuplicadas)
+      new DatasetGenerico(
+        datasetId, analistaId, nombreArchivoOriginal, columnas, 'archivo', null, diagnostico.filasDuplicadas,
+        new Date(), null, null, hashOriginalSha256
+      )
     );
 
     for (let inicio = 0; inicio < filas.length; inicio += TAMANO_DE_LOTE) {

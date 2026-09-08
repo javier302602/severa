@@ -13,6 +13,17 @@ import { CriterioDeClasificacionValue } from '../shared/value-objects/CriterioDe
 // conceptos distintos: columnaClave identifica la fila, criterioClasificacion
 // dice por qué valor se prioriza. Ambos null hasta que el analista los
 // configure explícitamente — no hay default inventado.
+//
+// `hashOriginalSha256` (RF-135, M-12, migración 013): hash SHA-256 del
+// archivo tal como se subió, calculado en AnalizarDatasetGenerico.ejecutar()
+// ANTES de parsearlo — permite comprobar más adelante que un archivo
+// (re-subido para comparar, ver VerificarIntegridadDataset.ts) es
+// byte-a-byte el mismo que el original. SEVERA no conserva el archivo en sí
+// (decisión confirmada: guardar blobs es una superficie de almacenamiento
+// nueva sin precedente en este proyecto) — solo el hash, así que la
+// verificación siempre requiere volver a aportar el archivo a comparar.
+// null en datasets importados antes de esta migración (no hay forma honesta
+// de calcular un hash retroactivo de un archivo que ya no existe en disco).
 export class DatasetGenerico {
   constructor(
     public readonly id: string,
@@ -24,6 +35,7 @@ export class DatasetGenerico {
     public readonly filasDuplicadas: number,
     public readonly fechaCarga: Date = new Date(),
     public readonly criterioClasificacion: CriterioDeClasificacionValue | null = null,
-    public readonly columnaClave: string | null = null
+    public readonly columnaClave: string | null = null,
+    public readonly hashOriginalSha256: string | null = null
   ) {}
 }

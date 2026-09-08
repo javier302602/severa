@@ -33,6 +33,9 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => (
     },
     configurarCriterioDeClasificacionUseCase: {
       ejecutar: jest.fn()
+    },
+    verificarIntegridadDatasetUseCase: {
+      ejecutar: jest.fn()
     }
   }
 }));
@@ -242,6 +245,50 @@ describe('PATCH /analisis-datos/:datasetId/criterio-clasificacion — RF-139', (
     const res = await conHttps(
       request(app).patch('/analisis-datos/dataset-1/criterio-clasificacion').send({ nombreColumna: 'Puntaje', tipo: 'numerica' })
     );
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('POST /analisis-datos/:datasetId/verificar-integridad — RF-135', () => {
+  const token = tokenPara('analista-A');
+
+  test('camino feliz: responde 200 con el resultado de la comparación', async () => {
+    (container.verificarIntegridadDatasetUseCase.ejecutar as jest.Mock).mockResolvedValueOnce({
+      coincide: true,
+      hashActual: 'abc123',
+      hashOriginal: 'abc123'
+    });
+    const filePath = crearXlsxDePrueba();
+
+    const res = await conHttps(
+      request(app).post('/analisis-datos/dataset-1/verificar-integridad').set('Authorization', `Bearer ${token}`).attach('archivo', filePath)
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ coincide: true, hashActual: 'abc123', hashOriginal: 'abc123' });
+    expect(container.verificarIntegridadDatasetUseCase.ejecutar).toHaveBeenCalledWith('dataset-1', 'analista-A', expect.any(String));
+  });
+
+  test('sin archivo responde 400', async () => {
+    const res = await conHttps(
+      request(app).post('/analisis-datos/dataset-1/verificar-integridad').set('Authorization', `Bearer ${token}`)
+    );
+    expect(res.status).toBe(400);
+  });
+
+  test('responde 404 si el dataset no existe o pertenece a otro analista', async () => {
+    (container.verificarIntegridadDatasetUseCase.ejecutar as jest.Mock).mockRejectedValueOnce(new DatasetGenericoNoEncontradoError());
+    const filePath = crearXlsxDePrueba();
+
+    const res = await conHttps(
+      request(app).post('/analisis-datos/dataset-ajeno/verificar-integridad').set('Authorization', `Bearer ${token}`).attach('archivo', filePath)
+    );
+
+    expect(res.status).toBe(404);
+  });
+
+  test('sin autenticar devuelve 401', async () => {
+    const res = await conHttps(request(app).post('/analisis-datos/dataset-1/verificar-integridad'));
     expect(res.status).toBe(401);
   });
 });

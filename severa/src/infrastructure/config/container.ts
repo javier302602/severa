@@ -86,6 +86,7 @@ import { ConvertirUrlAExcel } from '../../application/usecases/module_carga_gest
 import { ExportarDatasetGenerico } from '../../application/usecases/module_carga_gestion_datasets/ExportarDatasetGenerico';
 import { AnalizarDatasetGenericoConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/AnalizarDatasetGenericoConAuditoria';
 import { ConfigurarCriterioDeClasificacion } from '../../application/usecases/module_carga_gestion_datasets/ConfigurarCriterioDeClasificacion';
+import { VerificarIntegridadDataset } from '../../application/usecases/module_carga_gestion_datasets/VerificarIntegridadDataset';
 
 const pool = new Pool({ connectionString: config.databaseUrl });
 const analistaRepository = new PostgresAnalistaRepository(pool);
@@ -135,13 +136,18 @@ const sincronizarConApiNvdUseCase = new SincronizarConApiNvd(
   servicioDeNotificaciones
 );
 const descargadorDeArchivos = new DescargadorDeArchivosHttp();
+// RF-11 (M-02): hoisteado para poder pasarlo a generarInformeConAuditoria de
+// abajo (M-12, RF-95) — es el primer productor real conectado a este puerto,
+// que hasta ahora quedaba dado de alta sin nadie que lo invocara.
+const registrarAnalisisRealizadoUseCase = new RegistrarAnalisisRealizado(historialAnalisisRepository);
 // Compartido entre `generarInformeUseCase` y `programarInformePeriodicoUseCase`
 // para que un informe generado automáticamente por el cron quede auditado
 // (RF-95) y notificado (RF-101) igual que uno pedido a mano.
 const generarInformeConAuditoria = new GenerarInformeConAuditoria(
   new GenerarInforme(vulnerabilidadRepository, geradorDeInformes, auditoriaRepository, analistaRepository),
   auditoriaRepository,
-  servicioDeNotificaciones
+  servicioDeNotificaciones,
+  registrarAnalisisRealizadoUseCase
 );
 
 export const container = {
@@ -182,12 +188,13 @@ export const container = {
     analistaRepository,
     auditoriaRepository
   ),
-  // RF-11: solo infraestructura de consulta/escritura del historial de
-  // análisis. registrarAnalisisRealizadoUseCase queda dado de alta para que
-  // los módulos que generan análisis reales lo invoquen más adelante (M-05 a
-  // M-09) — deliberadamente sin conectar a ningún productor todavía.
+  // RF-11: infraestructura de consulta/escritura del historial de análisis.
+  // registrarAnalisisRealizadoUseCase (instanciado arriba, hoisteado para
+  // generarInformeConAuditoria) tiene su primer productor real desde M-12
+  // (RF-95, informes generados) — otros módulos pueden seguir conectándose
+  // más adelante.
   obtenerHistorialAnalisisUseCase: new ObtenerHistorialAnalisis(historialAnalisisRepository),
-  registrarAnalisisRealizadoUseCase: new RegistrarAnalisisRealizado(historialAnalisisRepository),
+  registrarAnalisisRealizadoUseCase,
   // RF-04/RNF-33: decorado con auditoría — queda registrado quién asignó qué
   // rol a quién y cuál era el rol anterior.
   asignarRolUseCase: new AsignarRolConAuditoria(
@@ -284,6 +291,9 @@ export const container = {
   // una acción que el SDS pida auditar como sí pide RF-94 para escritura de
   // vulnerabilidades).
   configurarCriterioDeClasificacionUseCase: new ConfigurarCriterioDeClasificacion(datasetGenericoRepository),
+  // RF-135 (M-12): sin decorador de auditoría — es una consulta de
+  // verificación, no una escritura (mismo criterio que exportarDatasetGenericoUseCase).
+  verificarIntegridadDatasetUseCase: new VerificarIntegridadDataset(datasetGenericoRepository),
   // Fase 3: reciben sesionId en vez de un archivo — leen del mismo
   // sesionAnalisisStore que acaba de poblar analizarDatasetGenericoUseCase.
   calcularEstadisticasDescriptivasGenericoUseCase: new CalcularEstadisticasDescriptivasGenerico(sesionAnalisisStore),

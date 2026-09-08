@@ -9,8 +9,8 @@ export class PostgresDatasetGenericoRepository implements DatasetGenericoReposit
 
   async guardar(dataset: DatasetGenerico): Promise<void> {
     await this.pool.query(
-      `INSERT INTO datasets_genericos (id, analista_id, nombre_archivo, columnas, fuente, preset, filas_duplicadas, fecha_carga, criterio_clasificacion, columna_clave)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      `INSERT INTO datasets_genericos (id, analista_id, nombre_archivo, columnas, fuente, preset, filas_duplicadas, fecha_carga, criterio_clasificacion, columna_clave, hash_original_sha256)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
         dataset.id,
         dataset.analistaId,
@@ -21,7 +21,8 @@ export class PostgresDatasetGenericoRepository implements DatasetGenericoReposit
         dataset.filasDuplicadas,
         dataset.fechaCarga,
         dataset.criterioClasificacion ? JSON.stringify(dataset.criterioClasificacion.toJSON()) : null,
-        dataset.columnaClave
+        dataset.columnaClave,
+        dataset.hashOriginalSha256
       ]
     );
   }
@@ -91,7 +92,8 @@ export class PostgresDatasetGenericoRepository implements DatasetGenericoReposit
       row.criterio_clasificacion
         ? CriterioDeClasificacionValue.desdeJSON(row.criterio_clasificacion as ReturnType<CriterioDeClasificacionValue['toJSON']>)
         : null,
-      row.columna_clave === null || row.columna_clave === undefined ? null : String(row.columna_clave)
+      row.columna_clave === null || row.columna_clave === undefined ? null : String(row.columna_clave),
+      row.hash_original_sha256 === null || row.hash_original_sha256 === undefined ? null : String(row.hash_original_sha256)
     );
   }
 }

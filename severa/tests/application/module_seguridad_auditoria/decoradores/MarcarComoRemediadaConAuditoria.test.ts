@@ -1,0 +1,46 @@
+import { MarcarComoRemediadaConAuditoria } from '../../../../src/application/usecases/module_seguridad_auditoria/decoradores/MarcarComoRemediadaConAuditoria';
+import { MarcarComoRemediadaUseCase } from '../../../../src/application/ports/in/module_priorizacion_clasificacion/MarcarComoRemediadaUseCase';
+import { AuditoriaRepository } from '../../../../src/application/ports/out/persistencia/repositorios/AuditoriaRepository';
+import { Vulnerabilidad } from '../../../../src/domain/entities/Vulnerabilidad';
+import { IdentificadorCVE } from '../../../../src/domain/shared/value-objects/IdentificadorCVE';
+import { CvssScore } from '../../../../src/domain/shared/value-objects/CvssScore';
+import { TipoAccesoValue } from '../../../../src/domain/shared/value-objects/TipoAcceso';
+import { EstadoRemediacionValue } from '../../../../src/domain/shared/value-objects/EstadoRemediacion';
+
+function auditoriaFalsa(): AuditoriaRepository {
+  return {
+    registrar: jest.fn().mockResolvedValue(undefined),
+    listar: jest.fn().mockResolvedValue([])
+  };
+}
+
+describe('MarcarComoRemediadaConAuditoria', () => {
+  test('registra quién marcó la vulnerabilidad como remediada cuando la actualización tiene éxito', async () => {
+    const actualizada = new Vulnerabilidad(
+      '1', new IdentificadorCVE('CVE-2021-44228'), new CvssScore(10.0), 'Apache Log4j',
+      new TipoAccesoValue('Sí'), undefined, undefined, undefined,
+      new EstadoRemediacionValue('Pendiente').transicionarA('EnProceso').transicionarA('Remediada')
+    );
+    const usecase: MarcarComoRemediadaUseCase = { ejecutar: jest.fn().mockResolvedValue(actualizada) };
+    const auditoriaRepository = auditoriaFalsa();
+    const decorator = new MarcarComoRemediadaConAuditoria(usecase, auditoriaRepository);
+
+    const resultado = await decorator.ejecutar('CVE-2021-44228', 'analista-9');
+
+    expect(resultado).toBe(actualizada);
+    expect(auditoriaRepository.registrar).toHaveBeenCalledWith(
+      expect.objectContaining({ usuario: 'analista-9', accion: 'CambioEstadoRemediacion', detalle: expect.stringContaining('Remediada') })
+    );
+  });
+
+  test('NO registra nada si la vulnerabilidad no existe (usecase devuelve null)', async () => {
+    const usecase: MarcarComoRemediadaUseCase = { ejecutar: jest.fn().mockResolvedValue(null) };
+    const auditoriaRepository = auditoriaFalsa();
+    const decorator = new MarcarComoRemediadaConAuditoria(usecase, auditoriaRepository);
+
+    const resultado = await decorator.ejecutar('CVE-9999-99999', 'analista-9');
+
+    expect(resultado).toBeNull();
+    expect(auditoriaRepository.registrar).not.toHaveBeenCalled();
+  });
+});
