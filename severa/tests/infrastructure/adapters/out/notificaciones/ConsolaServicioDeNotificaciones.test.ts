@@ -76,6 +76,60 @@ describe('ConsolaServicioDeNotificaciones — notificarImportacionCompletada (RF
   });
 });
 
+describe('ConsolaServicioDeNotificaciones — notificarVulnerabilidadCritica (RF-99)', () => {
+  test('persiste una notificación de tipo VulnerabilidadCritica con CVE y CVSS en el mensaje', async () => {
+    const notificacionRepository = notificacionRepositoryEnMemoria();
+    const servicio = new ConsolaServicioDeNotificaciones(notificacionRepository);
+    const vulnerabilidad = new Vulnerabilidad('1', new IdentificadorCVE('CVE-2021-44228'), new CvssScore(9.8), 'Apache Log4j', new TipoAccesoValue('Sí'));
+
+    await servicio.notificarVulnerabilidadCritica(vulnerabilidad, 'analista-7');
+
+    const propias = await notificacionRepository.listarPorAnalista('analista-7');
+    expect(propias).toHaveLength(1);
+    expect(propias[0].tipo).toBe('VulnerabilidadCritica');
+    expect(propias[0].mensaje).toBe('Vulnerabilidad crítica detectada: CVE-2021-44228 (CVSS 9.8)');
+    expect(propias[0].leida).toBe(false);
+  });
+});
+
+describe('ConsolaServicioDeNotificaciones — notificarInformeListo (RF-101)', () => {
+  test('persiste una notificación de tipo InformeListo con el formato en el mensaje', async () => {
+    const notificacionRepository = notificacionRepositoryEnMemoria();
+    const servicio = new ConsolaServicioDeNotificaciones(notificacionRepository);
+
+    await servicio.notificarInformeListo('analista-7', 'pdf');
+
+    const propias = await notificacionRepository.listarPorAnalista('analista-7');
+    expect(propias).toHaveLength(1);
+    expect(propias[0].tipo).toBe('InformeListo');
+    expect(propias[0].mensaje).toBe('Informe generado (pdf)');
+  });
+
+  test('el formato docx también queda reflejado en el mensaje', async () => {
+    const notificacionRepository = notificacionRepositoryEnMemoria();
+    const servicio = new ConsolaServicioDeNotificaciones(notificacionRepository);
+
+    await servicio.notificarInformeListo('analista-7', 'docx');
+
+    const propias = await notificacionRepository.listarPorAnalista('analista-7');
+    expect(propias[0].mensaje).toBe('Informe generado (docx)');
+  });
+});
+
+describe('ConsolaServicioDeNotificaciones — notificarActualizacionDisponible (RF-102)', () => {
+  test('persiste una notificación de tipo ActualizacionNVD con el resumen de la sincronización', async () => {
+    const notificacionRepository = notificacionRepositoryEnMemoria();
+    const servicio = new ConsolaServicioDeNotificaciones(notificacionRepository);
+
+    await servicio.notificarActualizacionDisponible('analista-7', { importados: 25, rechazados: 2 });
+
+    const propias = await notificacionRepository.listarPorAnalista('analista-7');
+    expect(propias).toHaveLength(1);
+    expect(propias[0].tipo).toBe('ActualizacionNVD');
+    expect(propias[0].mensaje).toBe('Sincronización con NVD completada: 25 importados, 2 rechazados');
+  });
+});
+
 describe('ConsolaServicioDeNotificaciones — notificarPerfilActualizado (RF-16)', () => {
   test('persiste una notificación que solo menciona los campos modificados, sin valores', async () => {
     const notificacionRepository = notificacionRepositoryEnMemoria();
