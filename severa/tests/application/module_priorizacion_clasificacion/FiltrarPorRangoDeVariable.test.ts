@@ -1,0 +1,46 @@
+import { FiltrarPorRangoDeVariable } from '../../../src/application/usecases/module_priorizacion_clasificacion/FiltrarPorRangoDeVariable';
+import { VulnerabilidadRepository } from '../../../src/application/ports/out/persistencia/repositorios/VulnerabilidadRepository';
+import { Vulnerabilidad } from '../../../src/domain/entities/Vulnerabilidad';
+import { IdentificadorCVE } from '../../../src/domain/shared/value-objects/IdentificadorCVE';
+import { CvssScore } from '../../../src/domain/shared/value-objects/CvssScore';
+
+function repositorioFalso(resultados: Vulnerabilidad[]): VulnerabilidadRepository {
+  return {
+    guardar: jest.fn(),
+    guardarLote: jest.fn(),
+    contar: jest.fn(),
+    listar: jest.fn(),
+    buscarPorCve: jest.fn(),
+    filtrarPorRangoCvss: jest.fn().mockResolvedValue(resultados),
+    filtrarPorSeveridad: jest.fn(),
+    listarPorTipoAcceso: jest.fn(),
+    listarPorTipoVulnerabilidad: jest.fn(),
+    listarPorSoftware: jest.fn(),
+    listarSoftwareDisponible: jest.fn(),
+    actualizarEstado: jest.fn(),
+    buscarConFiltros: jest.fn(),
+    eliminarTodas: jest.fn()
+  };
+}
+
+describe('FiltrarPorRangoDeVariable', () => {
+  test('delega en filtrarPorRangoCvss con el rango y analistaId recibidos', async () => {
+    const vulnerabilidad = new Vulnerabilidad('1', new IdentificadorCVE('CVE-2021-44228'), new CvssScore(9.0), 'Apache Log4j');
+    const repository = repositorioFalso([vulnerabilidad]);
+    const usecase = new FiltrarPorRangoDeVariable(repository);
+
+    const resultado = await usecase.ejecutar(7.0, 10.0, 'analista-A');
+
+    expect(repository.filtrarPorRangoCvss).toHaveBeenCalledWith(7.0, 10.0, 'analista-A');
+    expect(resultado).toEqual([vulnerabilidad]);
+  });
+
+  test('devuelve un array vacío si no hay coincidencias en el rango', async () => {
+    const repository = repositorioFalso([]);
+    const usecase = new FiltrarPorRangoDeVariable(repository);
+
+    const resultado = await usecase.ejecutar(0.1, 0.5, 'analista-A');
+
+    expect(resultado).toEqual([]);
+  });
+});

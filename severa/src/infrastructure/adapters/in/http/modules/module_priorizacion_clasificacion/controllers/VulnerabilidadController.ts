@@ -3,6 +3,12 @@ import { container } from '../../../../../../config/container';
 
 export const vulnerabilidadRouter = express.Router();
 
+// RF-25/RF-30/RF-31 (M-04): el SDS marca la ficha como "generalizada"
+// (variable de clasificación configurada en vez de puntaje de severidad,
+// variable de agrupación en vez de tipo de acceso fijo, fechas ya no
+// asumidas del NVD) — pero esta respuesta sigue exponiendo cve/cvssScore/
+// tipoAcceso literales. Pendiente real hasta auditar M-09.
+//
 // Bug real de Sprint 17: esta respuesta se armaba a mano y solo copiaba 5
 // campos, olvidando estadoRemediacion/tipoVulnerabilidad/diasParaParche/
 // fechaCarga/fechaRemediacion — ConsultarVulnerabilidadPorCVE ya devolvía la
