@@ -1,4 +1,14 @@
-import { generarDatosHistogramaCvss, contarPorSeveridad, generarTopN, generarTopTiposClasificados, generarDatosHistogramaAgrupado, generarDatosCvssPorAcceso, generarDatosHistogramaDiasParche } from '../../../../src/domain/services/graphs/GraficosEstadisticos';
+import {
+  generarDatosHistogramaCvss,
+  contarPorSeveridad,
+  contarPorCategoria,
+  generarTopN,
+  generarTopTiposClasificados,
+  generarDatosHistogramaAgrupado,
+  generarDatosPromedioPorCategoria,
+  generarDatosHistogramaDiasParche
+} from '../../../../src/domain/services/graphs/GraficosEstadisticos';
+import { obtenerSeveridadPorDefecto } from '../../../../src/domain/services/classification/VariablesVulnerabilidad';
 import { Vulnerabilidad } from '../../../../src/domain/entities/Vulnerabilidad';
 import { IdentificadorCVE } from '../../../../src/domain/shared/value-objects/IdentificadorCVE';
 import { CvssScore } from '../../../../src/domain/shared/value-objects/CvssScore';
@@ -32,7 +42,11 @@ describe('GraficosEstadisticos', () => {
     expect(agrupado.bins[4].frecuencia).toBe(2);
   });
 
-  test('compara la media de CVSS por tipo de acceso', () => {
+  // M-07 (retoma, RF-56/57): generarDatosCvssPorAcceso se retiró (único
+  // consumidor era GenerarGrafico.ts) — generarDatosPromedioPorCategoria la
+  // reemplaza, y con los defaults ('tipoAcceso','cvssScore') da EXACTAMENTE
+  // el mismo resultado que la función retirada daba (mismos fixtures).
+  describe('generarDatosPromedioPorCategoria (reemplaza a generarDatosCvssPorAcceso)', () => {
     const vulnerabilidades = [
       new Vulnerabilidad('1', new IdentificadorCVE('CVE-2024-00001'), new CvssScore(10), 'Apache Log4j', new TipoAccesoValue('Sí'), 5),
       new Vulnerabilidad('2', new IdentificadorCVE('CVE-2024-00002'), new CvssScore(9.8), 'Apache Log4j', new TipoAccesoValue('No'), 8),
@@ -40,12 +54,99 @@ describe('GraficosEstadisticos', () => {
       new Vulnerabilidad('4', new IdentificadorCVE('CVE-2024-00004'), new CvssScore(7.8), 'Nginx', new TipoAccesoValue('No'), 1)
     ];
 
-    const acceso = generarDatosCvssPorAcceso(vulnerabilidades);
+    test('RETROCOMPATIBILIDAD: sin variables explícitas, compara la media de CVSS por tipo de acceso (igual que la función retirada)', () => {
+      const acceso = generarDatosPromedioPorCategoria(vulnerabilidades);
 
-    expect(acceso).toEqual([
-      { etiqueta: 'Remoto', valor: 8.9 },
-      { etiqueta: 'Local', valor: 8.8 }
-    ]);
+      expect(acceso).toEqual([
+        { etiqueta: 'Remoto', valor: 8.9 },
+        { etiqueta: 'Local', valor: 8.8 }
+      ]);
+    });
+
+    test('con variableAgrupacion="estadoRemediacion", promedia por las 3 categorías de estado', () => {
+      const conEstados = [
+        vulnerabilidades[0].transicionarEstado('EnProceso'),
+        vulnerabilidades[1],
+        vulnerabilidades[2].transicionarEstado('EnProceso').transicionarEstado('Remediada'),
+        vulnerabilidades[3]
+      ];
+
+      const resultado = generarDatosPromedioPorCategoria(conEstados, 'estadoRemediacion', 'cvssScore');
+
+      // Pendiente: CVE2 (9.8) y CVE4 (7.8) -> promedio 8.8.
+      // EnProceso: CVE1 (10) sola. Remediada: CVE3 (7.8) sola.
+      expect(resultado).toEqual([
+        { etiqueta: 'Pendiente', valor: 8.8 },
+        { etiqueta: 'EnProceso', valor: 10 },
+        { etiqueta: 'Remediada', valor: 7.8 }
+      ]);
+    });
+
+    test('con variableValor="diasParaParche", promedia días para parche en vez de CVSS, por tipo de acceso', () => {
+      const resultado = generarDatosPromedioPorCategoria(vulnerabilidades, 'tipoAcceso', 'diasParaParche');
+
+      // Remoto: CVEs 1 y 3 -> dias 5 y 2 -> promedio 3.5. Local: CVEs 2 y 4 -> dias 8 y 1 -> promedio 4.5.
+      expect(resultado).toEqual([
+        { etiqueta: 'Remoto', valor: 3.5 },
+        { etiqueta: 'Local', valor: 4.5 }
+      ]);
+    });
+
+    test('categoría sin ninguna vulnerabilidad queda en 0, no rompe', () => {
+      const soloRemoto = [vulnerabilidades[0], vulnerabilidades[2]];
+      const resultado = generarDatosPromedioPorCategoria(soloRemoto);
+
+      expect(resultado).toEqual([
+        { etiqueta: 'Remoto', valor: 8.9 },
+        { etiqueta: 'Local', valor: 0 }
+      ]);
+    });
+  });
+
+  // M-07 (retoma, RF-52/53): Modo A — contarPorCategoria generaliza
+  // contarPorSeveridad a cualquier variable categórica existente.
+  describe('contarPorCategoria (generaliza contarPorSeveridad)', () => {
+    const vulnerabilidades = [
+      new Vulnerabilidad('1', new IdentificadorCVE('CVE-2024-00001'), new CvssScore(9.5), 'A', new TipoAccesoValue('Sí')),
+      new Vulnerabilidad('2', new IdentificadorCVE('CVE-2024-00002'), new CvssScore(2.0), 'B', new TipoAccesoValue('No')),
+      new Vulnerabilidad('3', new IdentificadorCVE('CVE-2024-00003'), new CvssScore(3.0), 'C', new TipoAccesoValue('No'))
+    ];
+
+    test('RETROCOMPATIBILIDAD: sin variable explícita (o "severidad"), delega en contarPorSeveridad', () => {
+      const scores = vulnerabilidades.map((v) => v.cvssScore.valor);
+      expect(contarPorCategoria(vulnerabilidades)).toEqual(contarPorSeveridad(scores));
+      expect(contarPorCategoria(vulnerabilidades, 'severidad')).toEqual(contarPorSeveridad(scores));
+    });
+
+    test('con variable="tipoAcceso", cuenta por Remoto/Local', () => {
+      expect(contarPorCategoria(vulnerabilidades, 'tipoAcceso')).toEqual([
+        { etiqueta: 'Remoto', valor: 1 },
+        { etiqueta: 'Local', valor: 2 }
+      ]);
+    });
+
+    test('con variable="estadoRemediacion", cuenta por las 3 categorías, con 0 para las que no tienen datos', () => {
+      expect(contarPorCategoria(vulnerabilidades, 'estadoRemediacion')).toEqual([
+        { etiqueta: 'Pendiente', valor: 3 },
+        { etiqueta: 'EnProceso', valor: 0 },
+        { etiqueta: 'Remediada', valor: 0 }
+      ]);
+    });
+  });
+
+  // M-07 (retoma): reconciliación de ETIQUETA_POR_NIVEL — contarPorSeveridad
+  // ahora usa obtenerSeveridadPorDefecto() (VariablesVulnerabilidad.ts, M-04)
+  // en vez de un mapa NivelDeRiesgo->etiqueta propio. Verifica no-regresión
+  // cruzando el resultado real contra la fuente única.
+  test('no-regresión: contarPorSeveridad sigue usando las mismas etiquetas que obtenerSeveridadPorDefecto()', () => {
+    const scores = [1.0, 5.0, 8.0, 9.5];
+    const resultado = contarPorSeveridad(scores);
+    const etiquetasEsperadas = scores.map((score) => obtenerSeveridadPorDefecto(new CvssScore(score)));
+
+    resultado.forEach((entrada) => {
+      const cantidadEsperada = etiquetasEsperadas.filter((e) => e === entrada.etiqueta).length;
+      expect(entrada.valor).toBe(cantidadEsperada);
+    });
   });
 
   test('genera el histograma de días para parche', () => {

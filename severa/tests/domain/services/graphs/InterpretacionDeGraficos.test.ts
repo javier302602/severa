@@ -3,9 +3,11 @@ import {
   interpretarHistogramaAgrupado,
   interpretarHistogramaDiasParche,
   interpretarBarrasSeveridad,
+  interpretarBarrasPorCategoria,
   interpretarPastelSeveridad,
   interpretarBoxplotCvss,
   interpretarCvssPorAcceso,
+  interpretarPromedioPorCategoria,
   interpretarDispersionCvssDias,
   interpretarTopTipos,
   interpretarTopSoftware
@@ -62,6 +64,30 @@ describe('InterpretacionDeGraficos', () => {
     expect(interpretarPastelSeveridad()).toContain('leyenda');
   });
 
+  // M-07 (retoma, RF-52/53): interpretación genérica para variables
+  // categóricas sin la noción de "Crítica o Alta" (que solo aplica a
+  // severidad) — informa cuál categoría es la más frecuente.
+  describe('interpretarBarrasPorCategoria', () => {
+    test('nombra la categoría más frecuente y su porcentaje del total', () => {
+      const datos = [
+        { etiqueta: 'Remoto', valor: 30 },
+        { etiqueta: 'Local', valor: 10 }
+      ];
+      const texto = interpretarBarrasPorCategoria(datos, 'tipo de acceso');
+      expect(texto).toContain('Remoto');
+      expect(texto).toContain('75.0%');
+      expect(texto).toContain('tipo de acceso');
+    });
+
+    test('con total 0, dice que no hay datos suficientes en vez de dividir por cero', () => {
+      const datos = [
+        { etiqueta: 'Pendiente', valor: 0 },
+        { etiqueta: 'EnProceso', valor: 0 }
+      ];
+      expect(interpretarBarrasPorCategoria(datos, 'estado de remediación')).toContain('No hay datos suficientes');
+    });
+  });
+
   test('interpretarBoxplotCvss menciona el máximo real', () => {
     expect(interpretarBoxplotCvss({ minimo: 0, q1: 2, mediana: 5, q3: 8, maximo: 9.8, media: 5 })).toContain('9.8');
   });
@@ -89,6 +115,37 @@ describe('InterpretacionDeGraficos', () => {
       { etiqueta: 'Local', valor: 8.0 }
     ]);
     expect(texto).toContain('local');
+  });
+
+  // M-07 (retoma, RF-56/57): interpretación genérica para N grupos (no solo
+  // remoto/local) — informa cuál grupo tiene el promedio más alto.
+  describe('interpretarPromedioPorCategoria', () => {
+    test('nombra el grupo con el promedio más alto entre N categorías', () => {
+      const datos = [
+        { etiqueta: 'Pendiente', valor: 5.0 },
+        { etiqueta: 'EnProceso', valor: 8.5 },
+        { etiqueta: 'Remediada', valor: 3.0 }
+      ];
+      const texto = interpretarPromedioPorCategoria(datos, 'CVSS Score');
+      expect(texto).toContain('EnProceso');
+      expect(texto).toContain('8.50');
+    });
+
+    test('todas las categorías con el mismo promedio: dice que son prácticamente iguales', () => {
+      const datos = [
+        { etiqueta: 'Remoto', valor: 7.0 },
+        { etiqueta: 'Local', valor: 7.0 }
+      ];
+      expect(interpretarPromedioPorCategoria(datos, 'CVSS Score')).toContain('prácticamente igual');
+    });
+
+    test('sin ningún dato (todo en 0), dice que no hay datos suficientes', () => {
+      const datos = [
+        { etiqueta: 'Remoto', valor: 0 },
+        { etiqueta: 'Local', valor: 0 }
+      ];
+      expect(interpretarPromedioPorCategoria(datos, 'Días para Parche')).toContain('No hay datos suficientes');
+    });
   });
 
   test('interpretarDispersionCvssDias: menos de 2 puntos, dice que no hay datos suficientes', () => {

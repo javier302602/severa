@@ -2,9 +2,14 @@ import { Vulnerabilidad } from '../../entities/Vulnerabilidad';
 import { calcularMedia, calcularMediana } from '../descriptive-statistics/EstadisticaDescriptiva';
 import { generarTablaAgrupada } from '../descriptive-statistics/DistribucionFrecuencias';
 import { minimoDe, maximoDe } from '../MinMax';
-import { clasificar } from '../classification/ClasificadorDeRiesgo';
 import { CvssScore } from '../../shared/value-objects/CvssScore';
-import { NivelDeRiesgo } from '../../shared/value-objects/NivelDeRiesgo';
+import {
+  obtenerSeveridadPorDefecto,
+  obtenerValorCategorico,
+  obtenerValorNumerico,
+  VariableCategoricaVulnerabilidad,
+  VariableNumericaVulnerabilidad
+} from '../classification/VariablesVulnerabilidad';
 
 export interface BinHistograma {
   intervalo: string;
@@ -75,28 +80,30 @@ export function generarDatosHistogramaCvss(scores: number[], opciones: OpcionesH
   return generarDatosHistograma(scores, opciones);
 }
 
-// Etiquetas de gráfico en femenino (concuerdan con "severidad"), distintas de
-// los valores del enum de dominio NivelDeRiesgo (masculino, concuerda con
-// "nivel"). El único origen de los umbrales es ClasificadorDeRiesgo.
-export const ETIQUETA_POR_NIVEL: Record<NivelDeRiesgo, string> = {
-  Bajo: 'Baja',
-  Moderado: 'Media',
-  Alto: 'Alta',
-  Crítico: 'Crítica'
-};
+// M-07 (retoma, RF-52/53): antes este archivo mantenía su PROPIO mapa
+// NivelDeRiesgo -> etiqueta en femenino (ETIQUETA_POR_NIVEL), duplicado
+// exacto de ETIQUETAS_SEVERIDAD_POR_DEFECTO en VariablesVulnerabilidad.ts
+// (M-04) — hallazgo de la auditoría de retoma de M-07, nunca detectado antes
+// porque esa auditoría nunca había cruzado ambos archivos. contarPorSeveridad
+// ahora llama a obtenerSeveridadPorDefecto() (fuente única) en vez de mapear
+// NivelDeRiesgo a mano — mismo resultado exacto (mismo orden Baja->Media->
+// Alta->Crítica, mismos ceros si una categoría no tiene datos), verificado
+// con test de no-regresión. RecopilarDatosDeInforme.ts/
+// ExportacionAgrupadaPorSeveridad.ts (M-10), que antes importaban
+// ETIQUETA_POR_NIVEL directo, ahora importan obtenerSeveridadPorDefecto de
+// VariablesVulnerabilidad.ts en su lugar — ETIQUETA_POR_NIVEL deja de
+// exportarse desde acá.
+const ORDEN_SEVERIDAD_POR_DEFECTO = ['Baja', 'Media', 'Alta', 'Crítica'];
 
 export function contarPorSeveridad(scores: number[]): DatoConteo[] {
-  const conteos: Record<NivelDeRiesgo, number> = { Bajo: 0, Moderado: 0, Alto: 0, Crítico: 0 };
+  const conteos = new Map(ORDEN_SEVERIDAD_POR_DEFECTO.map((etiqueta) => [etiqueta, 0]));
 
   scores.forEach((score) => {
-    const nivel = clasificar(new CvssScore(score)).valor;
-    conteos[nivel] += 1;
+    const etiqueta = obtenerSeveridadPorDefecto(new CvssScore(score));
+    conteos.set(etiqueta, (conteos.get(etiqueta) ?? 0) + 1);
   });
 
-  return (['Bajo', 'Moderado', 'Alto', 'Crítico'] as NivelDeRiesgo[]).map((nivel) => ({
-    etiqueta: ETIQUETA_POR_NIVEL[nivel],
-    valor: conteos[nivel]
-  }));
+  return ORDEN_SEVERIDAD_POR_DEFECTO.map((etiqueta) => ({ etiqueta, valor: conteos.get(etiqueta)! }));
 }
 
 export function generarDatosHistogramaAgrupado(scores: number[]): DatosHistogramaCvss {
@@ -111,14 +118,56 @@ export function generarDatosHistogramaAgrupado(scores: number[]): DatosHistogram
   };
 }
 
-export function generarDatosCvssPorAcceso(vulnerabilidades: Vulnerabilidad[]): DatoConteo[] {
-  const remotos = vulnerabilidades.filter((item) => item.tipoAcceso?.valor === 'Remoto').map((item) => item.cvssScore.valor);
-  const locales = vulnerabilidades.filter((item) => item.tipoAcceso?.valor === 'Local').map((item) => item.cvssScore.valor);
+// M-07 (retoma, RF-52/53): generaliza contarPorSeveridad a cualquier variable
+// categórica existente (Modo A — elegir variable, sin redefinir categorías;
+// el Modo B de umbrales configurables sigue diferido, igual que en M-04/M-05).
+// contarPorSeveridad queda INTACTA (firma y comportamiento) porque
+// RecopilarDatosDeInforme.ts la sigue llamando directo, sin este parámetro —
+// contarPorCategoria('severidad') delega en ella para no duplicar la lógica
+// del caso default.
+const CATEGORIAS_POR_VARIABLE: Record<VariableCategoricaVulnerabilidad, string[]> = {
+  severidad: ORDEN_SEVERIDAD_POR_DEFECTO,
+  tipoAcceso: ['Remoto', 'Local'],
+  estadoRemediacion: ['Pendiente', 'EnProceso', 'Remediada']
+};
 
-  return [
-    { etiqueta: 'Remoto', valor: remotos.length ? calcularMedia(remotos) : 0 },
-    { etiqueta: 'Local', valor: locales.length ? calcularMedia(locales) : 0 }
-  ];
+export function contarPorCategoria(vulnerabilidades: Vulnerabilidad[], variable: VariableCategoricaVulnerabilidad = 'severidad'): DatoConteo[] {
+  if (variable === 'severidad') {
+    return contarPorSeveridad(vulnerabilidades.map((v) => v.cvssScore.valor));
+  }
+
+  const categorias = CATEGORIAS_POR_VARIABLE[variable];
+  const conteos = new Map(categorias.map((etiqueta) => [etiqueta, 0]));
+  vulnerabilidades.forEach((v) => {
+    const etiqueta = obtenerValorCategorico(v, variable);
+    conteos.set(etiqueta, (conteos.get(etiqueta) ?? 0) + 1);
+  });
+
+  return categorias.map((etiqueta) => ({ etiqueta, valor: conteos.get(etiqueta) ?? 0 }));
+}
+
+// M-07 (retoma, RF-56/57): reemplaza a generarDatosCvssPorAcceso (retirada —
+// único consumidor era GenerarGrafico.ts, confirmado en la auditoría de
+// retoma, así que no queda como alias muerto). Generaliza AMBOS ejes por
+// separado, tal como el SDS los separa (RF-56: variable de agrupación;
+// RF-57: variable de valor promediado) — con los defaults
+// ('tipoAcceso','cvssScore') el resultado es idéntico al de
+// generarDatosCvssPorAcceso, verificado con test de equivalencia.
+export function generarDatosPromedioPorCategoria(
+  vulnerabilidades: Vulnerabilidad[],
+  variableAgrupacion: VariableCategoricaVulnerabilidad = 'tipoAcceso',
+  variableValor: VariableNumericaVulnerabilidad = 'cvssScore'
+): DatoConteo[] {
+  const categorias = CATEGORIAS_POR_VARIABLE[variableAgrupacion];
+
+  return categorias.map((etiqueta) => {
+    const valores = vulnerabilidades
+      .filter((v) => obtenerValorCategorico(v, variableAgrupacion) === etiqueta)
+      .map((v) => obtenerValorNumerico(v, variableValor))
+      .filter((v): v is number => v !== undefined);
+
+    return { etiqueta, valor: valores.length ? calcularMedia(valores) : 0 };
+  });
 }
 
 // Antes duplicaba el algoritmo de calcularHistograma línea por línea Y

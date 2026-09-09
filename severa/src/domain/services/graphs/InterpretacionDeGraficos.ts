@@ -57,6 +57,22 @@ export function interpretarPastelSeveridad(): string {
   return 'La proporción de cada color corresponde exactamente a los porcentajes de la leyenda.';
 }
 
+// M-07 (retoma, RF-52/53): interpretarBarrasSeveridad calcula "% Crítica o
+// Alta", un concepto que solo tiene sentido para severidad — no hay un
+// "Crítica o Alta" de tipoAcceso ni de estadoRemediacion. Para esas otras
+// variables, en vez de forzar una noción de "gravedad" que no aplica, se
+// informa cuál categoría es la más frecuente y qué porcentaje representa —
+// interpretación honesta sobre lo que los datos realmente muestran.
+export function interpretarBarrasPorCategoria(datos: DatoConteo[], etiquetaVariable: string): string {
+  const total = datos.reduce((acumulado, item) => acumulado + item.valor, 0);
+  if (total === 0) {
+    return `No hay datos suficientes de ${etiquetaVariable} para interpretar.`;
+  }
+  const masFrecuente = [...datos].sort((a, b) => b.valor - a.valor)[0];
+  const porcentaje = (masFrecuente.valor / total) * 100;
+  return `"${masFrecuente.etiqueta}" es la categoría más frecuente de ${etiquetaVariable}, con ${porcentaje.toFixed(1)}% del total.`;
+}
+
 export function interpretarBoxplotCvss(resumen: ResumenCincoNumeros): string {
   return `El bigote superior llega hasta ${resumen.maximo.toFixed(1)}, mostrando que la muestra incluye casos cercanos al máximo teórico de la escala CVSS.`;
 }
@@ -80,6 +96,25 @@ export function interpretarCvssPorAcceso(datos: DatoConteo[]): string {
     `Las vulnerabilidades de acceso ${cual} presentan, en promedio, una severidad ${Math.abs(diferencia).toFixed(2)} puntos mayor, ` +
     'lo que sugiere priorizar su remediación.'
   );
+}
+
+// M-07 (retoma, RF-56/57): interpretarCvssPorAcceso asume EXACTAMENTE 2
+// grupos (remoto/local, una resta entre dos números) — generalizado a
+// cualquier variable de agrupación, estadoRemediacion tiene 3 categorías, y
+// la noción de "diferencia entre dos" deja de aplicar. Para el caso general
+// de N grupos, se informa cuál grupo tiene el promedio más alto en vez de
+// una diferencia puntual. El caso default (tipoAcceso + cvssScore) sigue
+// usando interpretarCvssPorAcceso tal cual, sin pasar por esta función —
+// ver GenerarGrafico.ts.
+export function interpretarPromedioPorCategoria(datos: DatoConteo[], etiquetaValor: string): string {
+  if (datos.every((item) => item.valor === 0)) {
+    return `No hay datos suficientes de ${etiquetaValor} para interpretar.`;
+  }
+  const ordenados = [...datos].sort((a, b) => b.valor - a.valor);
+  if (ordenados[0].valor === ordenados[ordenados.length - 1].valor) {
+    return `El promedio de ${etiquetaValor} es prácticamente igual entre todas las categorías en esta muestra.`;
+  }
+  return `"${ordenados[0].etiqueta}" presenta, en promedio, el ${etiquetaValor} más alto (${ordenados[0].valor.toFixed(2)}) entre las categorías analizadas.`;
 }
 
 export function interpretarDispersionCvssDias(datos: { puntos: Array<{ x: number; y: number }>; correlacion: number }): string {

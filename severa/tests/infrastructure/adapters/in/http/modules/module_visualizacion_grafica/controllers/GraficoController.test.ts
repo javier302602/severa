@@ -1,6 +1,8 @@
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 
+import { VariableDeConsultaInvalidaError } from '../../../../../../../../src/domain/errors/VariableDeConsultaInvalidaError';
+
 jest.mock('../../../../../../../../src/infrastructure/config/container', () => ({
   container: {
     generarGraficoUseCase: {
@@ -79,5 +81,69 @@ describe('GraficoController — header X-Formato-Real (RF-61)', () => {
 
     expect(res.status).toBe(200);
     expect(res.headers['x-formato-real']).toBeUndefined();
+  });
+});
+
+// M-07 (retoma, RF-51/52/53/56/57): el controller reenvía `variable`/
+// `variableAgrupacion`/`variableValor` tal cual (strings crudos, sin
+// validar acá) — la validación vive en GenerarGrafico.ts (ver su propia
+// suite de tests), este archivo solo confirma el passthrough y que un error
+// del caso de uso cae en el mismo catch 400 de siempre.
+describe('GraficoController — M-07 retoma: passthrough de variable/variableAgrupacion/variableValor', () => {
+  const token = tokenPara('analista-A');
+
+  test('?variable=diasParaParche se reenvía tal cual en opciones', async () => {
+    const res = await conHttps(
+      request(app).get('/graficos/histogramaCvss?variable=diasParaParche').set('Authorization', `Bearer ${token}`)
+    );
+
+    expect(res.status).toBe(200);
+    const container = jest.requireMock('../../../../../../../../src/infrastructure/config/container').container;
+    expect(container.generarGraficoUseCase.ejecutar).toHaveBeenCalledWith(
+      'histogramaCvss',
+      'analista-A',
+      expect.objectContaining({ variable: 'diasParaParche' })
+    );
+  });
+
+  test('?variableAgrupacion=estadoRemediacion&variableValor=diasParaParche se reenvían tal cual', async () => {
+    const res = await conHttps(
+      request(app)
+        .get('/graficos/cvssPorAcceso?variableAgrupacion=estadoRemediacion&variableValor=diasParaParche')
+        .set('Authorization', `Bearer ${token}`)
+    );
+
+    expect(res.status).toBe(200);
+    const container = jest.requireMock('../../../../../../../../src/infrastructure/config/container').container;
+    expect(container.generarGraficoUseCase.ejecutar).toHaveBeenCalledWith(
+      'cvssPorAcceso',
+      'analista-A',
+      expect.objectContaining({ variableAgrupacion: 'estadoRemediacion', variableValor: 'diasParaParche' })
+    );
+  });
+
+  test('sin esos query params, se reenvían como undefined (RETROCOMPATIBILIDAD)', async () => {
+    await conHttps(request(app).get('/graficos/histogramaCvss').set('Authorization', `Bearer ${token}`));
+
+    const container = jest.requireMock('../../../../../../../../src/infrastructure/config/container').container;
+    expect(container.generarGraficoUseCase.ejecutar).toHaveBeenCalledWith(
+      'histogramaCvss',
+      'analista-A',
+      expect.objectContaining({ variable: undefined, variableAgrupacion: undefined, variableValor: undefined })
+    );
+  });
+
+  test('variable inválida: el caso de uso tira VariableDeConsultaInvalidaError y el controller responde 400 (mismo catch de siempre)', async () => {
+    const container = jest.requireMock('../../../../../../../../src/infrastructure/config/container').container;
+    (container.generarGraficoUseCase.ejecutar as jest.Mock).mockRejectedValueOnce(
+      new VariableDeConsultaInvalidaError('"noExiste" no es una variable numérica válida (cvssScore, diasParaParche)')
+    );
+
+    const res = await conHttps(
+      request(app).get('/graficos/histogramaCvss?variable=noExiste').set('Authorization', `Bearer ${token}`)
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('no es una variable numérica válida');
   });
 });

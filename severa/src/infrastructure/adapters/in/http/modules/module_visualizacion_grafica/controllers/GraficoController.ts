@@ -18,9 +18,23 @@ graficoRouter.get('/:tipo', async (req, res) => {
   const formatoParam = typeof req.query.formato === 'string' ? req.query.formato : 'svg';
   const formato = formatoParam === 'json' || formatoParam === 'png' || formatoParam === 'pdf' ? formatoParam : 'svg';
   const limite = req.query.limite ? Number(req.query.limite) : undefined;
+  // RF-51/52/53/56/57 (M-07, retoma): strings crudos, sin validar acá — cada
+  // `case` del switch en GenerarGrafico.ts sabe qué taxonomía de variable
+  // espera (numérica o categórica) y valida/castea ahí (VariableDeConsultaInvalidaError
+  // si no es válida, capturado por el catch de abajo, ya existente). El
+  // controller no necesita conocer esa taxonomía.
+  const variable = typeof req.query.variable === 'string' ? req.query.variable : undefined;
+  const variableAgrupacion = typeof req.query.variableAgrupacion === 'string' ? req.query.variableAgrupacion : undefined;
+  const variableValor = typeof req.query.variableValor === 'string' ? req.query.variableValor : undefined;
 
   try {
-    const resultado = await container.generarGraficoUseCase.ejecutar(tipo, req.analistaAutenticado!.id, { limite, formato });
+    const resultado = await container.generarGraficoUseCase.ejecutar(tipo, req.analistaAutenticado!.id, {
+      limite,
+      formato,
+      variable,
+      variableAgrupacion,
+      variableValor
+    });
 
     // RF-61: la conversión real a PNG/PDF no está implementada (ver
     // SvgGraficosAdapter.generarSvgPendiente) — el Content-Type SIEMPRE

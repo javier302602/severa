@@ -194,3 +194,122 @@ describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () =
     await expect(useCase.ejecutar('noExiste' as never, 'analista-1')).rejects.toThrow('Tipo de gráfico no soportado');
   });
 });
+
+// M-07 (retoma, RF-51/52/53/56/57): `variable`/`variableAgrupacion`/
+// `variableValor` generalizan histogramaCvss, histogramaCvssAgrupado,
+// barrasSeveridad, pastelSeveridad y cvssPorAcceso a diasParaParche/
+// tipoAcceso/estadoRemediacion — Modo A (elegir variable existente, sin
+// redefinir umbrales/categorías).
+describe('GenerarGrafico — M-07 retoma: variable configurable', () => {
+  const datasetConDias = [
+    new Vulnerabilidad('1', new IdentificadorCVE('CVE-2021-44228'), new CvssScore(10.0), 'Apache Log4j', new TipoAccesoValue('Sí'), 5),
+    new Vulnerabilidad('2', new IdentificadorCVE('CVE-2021-35587'), new CvssScore(4.2), 'OpenSSL', new TipoAccesoValue('No'), 30)
+  ];
+
+  test('RETROCOMPATIBILIDAD: histogramaCvss sin variable da exactamente el título/etiqueta de siempre', async () => {
+    const port = graficosOutputPortFalso();
+    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+
+    await useCase.ejecutar('histogramaCvss', 'analista-1');
+
+    expect(port.renderizarHistograma).toHaveBeenCalledWith(expect.anything(), 'svg', 'Histograma de CVSS', 'CVSS Score');
+  });
+
+  test('histogramaCvss con variable="diasParaParche" usa el título/etiqueta de esa variable', async () => {
+    const port = graficosOutputPortFalso();
+    const useCase = new GenerarGrafico(repoFalso(datasetConDias), port);
+
+    await useCase.ejecutar('histogramaCvss', 'analista-1', { variable: 'diasParaParche' });
+
+    expect(port.renderizarHistograma).toHaveBeenCalledWith(expect.anything(), 'svg', 'Histograma de días para parche', 'Días para parche');
+  });
+
+  test('histogramaCvssAgrupado con variable="diasParaParche" reparte el rango real de los datos (no 0-10)', async () => {
+    const port = graficosOutputPortFalso();
+    const useCase = new GenerarGrafico(repoFalso(datasetConDias), port);
+
+    const resultado = await useCase.ejecutar('histogramaCvssAgrupado', 'analista-1', { variable: 'diasParaParche', formato: 'json' });
+
+    expect(port.renderizarHistograma).toHaveBeenCalled();
+    // formato json: passthrough del adapter (mock siempre devuelve el mismo string) —
+    // lo relevante es que no explota calculando el rango real (5..30).
+    expect(resultado).toBe('<svg>histograma</svg>');
+  });
+
+  test('RETROCOMPATIBILIDAD: barrasSeveridad sin variable delega en el conteo por severidad de siempre', async () => {
+    const port = graficosOutputPortFalso();
+    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+
+    await useCase.ejecutar('barrasSeveridad', 'analista-1');
+
+    expect(port.renderizarBarras).toHaveBeenCalledWith(expect.anything(), 'svg', 'Barras por severidad', 'Cantidad', 'Severidad');
+  });
+
+  test('barrasSeveridad con variable="tipoAcceso" cuenta por Remoto/Local en vez de severidad', async () => {
+    const port = graficosOutputPortFalso();
+    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+
+    await useCase.ejecutar('barrasSeveridad', 'analista-1', { variable: 'tipoAcceso' });
+
+    expect(port.renderizarBarras).toHaveBeenCalledWith(
+      [{ etiqueta: 'Remoto', valor: 1 }, { etiqueta: 'Local', valor: 1 }],
+      'svg',
+      'Barras por tipo de acceso',
+      'Cantidad',
+      'Tipo de acceso'
+    );
+  });
+
+  test('pastelSeveridad con variable="estadoRemediacion" cuenta por las 3 categorías de estado', async () => {
+    const port = graficosOutputPortFalso();
+    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+
+    await useCase.ejecutar('pastelSeveridad', 'analista-1', { variable: 'estadoRemediacion' });
+
+    expect(port.renderizarPastel).toHaveBeenCalledWith(
+      [
+        { etiqueta: 'Pendiente', valor: 2 },
+        { etiqueta: 'EnProceso', valor: 0 },
+        { etiqueta: 'Remediada', valor: 0 }
+      ],
+      'svg',
+      'Distribución por estado de remediación'
+    );
+  });
+
+  test('RETROCOMPATIBILIDAD: cvssPorAcceso sin variableAgrupacion/variableValor da el título exacto de siempre', async () => {
+    const port = graficosOutputPortFalso();
+    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+
+    await useCase.ejecutar('cvssPorAcceso', 'analista-1');
+
+    expect(port.renderizarBarras).toHaveBeenCalledWith(expect.any(Array), 'svg', 'CVSS por tipo de acceso', 'CVSS Score', 'Tipo de acceso');
+  });
+
+  test('cvssPorAcceso con variableAgrupacion="estadoRemediacion" y variableValor="diasParaParche"', async () => {
+    const port = graficosOutputPortFalso();
+    const useCase = new GenerarGrafico(repoFalso(datasetConDias), port);
+
+    await useCase.ejecutar('cvssPorAcceso', 'analista-1', { variableAgrupacion: 'estadoRemediacion', variableValor: 'diasParaParche' });
+
+    expect(port.renderizarBarras).toHaveBeenCalledWith(
+      expect.any(Array),
+      'svg',
+      'Días para parche por estado de remediación',
+      'Días para parche',
+      'Estado de remediación'
+    );
+  });
+
+  test.each([
+    ['histogramaCvss', { variable: 'noExiste' }],
+    ['barrasSeveridad', { variable: 'noExiste' }],
+    ['cvssPorAcceso', { variableAgrupacion: 'noExiste' }],
+    ['cvssPorAcceso', { variableValor: 'noExiste' }]
+  ])('%s con variable inválida tira VariableDeConsultaInvalidaError', async (tipo, opciones) => {
+    const port = graficosOutputPortFalso();
+    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+
+    await expect(useCase.ejecutar(tipo as never, 'analista-1', opciones)).rejects.toThrow('no es una variable');
+  });
+});

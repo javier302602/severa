@@ -1,6 +1,5 @@
 import { Vulnerabilidad } from '../entities/Vulnerabilidad';
-import { clasificar } from './classification/ClasificadorDeRiesgo';
-import { ETIQUETA_POR_NIVEL } from './graphs/GraficosEstadisticos';
+import { obtenerSeveridadPorDefecto } from './classification/VariablesVulnerabilidad';
 
 // Bug real reportado: la descarga de vulnerabilidades era una lista plana
 // sin encabezado ni orden, difícil de trabajar (RF-90/Sprint 03 solo definía
@@ -27,7 +26,7 @@ export const ENCABEZADO_EXPORTACION = ['CVE', 'CVSS', 'Severidad', 'Software', '
 export const ORDEN_SEVERIDAD = ['Crítica', 'Alta', 'Media', 'Baja'] as const;
 
 export function severidadDe(vulnerabilidad: Vulnerabilidad): string {
-  return ETIQUETA_POR_NIVEL[clasificar(vulnerabilidad.cvssScore).valor];
+  return obtenerSeveridadPorDefecto(vulnerabilidad.cvssScore);
 }
 
 export interface GrupoDeSeveridad {

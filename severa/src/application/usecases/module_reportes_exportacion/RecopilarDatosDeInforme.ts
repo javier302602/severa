@@ -18,15 +18,14 @@ import { compararGrupos } from '../../../domain/services/inferential-statistics/
 import { generarRanking } from '../../../domain/services/classification/MotorDePriorizacion';
 import { generarInterpretacion } from '../../../domain/services/InterpretadorDeResultados';
 import { calcularCorrelacionPearson } from '../../../domain/services/descriptive-statistics/Correlacion';
-import { clasificar } from '../../../domain/services/classification/ClasificadorDeRiesgo';
+import { obtenerSeveridadPorDefecto } from '../../../domain/services/classification/VariablesVulnerabilidad';
 import {
   generarDatosHistogramaCvss,
   generarDatosHistogramaAgrupado,
   generarDatosHistogramaDiasParche,
   contarPorSeveridad,
   generarTopN,
-  generarTopTiposClasificados,
-  ETIQUETA_POR_NIVEL
+  generarTopTiposClasificados
 } from '../../../domain/services/graphs/GraficosEstadisticos';
 import { Vulnerabilidad } from '../../../domain/entities/Vulnerabilidad';
 
@@ -60,7 +59,7 @@ function aFilaMuestra(vulnerabilidad: Vulnerabilidad): FilaMuestraInforme {
     cve: vulnerabilidad.cve.valor,
     software: vulnerabilidad.software,
     cvssScore: vulnerabilidad.cvssScore.valor,
-    severidad: ETIQUETA_POR_NIVEL[clasificar(vulnerabilidad.cvssScore).valor],
+    severidad: obtenerSeveridadPorDefecto(vulnerabilidad.cvssScore),
     tipoAcceso: vulnerabilidad.tipoAcceso?.valor ?? 'N/A',
     estadoRemediacion: vulnerabilidad.estadoRemediacion.valor,
     fechaCarga: vulnerabilidad.fechaCarga
