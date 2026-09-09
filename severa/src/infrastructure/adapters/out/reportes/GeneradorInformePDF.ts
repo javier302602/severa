@@ -44,6 +44,12 @@ import {
   dibujarTabla,
   dibujarBadge
 } from './LayoutInformePdf';
+// M-10 Ronda 2, Pasada 2-C — Cutover, Paso 1 de 2: generarInformeCompleto
+// (CVSS) pasa a delegar en el orquestador de 20 secciones. generarResumenEjecutivo
+// (RF-82) NO se toca acá — sigue en renderizarPdf/resumido=true con las
+// dibujarX() viejas, sin ningún cambio. El cutover del pipeline genérico
+// (generarInformeDataset) es el Paso 2, aparte.
+import { renderizarInformeUniversal } from './InformeUniversalRF130';
 
 // RF-77/RF-82: implementación única del puerto GeneradorDeInformes (mismo
 // patrón de "un solo adaptador por puerto de salida" que SvgGraficosAdapter
@@ -66,7 +72,7 @@ export class GeneradorInformePDF implements GeneradorDeInformes {
   constructor(private readonly generadorInformeWord: GeneradorInformeWord = new GeneradorInformeWord()) {}
 
   async generarInformeCompleto(datos: DatosInforme): Promise<Buffer> {
-    return this.renderizarPdf('Informe SEVERA — Análisis Estadístico de Vulnerabilidades', datos, false);
+    return renderizarInformeUniversal({ pipeline: 'cvss', datos });
   }
 
   async generarInformeWord(datos: DatosInforme): Promise<Buffer> {
