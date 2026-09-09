@@ -6,8 +6,11 @@ import { CvssScore } from '../../../../../domain/shared/value-objects/CvssScore'
 import { TipoAccesoValue } from '../../../../../domain/shared/value-objects/TipoAcceso';
 import { EstadoRemediacion, EstadoRemediacionValue } from '../../../../../domain/shared/value-objects/EstadoRemediacion';
 import { FiltroVulnerabilidad } from '../../../../../domain/shared/value-objects/FiltroVulnerabilidad';
-import { clasificar } from '../../../../../domain/services/classification/ClasificadorDeRiesgo';
-import { NivelDeRiesgo } from '../../../../../domain/shared/value-objects/NivelDeRiesgo';
+import {
+  VariableNumericaVulnerabilidad,
+  VariableCategoricaVulnerabilidad,
+  obtenerSeveridadPorDefecto
+} from '../../../../../domain/services/classification/VariablesVulnerabilidad';
 
 // Multi-tenancy a nivel de dueño (migración 006): TODA consulta/modificación
 // de esta tabla lleva WHERE/columna analista_id — no hay ningún método acá
@@ -306,16 +309,51 @@ export class PostgresVulnerabilidadRepository implements VulnerabilidadRepositor
     );
   }
 
-  // Reutiliza ClasificadorDeRiesgo (RF-69) como fuente única de los umbrales;
-  // solo traduce el NivelDeRiesgo a las etiquetas en femenino ya usadas en la
-  // columna 'severidad'.
+  // M-04 (retoma, RF-27/RF-28): variable elegida por el analista para el
+  // filtro — Modo A únicamente (sin redefinir umbrales, ver
+  // VariablesVulnerabilidad.ts). El mapeo a nombre de columna SQL vive SOLO
+  // acá (capa de infraestructura); dominio/aplicación nunca conocen
+  // 'cvss_score'/'dias_para_parche' como strings.
+  private static readonly COLUMNA_SQL_NUMERICA: Record<VariableNumericaVulnerabilidad, string> = {
+    cvssScore: 'cvss_score',
+    diasParaParche: 'dias_para_parche'
+  };
+
+  private static readonly COLUMNA_SQL_CATEGORICA: Record<VariableCategoricaVulnerabilidad, string> = {
+    tipoAcceso: 'acceso_remoto',
+    estadoRemediacion: 'estado_remediacion',
+    severidad: 'severidad'
+  };
+
+  async filtrarPorRango(variable: VariableNumericaVulnerabilidad, minimo: number, maximo: number, analistaId: string): Promise<Vulnerabilidad[]> {
+    const columna = PostgresVulnerabilidadRepository.COLUMNA_SQL_NUMERICA[variable];
+    const result = await this.pool.query(
+      `SELECT * FROM vulnerabilidades WHERE ${columna} BETWEEN $1 AND $2 AND analista_id = $3 ORDER BY cvss_score DESC`,
+      [minimo, maximo, analistaId]
+    );
+    return result.rows.map((row) => this.mapRow(row));
+  }
+
+  // tipoAcceso es la única variable categórica cuya columna SQL (acceso_remoto)
+  // no es del mismo tipo que el `valor` recibido (BOOLEAN vs. 'Remoto'/'Local')
+  // — se traduce acá, en el único punto que conoce ambos vocabularios.
+  async filtrarPorCategoria(variable: VariableCategoricaVulnerabilidad, valor: string, analistaId: string): Promise<Vulnerabilidad[]> {
+    const columna = PostgresVulnerabilidadRepository.COLUMNA_SQL_CATEGORICA[variable];
+    const valorSql = variable === 'tipoAcceso' ? new TipoAccesoValue(valor).valor === 'Remoto' : valor;
+    const operador = variable === 'tipoAcceso' ? '=' : 'ILIKE';
+
+    const result = await this.pool.query(
+      `SELECT * FROM vulnerabilidades WHERE ${columna} ${operador} $1 AND analista_id = $2 ORDER BY cvss_score DESC`,
+      [valorSql, analistaId]
+    );
+    return result.rows.map((row) => this.mapRow(row));
+  }
+
+  // Reutiliza ClasificadorDeRiesgo (RF-69) como fuente única de los umbrales
+  // — ver obtenerSeveridadPorDefecto (VariablesVulnerabilidad.ts), que
+  // centraliza esta misma traducción para reutilizarla también en el
+  // envelope en memoria de RF-25/RF-30 (VulnerabilidadController.ts).
   private calcularSeveridad(cvssScore: CvssScore): string {
-    const etiquetas: Record<NivelDeRiesgo, string> = {
-      Bajo: 'Baja',
-      Moderado: 'Media',
-      Alto: 'Alta',
-      Crítico: 'Crítica'
-    };
-    return etiquetas[clasificar(cvssScore).valor];
+    return obtenerSeveridadPorDefecto(cvssScore);
   }
 }

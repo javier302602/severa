@@ -12,7 +12,9 @@ function repositorioFalso(resultados: Vulnerabilidad[]): VulnerabilidadRepositor
     listar: jest.fn(),
     buscarPorCve: jest.fn(),
     filtrarPorRangoCvss: jest.fn(),
-    filtrarPorSeveridad: jest.fn().mockResolvedValue(resultados),
+    filtrarPorSeveridad: jest.fn(),
+    filtrarPorRango: jest.fn(),
+    filtrarPorCategoria: jest.fn().mockResolvedValue(resultados),
     listarPorTipoAcceso: jest.fn(),
     listarPorTipoVulnerabilidad: jest.fn(),
     listarPorSoftware: jest.fn(),
@@ -23,16 +25,37 @@ function repositorioFalso(resultados: Vulnerabilidad[]): VulnerabilidadRepositor
   };
 }
 
+// M-04 (retoma, RF-28): filtrarPorSeveridad ya NO se usa desde acá — sigue
+// existiendo en el puerto porque GenerarRankingUrgencia.ts (M-08, fuera de
+// esta ronda) la sigue usando para su propia optimización de carga.
 describe('FiltrarPorCategoriaClasificacion', () => {
-  test('delega en filtrarPorSeveridad con la categoría y analistaId recibidos', async () => {
+  test('sin variable explícita, delega en filtrarPorCategoria con "severidad" (RETROCOMPATIBILIDAD, M-04 retoma)', async () => {
     const vulnerabilidad = new Vulnerabilidad('1', new IdentificadorCVE('CVE-2021-44228'), new CvssScore(9.5), 'Apache Log4j');
     const repository = repositorioFalso([vulnerabilidad]);
     const usecase = new FiltrarPorCategoriaClasificacion(repository);
 
     const resultado = await usecase.ejecutar('Crítica', 'analista-A');
 
-    expect(repository.filtrarPorSeveridad).toHaveBeenCalledWith('Crítica', 'analista-A');
+    expect(repository.filtrarPorCategoria).toHaveBeenCalledWith('severidad', 'Crítica', 'analista-A');
     expect(resultado).toEqual([vulnerabilidad]);
+  });
+
+  test('con variable="tipoAcceso" explícita, delega en filtrarPorCategoria con esa variable', async () => {
+    const repository = repositorioFalso([]);
+    const usecase = new FiltrarPorCategoriaClasificacion(repository);
+
+    await usecase.ejecutar('Remoto', 'analista-A', 'tipoAcceso');
+
+    expect(repository.filtrarPorCategoria).toHaveBeenCalledWith('tipoAcceso', 'Remoto', 'analista-A');
+  });
+
+  test('con variable="estadoRemediacion" explícita, delega en filtrarPorCategoria con esa variable', async () => {
+    const repository = repositorioFalso([]);
+    const usecase = new FiltrarPorCategoriaClasificacion(repository);
+
+    await usecase.ejecutar('Pendiente', 'analista-A', 'estadoRemediacion');
+
+    expect(repository.filtrarPorCategoria).toHaveBeenCalledWith('estadoRemediacion', 'Pendiente', 'analista-A');
   });
 
   test('devuelve un array vacío si no hay coincidencias en la categoría', async () => {

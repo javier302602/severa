@@ -88,6 +88,21 @@ describe('GET /vulnerabilidades/:cve — RF (Sprint 17)', () => {
     expect(new Date(res.body.fechaCarga)).toEqual(FECHA_CARGA);
   });
 
+  // RF-25/RF-30 (M-04, retoma): envelope genérico ADITIVO — los campos
+  // concretos de arriba (cvssScore, tipoAcceso, ...) siguen ahí sin cambios
+  // (verificado por el test anterior), esto solo confirma que la vista
+  // generalizada se suma en la misma respuesta.
+  test('RF-25/RF-30: suma variableClasificacion y variableAgrupacion sin quitar los campos concretos', async () => {
+    const res = await conToken(conHttps(request(app).get('/vulnerabilidades/CVE-2021-44228')));
+
+    expect(res.status).toBe(200);
+    expect(res.body.variableClasificacion).toEqual({ variable: 'cvssScore', valor: 10 });
+    expect(res.body.variableAgrupacion).toEqual({ variable: 'tipoAcceso', valor: 'Remoto' });
+    // Los campos de siempre no desaparecieron.
+    expect(res.body.cvssScore).toBe(10);
+    expect(res.body.tipoAcceso).toBe('Remoto');
+  });
+
   test('404 cuando el CVE no existe, sin filtrar campos internos', async () => {
     const res = await conToken(conHttps(request(app).get('/vulnerabilidades/CVE-9999-99999')));
 
@@ -95,24 +110,70 @@ describe('GET /vulnerabilidades/:cve — RF (Sprint 17)', () => {
   });
 });
 
-// RF-27/RF-28 (M-04): mismo criterio que arriba — se prueba el comportamiento
-// tal cual está hoy (parámetros cvssMin/cvssMax/severidad), sin generalizar
-// nada (ver el comentario en VulnerabilidadController.ts).
+// RF-27/RF-28 (M-04, retoma): generalizado de verdad — `variable` elige
+// entre las variables numéricas/categóricas existentes (ver
+// VariablesVulnerabilidad.ts). Retrocompatibilidad explícita: una URL sin
+// `variable` (como las que ya usan las llamadas existentes y los filtros
+// favoritos guardados en M-11) debe delegar exactamente con el default de
+// siempre, sin que el analista tenga que enterarse de que el mecanismo
+// cambió por dentro.
 describe('GET /vulnerabilidades — filtro por rango (RF-27) y por categoría (RF-28)', () => {
-  test('con cvssMin y cvssMax, delega en filtrarPorRangoDeVariableUseCase', async () => {
+  test('RETROCOMPATIBILIDAD: sin variable, cvssMin/cvssMax delega igual que antes (default cvssScore)', async () => {
     const res = await conToken(conHttps(request(app).get('/vulnerabilidades').query({ cvssMin: 7, cvssMax: 10 })));
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual([{ cve: 'CVE-2022-00001', cvssScore: 8.5, software: 'Nginx' }]);
-    expect(container.filtrarPorRangoDeVariableUseCase.ejecutar).toHaveBeenCalledWith(7, 10, 'analista-1');
+    expect(container.filtrarPorRangoDeVariableUseCase.ejecutar).toHaveBeenCalledWith(7, 10, 'analista-1', 'cvssScore');
   });
 
-  test('con severidad, delega en filtrarPorCategoriaClasificacionUseCase', async () => {
+  test('RETROCOMPATIBILIDAD: sin variable, severidad delega igual que antes (default severidad)', async () => {
     const res = await conToken(conHttps(request(app).get('/vulnerabilidades').query({ severidad: 'Crítica' })));
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual([{ cve: 'CVE-2022-00002', cvssScore: 9.8, software: 'OpenSSL' }]);
-    expect(container.filtrarPorCategoriaClasificacionUseCase.ejecutar).toHaveBeenCalledWith('Crítica', 'analista-1');
+    expect(container.filtrarPorCategoriaClasificacionUseCase.ejecutar).toHaveBeenCalledWith('Crítica', 'analista-1', 'severidad');
+  });
+
+  test('con variable=diasParaParche explícito, se pasa esa variable en vez del default', async () => {
+    const res = await conToken(
+      conHttps(request(app).get('/vulnerabilidades').query({ cvssMin: 1, cvssMax: 30, variable: 'diasParaParche' }))
+    );
+
+    expect(res.status).toBe(200);
+    expect(container.filtrarPorRangoDeVariableUseCase.ejecutar).toHaveBeenCalledWith(1, 30, 'analista-1', 'diasParaParche');
+  });
+
+  test('con variable=tipoAcceso explícito para categoría, se pasa esa variable en vez del default', async () => {
+    const res = await conToken(
+      conHttps(request(app).get('/vulnerabilidades').query({ severidad: 'Remoto', variable: 'tipoAcceso' }))
+    );
+
+    expect(res.status).toBe(200);
+    expect(container.filtrarPorCategoriaClasificacionUseCase.ejecutar).toHaveBeenCalledWith('Remoto', 'analista-1', 'tipoAcceso');
+  });
+
+  test('variable inválida para rango responde 400 sin llamar al caso de uso', async () => {
+    const llamadasPrevias = (container.filtrarPorRangoDeVariableUseCase.ejecutar as jest.Mock).mock.calls.length;
+
+    const res = await conToken(
+      conHttps(request(app).get('/vulnerabilidades').query({ cvssMin: 1, cvssMax: 10, variable: 'noExiste' }))
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('noExiste');
+    expect((container.filtrarPorRangoDeVariableUseCase.ejecutar as jest.Mock).mock.calls.length).toBe(llamadasPrevias);
+  });
+
+  test('variable inválida para categoría responde 400 sin llamar al caso de uso', async () => {
+    const llamadasPrevias = (container.filtrarPorCategoriaClasificacionUseCase.ejecutar as jest.Mock).mock.calls.length;
+
+    const res = await conToken(
+      conHttps(request(app).get('/vulnerabilidades').query({ severidad: 'Alta', variable: 'noExiste' }))
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('noExiste');
+    expect((container.filtrarPorCategoriaClasificacionUseCase.ejecutar as jest.Mock).mock.calls.length).toBe(llamadasPrevias);
   });
 
   test('sin ningún filtro, responde un array vacío sin llamar a ningún caso de uso de filtro', async () => {

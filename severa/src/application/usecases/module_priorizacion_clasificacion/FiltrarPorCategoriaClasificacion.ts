@@ -1,17 +1,23 @@
 import { Vulnerabilidad } from '../../../domain/entities/Vulnerabilidad';
 import { FiltrarPorCategoriaClasificacionUseCase } from '../../ports/in/module_priorizacion_clasificacion/FiltrarPorCategoriaClasificacionUseCase';
 import { VulnerabilidadRepository } from '../../ports/out/persistencia/repositorios/VulnerabilidadRepository';
+import { VariableCategoricaVulnerabilidad } from '../../../domain/services/classification/VariablesVulnerabilidad';
 
-// RF-28 (M-04): el SDS lo marca "generalizado" (renombrado de "Filtro por
-// Nivel de Severidad"), pero es solo el renombre de clase de
-// FiltrarPorSeveridad — el parámetro (severidad) y el método del
-// repositorio (filtrarPorSeveridad, columna severidad) siguen siendo
-// específicos de CVSS. Pendiente real hasta auditar M-09.
+// M-04 (retoma, RF-28): generalizado de verdad — `variable` decide qué
+// columna categórica compara el repositorio (ver PostgresVulnerabilidadRepository.
+// filtrarPorCategoria), en vez de asumir siempre severidad. Default
+// 'severidad' para retrocompatibilidad total con quien llame sin este
+// parámetro (URLs y filtros favoritos de M-11 ya existentes).
+const VARIABLE_POR_DEFECTO: VariableCategoricaVulnerabilidad = 'severidad';
 
 export class FiltrarPorCategoriaClasificacion implements FiltrarPorCategoriaClasificacionUseCase {
   constructor(private readonly vulnerabilidadRepository: VulnerabilidadRepository) {}
 
-  async ejecutar(severidad: string, analistaId: string): Promise<Vulnerabilidad[]> {
-    return this.vulnerabilidadRepository.filtrarPorSeveridad(severidad, analistaId);
+  async ejecutar(
+    valor: string,
+    analistaId: string,
+    variable: VariableCategoricaVulnerabilidad = VARIABLE_POR_DEFECTO
+  ): Promise<Vulnerabilidad[]> {
+    return this.vulnerabilidadRepository.filtrarPorCategoria(variable, valor, analistaId);
   }
 }

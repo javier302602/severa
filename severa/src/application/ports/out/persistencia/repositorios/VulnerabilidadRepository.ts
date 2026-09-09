@@ -1,6 +1,10 @@
 import { Vulnerabilidad } from '../../../../../domain/entities/Vulnerabilidad';
 import { EstadoRemediacion } from '../../../../../domain/shared/value-objects/EstadoRemediacion';
 import { FiltroVulnerabilidad } from '../../../../../domain/shared/value-objects/FiltroVulnerabilidad';
+import {
+  VariableNumericaVulnerabilidad,
+  VariableCategoricaVulnerabilidad
+} from '../../../../../domain/services/classification/VariablesVulnerabilidad';
 
 // Paginación (2026-07-19): opcional para no romper a ExportarBusquedaFiltrada,
 // que necesita TODAS las filas para el CSV — solo la búsqueda para pantalla
@@ -40,6 +44,15 @@ export interface VulnerabilidadRepository {
   buscarPorCve(cve: string, analistaId: string): Promise<Vulnerabilidad | null>;
   filtrarPorRangoCvss(cvssMin: number, cvssMax: number, analistaId: string): Promise<Vulnerabilidad[]>;
   filtrarPorSeveridad(severidad: string, analistaId: string): Promise<Vulnerabilidad[]>;
+  // M-04 (retoma, RF-27/RF-28), Modo A: generalización de las dos de arriba
+  // sobre un conjunto fijo y tipado de variables (ver VariablesVulnerabilidad.ts)
+  // — filtrarPorRangoCvss/filtrarPorSeveridad NO se eliminan ni se tocan:
+  // GenerarRankingUrgencia.ts sigue usando filtrarPorSeveridad para su propia
+  // optimización (evitar listar() el catálogo completo), fuera del alcance
+  // de esta retoma. Los nuevos métodos son los que consumen los casos de uso
+  // de M-04 de ahora en más.
+  filtrarPorRango(variable: VariableNumericaVulnerabilidad, minimo: number, maximo: number, analistaId: string): Promise<Vulnerabilidad[]>;
+  filtrarPorCategoria(variable: VariableCategoricaVulnerabilidad, valor: string, analistaId: string): Promise<Vulnerabilidad[]>;
   listarPorTipoAcceso(tipoAcceso: 'Remoto' | 'Local', analistaId: string): Promise<Vulnerabilidad[]>;
   listarPorTipoVulnerabilidad(tipoVulnerabilidad: string, analistaId: string): Promise<Vulnerabilidad[]>;
   listarPorSoftware(software: string, analistaId: string): Promise<Vulnerabilidad[]>;

@@ -328,4 +328,109 @@ describe('PostgresVulnerabilidadRepository — integración real (Sprint 16 + mi
       expect(resultado).toEqual(['Apache Log4j', 'Nginx']);
     });
   });
+
+  // M-04 (retoma, RF-27/RF-28): filtrarPorRango/filtrarPorCategoria son los
+  // únicos métodos nuevos de esta ronda — el mapeo columna-SQL
+  // (COLUMNA_SQL_NUMERICA/COLUMNA_SQL_CATEGORICA) y, sobre todo, el
+  // comportamiento real de Postgres con NULLs en dias_para_parche (columna
+  // nullable) solo se prueban de verdad acá, contra la base real — un mock
+  // de VulnerabilidadRepository nunca ejecuta este SQL (mismo motivo que el
+  // resto de este archivo).
+  describe('filtrarPorRango — RF-27 generalizado', () => {
+    const CVES_RANGO = ['CVE-1999-9501', 'CVE-1999-9502', 'CVE-1999-9503'];
+
+    afterEach(async () => {
+      await pool.query('DELETE FROM vulnerabilidades WHERE cve = ANY($1)', [CVES_RANGO]);
+    });
+
+    test('variable="cvssScore" (default) filtra por cvss_score, igual que antes de esta ronda', async () => {
+      await repository.guardar(
+        new Vulnerabilidad(CVES_RANGO[0], new IdentificadorCVE(CVES_RANGO[0]), new CvssScore(3.0), 'Rango CVSS').asignarAnalista(ANALISTA_DE_PRUEBA)
+      );
+      await repository.guardar(
+        new Vulnerabilidad(CVES_RANGO[1], new IdentificadorCVE(CVES_RANGO[1]), new CvssScore(8.0), 'Rango CVSS').asignarAnalista(ANALISTA_DE_PRUEBA)
+      );
+
+      const resultado = await repository.filtrarPorRango('cvssScore', 7.0, 10.0, ANALISTA_DE_PRUEBA);
+
+      expect(resultado.map((v) => v.cve.valor)).toEqual([CVES_RANGO[1]]);
+    });
+
+    // El caso pedido explícitamente: dias_para_parche es NULLABLE (migración
+    // 002, sin NOT NULL) — una fila sin diasParaParche debe quedar EXCLUIDA
+    // de cualquier rango (el comportamiento nativo de "NULL BETWEEN x AND y"
+    // en SQL, nunca verdadero), y una fila CON diasParaParche dentro del
+    // rango debe quedar INCLUIDA. No es un comportamiento que el código de
+    // la app implemente a mano — es Postgres mismo — pero es exactamente lo
+    // que un mock no puede demostrar, y es el motivo por el que esta prueba
+    // vive acá y no en el conjunto de tests con mock.
+    test('variable="diasParaParche": excluye filas con diasParaParche NULL e incluye las que caen en el rango', async () => {
+      const conDiasEnRango = new Vulnerabilidad(
+        CVES_RANGO[0], new IdentificadorCVE(CVES_RANGO[0]), new CvssScore(5.0), 'Con dias en rango',
+        new TipoAccesoValue('Sí'), 15
+      ).asignarAnalista(ANALISTA_DE_PRUEBA);
+      const conDiasFueraDeRango = new Vulnerabilidad(
+        CVES_RANGO[1], new IdentificadorCVE(CVES_RANGO[1]), new CvssScore(5.0), 'Con dias fuera de rango',
+        new TipoAccesoValue('Sí'), 90
+      ).asignarAnalista(ANALISTA_DE_PRUEBA);
+      const sinDias = new Vulnerabilidad(
+        CVES_RANGO[2], new IdentificadorCVE(CVES_RANGO[2]), new CvssScore(5.0), 'Sin dias para parche',
+        new TipoAccesoValue('Sí'), undefined
+      ).asignarAnalista(ANALISTA_DE_PRUEBA);
+
+      await repository.guardar(conDiasEnRango);
+      await repository.guardar(conDiasFueraDeRango);
+      await repository.guardar(sinDias);
+
+      const resultado = await repository.filtrarPorRango('diasParaParche', 0, 30, ANALISTA_DE_PRUEBA);
+
+      expect(resultado.map((v) => v.cve.valor)).toEqual([CVES_RANGO[0]]);
+      expect(resultado.map((v) => v.cve.valor)).not.toContain(CVES_RANGO[2]); // NULL excluido
+      expect(resultado.map((v) => v.cve.valor)).not.toContain(CVES_RANGO[1]); // fuera de rango
+    });
+  });
+
+  describe('filtrarPorCategoria — RF-28 generalizado', () => {
+    const CVES_CATEGORIA = ['CVE-1999-9601', 'CVE-1999-9602', 'CVE-1999-9603'];
+
+    afterEach(async () => {
+      await pool.query('DELETE FROM vulnerabilidades WHERE cve = ANY($1)', [CVES_CATEGORIA]);
+    });
+
+    test('variable="severidad" (default) filtra por la columna severidad, igual que antes de esta ronda', async () => {
+      await repository.guardar(
+        new Vulnerabilidad(CVES_CATEGORIA[0], new IdentificadorCVE(CVES_CATEGORIA[0]), new CvssScore(9.5), 'Categoria Severidad').asignarAnalista(ANALISTA_DE_PRUEBA)
+      );
+
+      const resultado = await repository.filtrarPorCategoria('severidad', 'Crítica', ANALISTA_DE_PRUEBA);
+
+      expect(resultado.map((v) => v.cve.valor)).toEqual([CVES_CATEGORIA[0]]);
+    });
+
+    // tipoAcceso es la única variable categórica cuya columna SQL es BOOLEAN
+    // (acceso_remoto) en vez de texto — la traducción 'Remoto'/'Local' -> true/false
+    // solo se demuestra contra Postgres real (un mock no valida el tipo de columna).
+    test('variable="tipoAcceso" traduce "Remoto"/"Local" a la columna booleana acceso_remoto', async () => {
+      await repository.guardar(
+        new Vulnerabilidad(CVES_CATEGORIA[0], new IdentificadorCVE(CVES_CATEGORIA[0]), new CvssScore(5.0), 'Acceso Remoto', new TipoAccesoValue('Sí')).asignarAnalista(ANALISTA_DE_PRUEBA)
+      );
+      await repository.guardar(
+        new Vulnerabilidad(CVES_CATEGORIA[1], new IdentificadorCVE(CVES_CATEGORIA[1]), new CvssScore(5.0), 'Acceso Local', new TipoAccesoValue('No')).asignarAnalista(ANALISTA_DE_PRUEBA)
+      );
+
+      const resultado = await repository.filtrarPorCategoria('tipoAcceso', 'Remoto', ANALISTA_DE_PRUEBA);
+
+      expect(resultado.map((v) => v.cve.valor)).toEqual([CVES_CATEGORIA[0]]);
+    });
+
+    test('variable="estadoRemediacion" filtra por la columna estado_remediacion', async () => {
+      await repository.guardar(
+        new Vulnerabilidad(CVES_CATEGORIA[0], new IdentificadorCVE(CVES_CATEGORIA[0]), new CvssScore(5.0), 'Estado Pendiente').asignarAnalista(ANALISTA_DE_PRUEBA)
+      );
+
+      const resultado = await repository.filtrarPorCategoria('estadoRemediacion', 'Pendiente', ANALISTA_DE_PRUEBA);
+
+      expect(resultado.map((v) => v.cve.valor)).toEqual([CVES_CATEGORIA[0]]);
+    });
+  });
 });

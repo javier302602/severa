@@ -22,6 +22,8 @@ describe('CompararPorSoftware', () => {
       buscarPorCve: jest.fn().mockResolvedValue(null),
       filtrarPorRangoCvss: jest.fn().mockResolvedValue([]),
       filtrarPorSeveridad: jest.fn().mockResolvedValue([]),
+      filtrarPorRango: jest.fn(),
+      filtrarPorCategoria: jest.fn(),
       listarPorTipoAcceso: jest.fn().mockResolvedValue([]),
       listarPorTipoVulnerabilidad: jest.fn().mockResolvedValue([]),
       listarSoftwareDisponible: jest.fn().mockResolvedValue([]),
