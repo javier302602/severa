@@ -9,7 +9,13 @@ import {
   calcularMediaArmonica,
   ResumenCincoNumeros
 } from './EstadisticaDescriptiva';
-import { generarTablaAgrupada, generarIntervalosEquiespaciados, validarNumeroDeIntervalos, TablaFrecuencia } from './DistribucionFrecuencias';
+import {
+  generarTablaAgrupada,
+  generarIntervalosEquiespaciados,
+  validarNumeroDeIntervalos,
+  calcularCantidadIntervalosAutomatica,
+  TablaFrecuencia
+} from './DistribucionFrecuencias';
 import { DatasetInvalidoError } from '../../errors/DatasetInvalidoError';
 import { minimoDe, maximoDe } from '../MinMax';
 
@@ -22,8 +28,6 @@ import { minimoDe, maximoDe } from '../MinMax';
 // intervalos custom, así que se reutiliza tal cual en vez de reimplementar
 // el agrupamiento; lo único nuevo acá es CÓMO se calculan esos intervalos
 // para una columna genérica (no hay un rango fijo como el 0-10 de CVSS).
-const CANTIDAD_MINIMA_INTERVALOS = 3;
-const CANTIDAD_MAXIMA_INTERVALOS = 10;
 
 export interface AnalisisUnivariadoNumerico {
   tipo: 'numerica';
@@ -71,12 +75,14 @@ function aFecha(valor: unknown): Date {
   return valor instanceof Date ? valor : new Date(String(valor));
 }
 
-// Regla de Sturges (k = ceil(log2(n) + 1)), acotada entre 3 y 10 intervalos
-// para que la tabla siga siendo legible tanto con pocos valores como con
-// miles — solo cuando el analista no pide un número de intervalos manual
-// (RF-39). El reparto real (incluido el redondeo de límites) vive en
-// generarIntervalosEquiespaciados (DistribucionFrecuencias.ts), compartido
-// con el pipeline de ciberseguridad.
+// Regla de Sturges — solo cuando el analista no pide un número de
+// intervalos manual (RF-39). El cálculo de cuántos intervalos (Sturges,
+// acotada 3-10) vive en calcularCantidadIntervalosAutomatica
+// (DistribucionFrecuencias.ts, M-05 retoma) — compartida con
+// GenerarDistribucionFrecuencias.ts (pipeline de ciberseguridad), que la
+// necesita para variables sin un rango fijo de negocio (ej.
+// diasParaParche). El reparto real (incluido el redondeo de límites) vive
+// en generarIntervalosEquiespaciados, también compartida.
 function generarIntervalosAutomaticos(
   valores: number[],
   numeroDeIntervalos?: number
@@ -93,11 +99,7 @@ function generarIntervalosAutomaticos(
     return generarIntervalosEquiespaciados(minimo, maximo, numeroDeIntervalos);
   }
 
-  const cantidadIntervalos = Math.min(
-    CANTIDAD_MAXIMA_INTERVALOS,
-    Math.max(CANTIDAD_MINIMA_INTERVALOS, Math.ceil(Math.log2(valores.length) + 1))
-  );
-  return generarIntervalosEquiespaciados(minimo, maximo, cantidadIntervalos);
+  return generarIntervalosEquiespaciados(minimo, maximo, calcularCantidadIntervalosAutomatica(valores.length));
 }
 
 function generarDistribucionCategorica(

@@ -1,6 +1,7 @@
 import { analizarColumnaUnivariado, AnalisisUnivariadoNumerico, AnalisisUnivariadoCategorico, AnalisisUnivariadoFecha } from '../../../../src/domain/services/descriptive-statistics/AnalisisUnivariadoGenerico';
 import { DatasetInvalidoError } from '../../../../src/domain/errors/DatasetInvalidoError';
 import { NumeroDeIntervalosInvalidoError } from '../../../../src/domain/errors/NumeroDeIntervalosInvalidoError';
+import { calcularCantidadIntervalosAutomatica } from '../../../../src/domain/services/descriptive-statistics/DistribucionFrecuencias';
 
 describe('AnalisisUnivariadoGenerico — Mejora 4 (Análisis de Datos General) Fase 3', () => {
   test('columna inexistente tira DatasetInvalidoError con mensaje claro', () => {
@@ -161,5 +162,29 @@ describe('AnalisisUnivariadoGenerico — Mejora 4 (Análisis de Datos General) F
 
     // Sturges para n=10: ceil(log2(10)+1) = ceil(4.32) = 5, dentro de [3,10].
     expect(analisis.distribucion).toHaveLength(5);
+  });
+
+  // M-05 (retoma): calcularCantidadIntervalosAutomatica() se extrajo de acá
+  // (era una función privada de este archivo) a DistribucionFrecuencias.ts,
+  // para que GenerarDistribucionFrecuencias.ts (M-05) también la reutilice.
+  // Estos tests confirman explícitamente que el resultado NO cambió con la
+  // extracción — mismos umbrales exactos (3 mínimo, 10 máximo), tanto en
+  // los bordes de la acotación como en un caso intermedio, cruzando el
+  // resultado de analizarColumnaUnivariado (consumidor real) contra una
+  // llamada directa a la función compartida (no una coincidencia puntual).
+  describe('calcularCantidadIntervalosAutomatica compartida con DistribucionFrecuencias.ts (no-regresión de la extracción)', () => {
+    test.each([
+      [3, 3], // n muy chico -> clampeado al mínimo (3)
+      [4, 3], // ceil(log2(4)+1) = 3, ya en el piso
+      [10, 5], // caso intermedio ya cubierto arriba, repetido acá para cruzar con la función directa
+      [64, 7], // ceil(log2(64)+1) = 7
+      [10000, 10] // n muy grande -> clampeado al máximo (10)
+    ])('n=%i -> %i intervalos, igual en analizarColumnaUnivariado y en la función compartida', (n, intervalosEsperados) => {
+      const filas = Array.from({ length: n }, (_, i) => ({ precio: i }));
+      const analisis = analizarColumnaUnivariado('precio', ['precio'], filas) as AnalisisUnivariadoNumerico;
+
+      expect(analisis.distribucion).toHaveLength(intervalosEsperados);
+      expect(calcularCantidadIntervalosAutomatica(n)).toBe(intervalosEsperados);
+    });
   });
 });

@@ -89,6 +89,21 @@ describe('Error-handler global — bug del catálogo vacío (Sprint 15)', () => 
     expect(res.body.error).toContain('no puede estar vacía');
   });
 
+  // M-05 (retoma, RF-33): mismo bug real de Sprint 15, ahora extendido a la
+  // variable nueva (diasParaParche) — confirma que generalizar el caso de
+  // uso no reabrió el crash del catálogo vacío para esta variable, y que el
+  // mensaje de error usa la etiqueta correcta ("Días para Parche", no "CVSS
+  // Score").
+  test('GET /estadistica/frecuencias?tipo=agrupada&variable=diasParaParche con catálogo vacío responde 400 JSON con la etiqueta correcta', async () => {
+    const res = await conToken(
+      conHttps(request(app).get('/estadistica/frecuencias?tipo=agrupada&variable=diasParaParche'))
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('Días para Parche');
+    expect(res.body.error).toContain('no puede estar vacía');
+  });
+
   test('GET /graficos/histogramaCvssAgrupado con catálogo vacío responde 400 JSON (los otros 9 tipos ya toleraban vacío)', async () => {
     const res = await conToken(conHttps(request(app).get('/graficos/histogramaCvssAgrupado')));
 

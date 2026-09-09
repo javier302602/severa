@@ -59,6 +59,27 @@ export function validarNumeroDeIntervalos(numeroDeIntervalos: number): void {
   }
 }
 
+// M-05 (retoma): extraída de AnalisisUnivariadoGenerico.ts (donde vivía
+// privada) para que GenerarDistribucionFrecuencias.ts también pueda calcular
+// una cantidad de intervalos automática para variables sin un rango fijo de
+// negocio (ej. diasParaParche) — mismos umbrales exactos que ya usaba el
+// pipeline genérico, sin duplicarlos. Regla de Sturges (k = ceil(log2(n)+1)),
+// acotada entre 3 y 10 intervalos para que la tabla siga siendo legible
+// tanto con pocos valores como con miles. Deliberadamente NOMBRES DISTINTOS
+// a NUMERO_MINIMO_DE_INTERVALOS/NUMERO_MAXIMO_DE_INTERVALOS de arriba: esas
+// acotan lo que el ANALISTA puede pedir a mano (2-30); estas acotan lo que
+// el sistema elige SOLO cuando el analista no pide nada (3-10) — son dos
+// rangos con propósitos distintos, no el mismo valor repetido.
+const CANTIDAD_MINIMA_INTERVALOS_AUTOMATICA = 3;
+const CANTIDAD_MAXIMA_INTERVALOS_AUTOMATICA = 10;
+
+export function calcularCantidadIntervalosAutomatica(cantidadDeValores: number): number {
+  return Math.min(
+    CANTIDAD_MAXIMA_INTERVALOS_AUTOMATICA,
+    Math.max(CANTIDAD_MINIMA_INTERVALOS_AUTOMATICA, Math.ceil(Math.log2(cantidadDeValores) + 1))
+  );
+}
+
 // Sin este redondeo, dividir un rango arbitrario en N partes iguales deja
 // restos de coma flotante en los límites (ej. 36.400000000000006 en vez de
 // 36.4) — bug real confirmado generando el informe de Fase 5. Los intervalos
