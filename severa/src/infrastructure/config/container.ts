@@ -41,6 +41,8 @@ import { CompararPorTipoAcceso } from '../../application/usecases/module_compara
 import { CompararPorTipoDeVulnerabilidad } from '../../application/usecases/module_comparacion_categorias/CompararPorTipoDeVulnerabilidad';
 import { CompararPorSoftware } from '../../application/usecases/module_comparacion_categorias/CompararPorSoftware';
 import { ListarSoftwareDisponible } from '../../application/usecases/module_comparacion_categorias/ListarSoftwareDisponible';
+import { CompararPorCategoria } from '../../application/usecases/module_comparacion_categorias/CompararPorCategoria';
+import { CompararPorCategoriasCruzadas } from '../../application/usecases/module_comparacion_categorias/CompararPorCategoriasCruzadas';
 import { ClasificarRiesgo } from '../../application/usecases/module_priorizacion_clasificacion/ClasificarRiesgo';
 import { GenerarRankingUrgencia } from '../../application/usecases/module_priorizacion_clasificacion/GenerarRankingUrgencia';
 import { MarcarEnProcesoDeRemediacion } from '../../application/usecases/module_priorizacion_clasificacion/MarcarEnProcesoDeRemediacion';
@@ -242,6 +244,11 @@ export const container = {
   compararPorTipoDeVulnerabilidadUseCase: new CompararPorTipoDeVulnerabilidad(vulnerabilidadRepository),
   compararPorSoftwareUseCase: new CompararPorSoftware(vulnerabilidadRepository),
   listarSoftwareDisponibleUseCase: new ListarSoftwareDisponible(vulnerabilidadRepository),
+  // M-08 (retoma, RF-62/63/64/65/67): N categorías (cerradas o abiertas) y
+  // cross-tab — CompararPorTipoAcceso/CompararPorTipoDeVulnerabilidad/
+  // CompararPorSoftware (arriba) quedan intactos, sin relación con estos dos.
+  compararPorCategoriaUseCase: new CompararPorCategoria(vulnerabilidadRepository),
+  compararPorCategoriasCruzadasUseCase: new CompararPorCategoriasCruzadas(vulnerabilidadRepository),
   clasificarRiesgoUseCase: new ClasificarRiesgo(vulnerabilidadRepository),
   generarRankingUrgenciaUseCase: new GenerarRankingUrgencia(vulnerabilidadRepository, servicioDeNotificaciones),
   // RF-94: cambios de estado de remediación quedan auditados (quién y cuándo).

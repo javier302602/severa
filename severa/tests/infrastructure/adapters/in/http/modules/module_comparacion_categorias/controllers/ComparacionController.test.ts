@@ -10,6 +10,8 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => {
   const { CompararPorSoftware } = require('../../../../../../../../src/application/usecases/module_comparacion_categorias/CompararPorSoftware');
   const { CompararPorTipoDeVulnerabilidad } = require('../../../../../../../../src/application/usecases/module_comparacion_categorias/CompararPorTipoDeVulnerabilidad');
   const { ListarSoftwareDisponible } = require('../../../../../../../../src/application/usecases/module_comparacion_categorias/ListarSoftwareDisponible');
+  const { CompararPorCategoria } = require('../../../../../../../../src/application/usecases/module_comparacion_categorias/CompararPorCategoria');
+  const { CompararPorCategoriasCruzadas } = require('../../../../../../../../src/application/usecases/module_comparacion_categorias/CompararPorCategoriasCruzadas');
   const { Vulnerabilidad } = require('../../../../../../../../src/domain/entities/Vulnerabilidad');
   const { IdentificadorCVE } = require('../../../../../../../../src/domain/shared/value-objects/IdentificadorCVE');
   const { CvssScore } = require('../../../../../../../../src/domain/shared/value-objects/CvssScore');
@@ -32,7 +34,7 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => {
     guardar: jest.fn(),
     guardarLote: jest.fn(),
     contar: jest.fn(),
-    listar: jest.fn(),
+    listar: jest.fn(async (analistaId: string) => catalogoPorAnalista[analistaId] ?? []),
     buscarPorCve: jest.fn(),
     filtrarPorRangoCvss: jest.fn(),
     filtrarPorSeveridad: jest.fn(),
@@ -60,7 +62,9 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => {
       compararPorTipoAccesoUseCase: new CompararPorTipoAcceso(repository),
       compararPorSoftwareUseCase: new CompararPorSoftware(repository),
       compararPorTipoDeVulnerabilidadUseCase: new CompararPorTipoDeVulnerabilidad(repository),
-      listarSoftwareDisponibleUseCase: new ListarSoftwareDisponible(repository)
+      listarSoftwareDisponibleUseCase: new ListarSoftwareDisponible(repository),
+      compararPorCategoriaUseCase: new CompararPorCategoria(repository),
+      compararPorCategoriasCruzadasUseCase: new CompararPorCategoriasCruzadas(repository)
     }
   };
 });
@@ -141,6 +145,110 @@ describe('GET /comparacion/software-disponible — scoping/multi-tenancy', () =>
 
   test('sin autenticar devuelve 401', async () => {
     const res = await conHttps(request(app).get('/comparacion/software-disponible'));
+    expect(res.status).toBe(401);
+  });
+});
+
+// M-08 (retoma, RF-62/63/64/67): N categorías — no reemplaza a /acceso,
+// /tipo, /software (verificados intactos arriba), es una ruta nueva.
+describe('GET /comparacion/por-categoria — RF-62/63/64/67', () => {
+  test('sin query params, agrupa por tipoAcceso (default) usando cvssScore (default)', async () => {
+    const res = await conToken('analista-comparacion-A')(conHttps(request(app).get('/comparacion/por-categoria')));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([
+      { categoria: 'Remoto', media: 10, desviacionEstandar: null, cantidad: 1 },
+      { categoria: 'Local', media: 9.8, desviacionEstandar: null, cantidad: 1 }
+    ]);
+  });
+
+  test('con variableAgrupacion="software" (variable ABIERTA), descubre las categorías reales del catálogo', async () => {
+    const res = await conToken('analista-comparacion-A')(
+      conHttps(request(app).get('/comparacion/por-categoria').query({ variableAgrupacion: 'software' }))
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([
+      { categoria: 'Apache Log4j', media: 10, desviacionEstandar: null, cantidad: 1 },
+      { categoria: 'OpenSSL', media: 9.8, desviacionEstandar: null, cantidad: 1 }
+    ]);
+  });
+
+  test('variableAgrupacion inválida responde 400', async () => {
+    const res = await conToken('analista-comparacion-A')(
+      conHttps(request(app).get('/comparacion/por-categoria').query({ variableAgrupacion: 'noExiste' }))
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('noExiste');
+  });
+
+  test('variableValor inválida responde 400', async () => {
+    const res = await conToken('analista-comparacion-A')(
+      conHttps(request(app).get('/comparacion/por-categoria').query({ variableValor: 'noExiste' }))
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  test('sin autenticar devuelve 401', async () => {
+    const res = await conHttps(request(app).get('/comparacion/por-categoria'));
+    expect(res.status).toBe(401);
+  });
+});
+
+// RF-65: cross-tab — pieza completamente nueva, sin equivalente previo.
+describe('GET /comparacion/cruzada — RF-65', () => {
+  test('sin query params, cruza tipoAcceso (default A) x estadoRemediacion (default B), solo celdas observadas', async () => {
+    const res = await conToken('analista-comparacion-A')(conHttps(request(app).get('/comparacion/cruzada')));
+
+    expect(res.status).toBe(200);
+    // Las 2 vulnerabilidades del fixture nunca configuran estadoRemediacion
+    // -> ambas caen en 'Pendiente' (default de la entidad) — 2 celdas
+    // observadas, no las 6 posibles de un cartesiano completo.
+    expect(res.body).toEqual([
+      { categoriaA: 'Local', categoriaB: 'Pendiente', media: 9.8, desviacionEstandar: null, cantidad: 1 },
+      { categoriaA: 'Remoto', categoriaB: 'Pendiente', media: 10, desviacionEstandar: null, cantidad: 1 }
+    ]);
+  });
+
+  test('cruzar una variable contra sí misma responde 400', async () => {
+    const res = await conToken('analista-comparacion-A')(
+      conHttps(request(app).get('/comparacion/cruzada').query({ variableAgrupacionA: 'tipoAcceso', variableAgrupacionB: 'tipoAcceso' }))
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  test('con variableAgrupacionA="software" (abierta) y variableAgrupacionB="tipoAcceso" (cerrada)', async () => {
+    const res = await conToken('analista-comparacion-A')(
+      conHttps(
+        request(app)
+          .get('/comparacion/cruzada')
+          .query({ variableAgrupacionA: 'software', variableAgrupacionB: 'tipoAcceso' })
+      )
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(
+      expect.arrayContaining([
+        { categoriaA: 'Apache Log4j', categoriaB: 'Remoto', media: 10, desviacionEstandar: null, cantidad: 1 },
+        { categoriaA: 'OpenSSL', categoriaB: 'Local', media: 9.8, desviacionEstandar: null, cantidad: 1 }
+      ])
+    );
+    expect(res.body).toHaveLength(2);
+  });
+
+  test('con variableValor="diasParaParche" explícito', async () => {
+    const res = await conToken('analista-comparacion-A')(
+      conHttps(request(app).get('/comparacion/cruzada').query({ variableValor: 'diasParaParche' }))
+    );
+
+    expect(res.status).toBe(200);
+  });
+
+  test('sin autenticar devuelve 401', async () => {
+    const res = await conHttps(request(app).get('/comparacion/cruzada'));
     expect(res.status).toBe(401);
   });
 });

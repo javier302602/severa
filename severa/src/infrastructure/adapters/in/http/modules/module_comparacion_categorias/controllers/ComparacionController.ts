@@ -33,3 +33,30 @@ comparacionRouter.get('/software', async (req, res) => {
   const resultado = await container.compararPorSoftwareUseCase.ejecutar(categoriaA, categoriaB, req.analistaAutenticado!.id);
   res.json(resultado);
 });
+
+// M-08 (retoma, RF-62/63/64/67): N categorías de una sola variable de
+// agrupación (cerrada: tipoAcceso/estadoRemediacion/severidad; abierta:
+// tipoVulnerabilidad/software) — sin try/catch propio, mismo criterio que el
+// resto de este archivo: un VariableDeConsultaInvalidaError cae al
+// error-handler global de app.ts, que responde 400.
+comparacionRouter.get('/por-categoria', async (req, res) => {
+  const variableAgrupacion = typeof req.query.variableAgrupacion === 'string' ? req.query.variableAgrupacion : undefined;
+  const variableValor = typeof req.query.variableValor === 'string' ? req.query.variableValor : undefined;
+  const resultado = await container.compararPorCategoriaUseCase.ejecutar(req.analistaAutenticado!.id, variableAgrupacion, variableValor);
+  res.json(resultado);
+});
+
+// RF-65: cross-tab de dos variables de agrupación independientes — mismo
+// criterio de error que la ruta anterior.
+comparacionRouter.get('/cruzada', async (req, res) => {
+  const variableAgrupacionA = typeof req.query.variableAgrupacionA === 'string' ? req.query.variableAgrupacionA : undefined;
+  const variableAgrupacionB = typeof req.query.variableAgrupacionB === 'string' ? req.query.variableAgrupacionB : undefined;
+  const variableValor = typeof req.query.variableValor === 'string' ? req.query.variableValor : undefined;
+  const resultado = await container.compararPorCategoriasCruzadasUseCase.ejecutar(
+    req.analistaAutenticado!.id,
+    variableAgrupacionA,
+    variableAgrupacionB,
+    variableValor
+  );
+  res.json(resultado);
+});
