@@ -149,7 +149,7 @@ function SelectorDeMapeo({
         })}
       </div>
       <p className="text-xs text-slate-500 dark:text-slate-500">
-        * Obligatorio. Los demás campos, si no se mapean, se buscan con los nombres habituales del dataset de SEVERA.
+        * Obligatorio. Los demás campos, si no se mapean, se buscan con los nombres habituales del dataset de SIADE.
       </p>
     </div>
   );
@@ -174,7 +174,7 @@ function RestablecerDatosSection() {
     <section className="space-y-3 rounded-lg border border-red-200 bg-red-50/50 p-6 shadow-sm dark:border-red-900/50 dark:bg-red-950/20">
       <h2 className="text-base font-semibold text-red-900 dark:text-red-300">Restablecer mis datos</h2>
       <p className="text-sm text-red-800 dark:text-red-400">
-        Elimina permanentemente todas TUS vulnerabilidades cargadas en SEVERA, para poder importar un dataset nuevo
+        Elimina permanentemente todas TUS vulnerabilidades cargadas en SIADE, para poder importar un dataset nuevo
         sin arrastrar el anterior. Cada analista tiene su propio catálogo aislado — esto no afecta a otros usuarios.
       </p>
       <button

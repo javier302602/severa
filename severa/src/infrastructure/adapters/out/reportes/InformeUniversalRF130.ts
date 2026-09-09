@@ -87,9 +87,9 @@ function dibujarSeccionPortada(doc: PDFKit.PDFDocument, contexto: ContextoInform
   switch (contexto.pipeline) {
     case 'cvss': {
       const datos = contexto.datos;
-      doc.fontSize(20).fillColor('#0f172a').font('Times-Bold').text('Informe SEVERA — Análisis Estadístico de Vulnerabilidades', { align: 'center' });
+      doc.fontSize(20).fillColor('#0f172a').font('Times-Bold').text('Informe SIADE — Análisis Estadístico de Vulnerabilidades', { align: 'center' });
       doc.moveDown(1);
-      doc.fontSize(12).fillColor('#334155').font('Times-Bold').text(`Generado por SEVERA para ${datos.generadoPara}`, { align: 'center' });
+      doc.fontSize(12).fillColor('#334155').font('Times-Bold').text(`Generado por SIADE para ${datos.generadoPara}`, { align: 'center' });
       doc.moveDown(0.5);
       doc.fontSize(10).fillColor('#64748b').font('Times-Roman').text(`Generado: ${datos.generadoEn.toLocaleString()}`, { align: 'center' });
       doc.text(`Total de vulnerabilidades analizadas: ${datos.totalVulnerabilidades}`, { align: 'center' });
@@ -98,9 +98,9 @@ function dibujarSeccionPortada(doc: PDFKit.PDFDocument, contexto: ContextoInform
     }
     case 'generico': {
       const datos = contexto.datos;
-      doc.fontSize(20).fillColor('#0f172a').font('Times-Bold').text('Informe SEVERA — Análisis de Datos General', { align: 'center' });
+      doc.fontSize(20).fillColor('#0f172a').font('Times-Bold').text('Informe SIADE — Análisis de Datos General', { align: 'center' });
       doc.moveDown(1);
-      doc.fontSize(12).fillColor('#334155').font('Times-Bold').text(`Generado por SEVERA para ${datos.generadoPara}`, { align: 'center' });
+      doc.fontSize(12).fillColor('#334155').font('Times-Bold').text(`Generado por SIADE para ${datos.generadoPara}`, { align: 'center' });
       doc.moveDown(0.5);
       doc.fontSize(10).fillColor('#64748b').font('Times-Roman').text(`Generado: ${datos.generadoEn.toLocaleString()}`, { align: 'center' });
       doc.text(`${datos.totalFilas} fila(s) — ${datos.totalColumnas} columna(s)`, { align: 'center' });
@@ -134,7 +134,7 @@ function dibujarSeccionResumenEjecutivo(doc: PDFKit.PDFDocument, contexto: Conte
       const r = datos.resumenEstadistico;
       parrafo(
         doc,
-        `Este informe analiza ${datos.totalVulnerabilidades} vulnerabilidad(es) registradas en SEVERA para ${datos.generadoPara}. ` +
+        `Este informe analiza ${datos.totalVulnerabilidades} vulnerabilidad(es) registradas en SIADE para ${datos.generadoPara}. ` +
           `La severidad promedio observada es ${r.media.toFixed(2)} en la escala CVSS, un nivel de riesgo típico ` +
           `"${nivelDeRiesgoDesdeCvss(r.media)}".`
       );
@@ -343,7 +343,7 @@ function dibujarSeccionCalidadDeDatos(doc: PDFKit.PDFDocument, contexto: Context
       }
       parrafo(
         doc,
-        'SEVERA no conserva el motivo de cada fila rechazada más allá de la respuesta inmediata de esa importación — ' +
+        'SIADE no conserva el motivo de cada fila rechazada más allá de la respuesta inmediata de esa importación — ' +
           'solo el conteo agregado (importados/rechazados) queda registrado en el historial de auditoría.'
       );
       return;
@@ -420,8 +420,8 @@ function dibujarSeccionValoresFaltantes(doc: PDFKit.PDFDocument, contexto: Conte
 }
 
 // ---------------------------------------------------------------------
-// 8. Limpieza realizada — no aplica a CVSS (SEVERA no transforma datos de
-// vulnerabilidades). Genérico: SEVERA tampoco transforma datos genéricos —
+// 8. Limpieza realizada — no aplica a CVSS (SIADE no transforma datos de
+// vulnerabilidades). Genérico: SIADE tampoco transforma datos genéricos —
 // solo se reporta el CONTEO de duplicados ya detectado, con la aclaración
 // explícita de que no hay una bitácora de limpieza real (nota ya redactada
 // y confirmada en el mapeo de RF-130).
@@ -429,7 +429,7 @@ function dibujarSeccionValoresFaltantes(doc: PDFKit.PDFDocument, contexto: Conte
 function dibujarSeccionLimpiezaRealizada(doc: PDFKit.PDFDocument, contexto: ContextoInformeUniversal): void {
   switch (contexto.pipeline) {
     case 'cvss':
-      dibujarSeccionNoAplicable(doc, 'SEVERA no transforma datos de vulnerabilidades — solo diagnostica lo que se importa tal cual.');
+      dibujarSeccionNoAplicable(doc, 'SIADE no transforma datos de vulnerabilidades — solo diagnostica lo que se importa tal cual.');
       return;
     case 'generico': {
       const datos = contexto.datos;
@@ -437,12 +437,12 @@ function dibujarSeccionLimpiezaRealizada(doc: PDFKit.PDFDocument, contexto: Cont
         doc,
         datos.filasDuplicadas === 0
           ? 'No se detectó ninguna limpieza necesaria: sin filas duplicadas exactas.'
-          : `Se detectaron ${datos.filasDuplicadas} fila(s) duplicada(s) exacta(s) (ver sección 6) — SEVERA no las ` +
+          : `Se detectaron ${datos.filasDuplicadas} fila(s) duplicada(s) exacta(s) (ver sección 6) — SIADE no las ` +
             'elimina ni modifica automáticamente.'
       );
       parrafo(
         doc,
-        'SEVERA no transforma datos: esta sección reporta únicamente lo que se detectó, no una bitácora de limpieza ' +
+        'SIADE no transforma datos: esta sección reporta únicamente lo que se detectó, no una bitácora de limpieza ' +
           'aplicada — el análisis se ejecuta siempre sobre el dataset tal cual fue importado.'
       );
       return;
@@ -1067,7 +1067,7 @@ function dibujarSeccionConclusiones(doc: PDFKit.PDFDocument, contexto: ContextoI
       parrafo(
         doc,
         'A partir de los hallazgos de la sección anterior, este cierre reúne las limitaciones a tener en cuenta al usar ' +
-          'este informe: SEVERA diagnostica el dataset tal cual fue importado, sin ajustar el análisis a un caso de uso ' +
+          'este informe: SIADE diagnostica el dataset tal cual fue importado, sin ajustar el análisis a un caso de uso ' +
           'de negocio específico.'
       );
 

@@ -188,8 +188,8 @@ async function construirContenido(datos: DatosInforme): Promise<Array<ElementoDo
   const ultimo = datos.origenYCalidad.ultimoCambioRegistrado;
 
   const contenido: Array<ElementoDocumento> = [
-    new Paragraph({ text: 'Informe SEVERA — Análisis Estadístico de Vulnerabilidades', heading: HeadingLevel.TITLE }),
-    new Paragraph({ children: [new TextRun({ text: `Generado por SEVERA para ${datos.generadoPara}`, bold: true, size: 24 })] }),
+    new Paragraph({ text: 'Informe SIADE — Análisis Estadístico de Vulnerabilidades', heading: HeadingLevel.TITLE }),
+    new Paragraph({ children: [new TextRun({ text: `Generado por SIADE para ${datos.generadoPara}`, bold: true, size: 24 })] }),
     texto(`Generado: ${datos.generadoEn.toLocaleString()}`),
     texto(`Total de vulnerabilidades analizadas: ${datos.totalVulnerabilidades}`),
 
@@ -199,7 +199,7 @@ async function construirContenido(datos: DatosInforme): Promise<Array<ElementoDo
     heading('1. Introducción', HeadingLevel.HEADING_1, true),
     texto(
       `Este informe aplica técnicas de estadística descriptiva sobre el conjunto de ${datos.totalVulnerabilidades} ` +
-        'vulnerabilidades de seguridad actualmente cargadas en SEVERA, con el fin de caracterizar su severidad ' +
+        'vulnerabilidades de seguridad actualmente cargadas en SIADE, con el fin de caracterizar su severidad ' +
         '(CVSS Score) y fundamentar, con evidencia numérica, una propuesta de priorización de remediación.'
     ),
 
@@ -211,7 +211,7 @@ async function construirContenido(datos: DatosInforme): Promise<Array<ElementoDo
         : 'No hay ningún registro de auditoría de importación disponible todavía para este dataset.'
     ),
     texto(
-      'SEVERA no conserva el motivo de cada fila rechazada más allá de la respuesta inmediata de esa importación — ' +
+      'SIADE no conserva el motivo de cada fila rechazada más allá de la respuesta inmediata de esa importación — ' +
         'solo el conteo agregado queda registrado en el historial de auditoría.'
     ),
 
@@ -554,8 +554,8 @@ function resumenColumnaComoTextoWord(columna: DatosInformeDataset['estadisticasD
 
 function construirContenidoDataset(datos: DatosInformeDataset): Array<ElementoDocumento> {
   const contenido: Array<ElementoDocumento> = [
-    new Paragraph({ text: 'Informe SEVERA — Análisis de Datos General', heading: HeadingLevel.TITLE }),
-    new Paragraph({ children: [new TextRun({ text: `Generado por SEVERA para ${datos.generadoPara}`, bold: true, size: 24 })] }),
+    new Paragraph({ text: 'Informe SIADE — Análisis de Datos General', heading: HeadingLevel.TITLE }),
+    new Paragraph({ children: [new TextRun({ text: `Generado por SIADE para ${datos.generadoPara}`, bold: true, size: 24 })] }),
     texto(`Generado: ${datos.generadoEn.toLocaleString()}`),
     texto(`${datos.totalFilas} fila(s) — ${datos.totalColumnas} columna(s)`),
 

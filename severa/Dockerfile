@@ -35,7 +35,7 @@ COPY scripts ./scripts
 # Los .sql no pasan por tsc (solo compila .ts a dist/), así que se copian
 # aparte para que migrate.js los encuentre en el mismo path relativo que usa
 # en desarrollo.
-COPY src/infrastructure/adapters/out/persistence/migrations ./src/infrastructure/adapters/out/persistence/migrations
+COPY src/infrastructure/adapters/out/persistencia/migrations ./src/infrastructure/adapters/out/persistencia/migrations
 
 # Documenta el puerto por defecto de config.port (env.ts: PORT ?? 3000). Si
 # se cambia PORT en tiempo de ejecución, EXPOSE no lo sigue (es metadata fija

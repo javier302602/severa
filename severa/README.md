@@ -1,6 +1,6 @@
-# SEVERA
+# SIADE
 
-Sistema de Priorización de Vulnerabilidades de Software.
+Sistema Integral de Análisis de Datos Estadísticos.
 
 ## Instalación (desarrollo local, sin Docker)
 
@@ -53,7 +53,7 @@ Vas a ver en los logs algo como:
 severa_app  | [migrate] 001_create_analistas_table.sql aplicada
 severa_app  | ...
 severa_app  | [migrate] Listo: 5 migración(es) nueva(s) aplicada(s).
-severa_app  | SEVERA running on http://localhost:3000
+severa_app  | SIADE running on http://localhost:3000
 ```
 
 Volver a correr `docker compose up --build` (o reiniciar el contenedor `app`)
@@ -121,7 +121,7 @@ localmente (mismo cliente que trae `postgresql-client`).
 
 El script en sí **no se programa solo** — no hay cron ni scheduler dentro de
 la aplicación todavía. Para que el respaldo sea diario, prográmalo con el
-mecanismo del sistema operativo donde corra SEVERA:
+mecanismo del sistema operativo donde corra SIADE:
 
 **Linux (cron)** — edita `crontab -e` y agrega, por ejemplo, para las 2 AM:
 

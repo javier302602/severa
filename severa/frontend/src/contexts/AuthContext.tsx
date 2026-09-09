@@ -4,7 +4,7 @@ import { authService, type CredencialesLogin } from '../api/authService';
 import { configurarHttpClient } from '../api/httpClient';
 import type { Analista } from '../types/Analista';
 
-const CLAVE_SESION = 'severa.sesion';
+const CLAVE_SESION = 'siade.sesion';
 
 interface SesionPersistida {
   token: string;

@@ -11,7 +11,7 @@ interface Paso {
 // el flujo general, así que usa un archivo cotidiano en vez de jargon de
 // seguridad (CVE/CVSS) que recién se explica en el resto de la app.
 //
-// Los 8 pasos reflejan el pipeline REAL de SEVERA (verificado contra
+// Los 8 pasos reflejan el pipeline REAL de SIADE (verificado contra
 // DatasetController.ts, LectorExcelDataset.ts, EstadisticaController.ts,
 // GraficoController.ts, InformeController.ts) con una aclaración importante:
 // estadísticas/gráficos/informe NO se generan automáticamente apenas se
@@ -38,7 +38,7 @@ const PASOS: Paso[] = [
     titulo: 'Almacenamiento temporal',
     recibe: 'El archivo ya validado.',
     hace: 'Lo mantiene en disco solo mientras dura la lectura; se borra automáticamente apenas termina de procesarlo, haya salido bien o mal.',
-    produce: 'Nada permanente todavía — es un paso de trabajo intermedio, SEVERA no guarda una copia del archivo original.'
+    produce: 'Nada permanente todavía — es un paso de trabajo intermedio, SIADE no guarda una copia del archivo original.'
   },
   {
     numero: 4,
@@ -112,7 +112,7 @@ export function ComoFuncionaPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Cómo funciona SEVERA</h1>
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Cómo funciona SIADE</h1>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
           El recorrido completo de un archivo dentro del sistema, de punta a punta. Para explicarlo simple, usamos un
           archivo genérico de ejemplo (<code className="rounded bg-slate-100 px-1 py-0.5 text-xs dark:bg-slate-700">ventas.csv</code>)
@@ -128,7 +128,7 @@ export function ComoFuncionaPage() {
 
       <p className="text-xs text-slate-500 dark:text-slate-500">
         Los pasos 5 a 7 no ocurren automáticamente apenas se importa el archivo: se calculan en el momento, cada vez que
-        entrás a esa sección o pedís el informe — SEVERA no guarda una copia recalculada de antemano.
+        entrás a esa sección o pedís el informe — SIADE no guarda una copia recalculada de antemano.
       </p>
     </div>
   );

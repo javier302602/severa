@@ -14,7 +14,7 @@ container.programadorDeTareas.programar('plazos-proximos-a-vencer', '0 8 * * *',
 );
 
 const servidor = app.listen(config.port, () => {
-  console.log(`SEVERA running on http://localhost:${config.port}`);
+  console.log(`SIADE running on http://localhost:${config.port}`);
 });
 
 // Timeouts generosos (2026-07-17, importación de datasets de cientos de MB

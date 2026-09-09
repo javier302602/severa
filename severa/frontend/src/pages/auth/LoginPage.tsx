@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { useTheme } from '../../contexts/ThemeContext';
 import { RUTAS } from '../../routes/paths';
 import { MensajeError } from '../../components/ui/MensajeError';
 import { mensajeDeError } from '../../utils/mensajeDeError';
@@ -24,6 +25,7 @@ interface EstadoNavegacion {
 
 export function LoginPage() {
   const { login } = useAuth();
+  const { tema } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
@@ -51,7 +53,10 @@ export function LoginPage() {
         onSubmit={handleSubmit(onSubmit)}
         className="w-full max-w-sm space-y-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-8 shadow-sm"
       >
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Iniciar sesión — SEVERA</h1>
+        <div className="flex items-center gap-2">
+          <img src={tema === 'dark' ? '/siade-icon-dark.svg' : '/siade-icon-light.svg'} alt="" className="h-8 w-8" />
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Iniciar sesión — SIADE</h1>
+        </div>
 
         {estadoNavegacion?.mensaje && (
           <p className="rounded-md bg-green-50 px-4 py-2 text-sm text-green-700 dark:bg-green-900/30 dark:text-green-300">

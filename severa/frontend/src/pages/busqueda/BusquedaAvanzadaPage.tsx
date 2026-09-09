@@ -306,7 +306,7 @@ export function BusquedaAvanzadaPage() {
           />
         </div>
         <p className="col-span-full -mt-2 text-xs text-slate-500 dark:text-slate-400">
-          "Cargado desde/hasta" filtra por cuándo se importó el registro a SEVERA, no por la fecha de publicación real del
+          "Cargado desde/hasta" filtra por cuándo se importó el registro a SIADE, no por la fecha de publicación real del
           CVE en NVD (ese dato no está disponible en el dataset).
         </p>
 

@@ -177,7 +177,7 @@ export function InformesPage() {
         <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Convertir link a Excel</h2>
         <p className="text-sm text-slate-600 dark:text-slate-400">
           Pegá el link de un dataset público y descargá su contenido convertido a .xlsx — sin importarlo al catálogo
-          de SEVERA. Si el archivo supera las 100.000 filas, se descarga como .csv (el dataset completo igual, sin
+          de SIADE. Si el archivo supera las 100.000 filas, se descarga como .csv (el dataset completo igual, sin
           reconvertirlo) en vez de .xlsx.
         </p>
         <form onSubmit={onConvertirUrl} className="space-y-3">

@@ -1,13 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
-  <style>
-    .trazo { stroke: #1d4ed8; }
-    @media (prefers-color-scheme: dark) {
-      .trazo { stroke: #ffffff; }
-    }
-  </style>
-  <circle cx="100" cy="100" r="72" fill="none" class="trazo" stroke-width="8" />
+  <circle cx="100" cy="100" r="72" fill="none" stroke="#1d4ed8" stroke-width="8" />
   <path d="M 42 128 C 60 128 68 128 76 110 C 84 92 90 62 100 62 C 110 62 116 92 124 110 C 132 128 140 128 158 128"
-        fill="none" class="trazo" stroke-width="7" stroke-linecap="round" />
+        fill="none" stroke="#1d4ed8" stroke-width="7" stroke-linecap="round" />
   <line x1="100" y1="128" x2="100" y2="90" stroke="#f97316" stroke-width="7" stroke-linecap="round" />
   <circle cx="100" cy="86" r="9" fill="#f97316" />
 </svg>

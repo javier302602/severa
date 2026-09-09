@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { useTheme } from '../../contexts/ThemeContext';
 import { RUTAS } from '../../routes/paths';
 
 interface ItemNavegacion {
@@ -25,17 +26,21 @@ const ITEMS_NAVEGACION: ItemNavegacion[] = [
   { etiqueta: 'Búsqueda avanzada', ruta: RUTAS.busqueda },
   { etiqueta: 'Auditoría', ruta: RUTAS.auditoria, soloAdministrador: true },
   { etiqueta: 'Notificaciones', ruta: RUTAS.notificaciones },
-  { etiqueta: 'Cómo funciona SEVERA', ruta: RUTAS.comoFunciona }
+  { etiqueta: 'Cómo funciona SIADE', ruta: RUTAS.comoFunciona }
 ];
 
 export function Sidebar() {
   const { analista } = useAuth();
+  const { tema } = useTheme();
 
   const itemsVisibles = ITEMS_NAVEGACION.filter((item) => !item.soloAdministrador || analista?.rol === 'administrador');
 
   return (
     <nav className="w-56 shrink-0 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm p-4">
-      <p className="mb-4 px-2 text-lg font-semibold text-slate-800 dark:text-slate-200">SEVERA</p>
+      <div className="mb-4 flex items-center gap-2 px-2">
+        <img src={tema === 'dark' ? '/siade-icon-dark.svg' : '/siade-icon-light.svg'} alt="" className="h-6 w-6" />
+        <p className="text-lg font-semibold text-slate-800 dark:text-slate-200">SIADE</p>
+      </div>
       <ul className="space-y-1">
         {itemsVisibles.map((item) => (
           <li key={item.ruta}>

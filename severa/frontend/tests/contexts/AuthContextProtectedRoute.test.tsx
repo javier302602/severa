@@ -66,7 +66,7 @@ describe('AuthContext + ProtectedRoute — flujo real de login/logout/ruta prote
   });
 
   test('con una sesión ya persistida en localStorage: ProtectedRoute muestra el contenido directamente', async () => {
-    localStorage.setItem('severa.sesion', JSON.stringify({ token: 'token-guardado', analista: analistaDePrueba }));
+    localStorage.setItem('siade.sesion', JSON.stringify({ token: 'token-guardado', analista: analistaDePrueba }));
 
     render(<App />);
 
@@ -82,13 +82,13 @@ describe('AuthContext + ProtectedRoute — flujo real de login/logout/ruta prote
 
     await waitFor(() => expect(authService.login).toHaveBeenCalledWith({ correo: 'ana@severa.test', contrasena: 'x' }));
     await waitFor(() => {
-      const guardado = JSON.parse(localStorage.getItem('severa.sesion') ?? 'null');
+      const guardado = JSON.parse(localStorage.getItem('siade.sesion') ?? 'null');
       expect(guardado?.token).toBe('token-nuevo');
     });
   });
 
   test('logout: borra la sesión persistida y redirige a /login', async () => {
-    localStorage.setItem('severa.sesion', JSON.stringify({ token: 'token-guardado', analista: analistaDePrueba }));
+    localStorage.setItem('siade.sesion', JSON.stringify({ token: 'token-guardado', analista: analistaDePrueba }));
 
     render(<App />);
     const botonLogout = await screen.findByRole('button', { name: 'Cerrar sesión' });
@@ -96,6 +96,6 @@ describe('AuthContext + ProtectedRoute — flujo real de login/logout/ruta prote
     await userEvent.click(botonLogout);
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Iniciar sesión' })).toBeInTheDocument());
-    expect(localStorage.getItem('severa.sesion')).toBeNull();
+    expect(localStorage.getItem('siade.sesion')).toBeNull();
   });
 });

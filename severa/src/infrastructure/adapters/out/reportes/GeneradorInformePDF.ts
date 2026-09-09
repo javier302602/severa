@@ -8,13 +8,8 @@ import {
   dibujarBoxplot,
   dibujarBoxplotDoble,
   dibujarDispersion,
-  dibujarPastel,
-  dibujarHeatmap
+  dibujarPastel
 } from './DibujoDeGraficosPdf';
-import {
-  interpretarComposicionDataset,
-  interpretarCorrelacionMasFuerte
-} from '../../../../domain/services/InterpretadorDeResultadosGenerico';
 import {
   interpretarHistogramaCvss,
   interpretarBarrasSeveridad,
@@ -59,7 +54,7 @@ import { renderizarInformeUniversal } from './InformeUniversalRF130';
 //
 // Fase 1 (retrofit): estructura y estilo de redacción tomados del informe de
 // referencia verificado (Proyecto_Final_2.qmd — análisis real en R/Quarto de
-// 150 vulnerabilidades NVD), adaptados a un informe que SEVERA genera bajo
+// 150 vulnerabilidades NVD), adaptados a un informe que SIADE genera bajo
 // demanda sobre datos que cambian con el tiempo, no sobre un dataset fijo de
 // tesis: se cae el "diseño de investigación" narrado en 10 pasos, la
 // justificación personal del autor y el capítulo de "pensamiento
@@ -80,55 +75,20 @@ export class GeneradorInformePDF implements GeneradorDeInformes {
   }
 
   async generarResumenEjecutivo(datos: DatosInforme): Promise<Buffer> {
-    return this.renderizarPdf('Resumen Ejecutivo SEVERA', datos, true);
+    return this.renderizarPdf('Resumen Ejecutivo SIADE', datos, true);
   }
 
-  // Fase 5 (Mejora 4 — Análisis de Datos General): mismo puerto, mismo
-  // patrón de renderizado (doc + chunks + secciones), "documento de datos"
-  // distinto — ver DatosInformeDataset en GeneradorDeInformes.ts. Sin la
-  // sección de "caso de estudio" (decisión confirmada: no aplica a un
-  // dataset genérico arbitrario).
+  // M-10 Ronda 2, Pasada 2-C — Cutover, Paso 2 de 2: generarInformeDataset
+  // (genérico) pasa a delegar en el orquestador de 20 secciones, mismo
+  // criterio que generarInformeCompleto (Paso 1). renderizarPdfDataset y las
+  // 11 dibujarXDataset() que orquestaba se retiraron — sin otro consumidor
+  // (ver diagnóstico previo, confirmado de nuevo antes de borrar).
   async generarInformeDataset(datos: DatosInformeDataset): Promise<Buffer> {
-    return this.renderizarPdfDataset(datos);
+    return renderizarInformeUniversal({ pipeline: 'generico', datos });
   }
 
   async generarInformeDatasetWord(datos: DatosInformeDataset): Promise<Buffer> {
     return this.generadorInformeWord.generarDataset(datos);
-  }
-
-  private renderizarPdfDataset(datos: DatosInformeDataset): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-      // bufferPages: true — necesario para el Índice (ver dibujarIndice más
-      // abajo): permite reservar una página en blanco justo después de la
-      // portada y volver a ella al final, cuando ya se sabe en qué página
-      // real cayó cada capítulo, sin tener que calcular la paginación a mano
-      // por adelantado.
-      // Formato APA 7 (2026-07-20): márgenes de 1 pulgada (72pt) en las 4
-      // direcciones, tamaño Carta (el estándar del formato) — antes eran
-      // márgenes de 50pt (~0.7in) sobre A4.
-      const doc = new PDFDocument({ margin: 72, size: 'LETTER', bufferPages: true });
-      const chunks: Buffer[] = [];
-      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', reject);
-
-      dibujarPortadaDataset(doc, datos);
-      const paginaIndice = reservarPaginaDeIndice(doc);
-      dibujarIntroduccionDataset(doc, datos);
-      dibujarMetodologiaDataset(doc);
-      dibujarDescripcionDataset(doc, datos);
-      dibujarCalidadDatosDataset(doc, datos);
-      dibujarEstadisticasDescriptivasDataset(doc, datos);
-      dibujarAnalisisUnivariadoDataset(doc, datos);
-      dibujarCorrelacionDataset(doc, datos);
-      dibujarOutliersDataset(doc, datos);
-      dibujarConclusionesDataset(doc, datos);
-      dibujarAnexosDataset(doc, datos);
-
-      completarIndice(doc, paginaIndice);
-      numerarPaginas(doc);
-      doc.end();
-    });
   }
 
   private renderizarPdf(titulo: string, datos: DatosInforme, resumido: boolean): Promise<Buffer> {
@@ -178,7 +138,7 @@ export class GeneradorInformePDF implements GeneradorDeInformes {
 function dibujarPortada(doc: PDFKit.PDFDocument, titulo: string, datos: DatosInforme): void {
   doc.fontSize(20).fillColor('#0f172a').font('Times-Bold').text(titulo, { align: 'center' });
   doc.moveDown(1);
-  doc.fontSize(12).fillColor('#334155').font('Times-Bold').text(`Generado por SEVERA para ${datos.generadoPara}`, { align: 'center' });
+  doc.fontSize(12).fillColor('#334155').font('Times-Bold').text(`Generado por SIADE para ${datos.generadoPara}`, { align: 'center' });
   doc.moveDown(0.5);
   doc.fontSize(10).fillColor('#64748b').font('Times-Roman').text(`Generado: ${datos.generadoEn.toLocaleString()}`, { align: 'center' });
   doc.text(`Total de vulnerabilidades analizadas: ${datos.totalVulnerabilidades}`, { align: 'center' });
@@ -190,7 +150,7 @@ function dibujarIntroduccion(doc: PDFKit.PDFDocument, datos: DatosInforme): void
   parrafo(
     doc,
     `Este informe aplica técnicas de estadística descriptiva sobre el conjunto de ${datos.totalVulnerabilidades} ` +
-      'vulnerabilidades de seguridad actualmente cargadas en SEVERA, con el fin de caracterizar su severidad ' +
+      'vulnerabilidades de seguridad actualmente cargadas en SIADE, con el fin de caracterizar su severidad ' +
       '(CVSS Score — Common Vulnerability Scoring System, el estándar abierto de FIRST/NIST para evaluar la ' +
       'gravedad de una vulnerabilidad en una escala de 0.0 a 10.0) y fundamentar, con evidencia numérica, una ' +
       'propuesta de priorización de remediación.'
@@ -200,7 +160,7 @@ function dibujarIntroduccion(doc: PDFKit.PDFDocument, datos: DatosInforme): void
 // ---------------------------------------------------------------------
 // Origen y calidad de los datos (capítulo 4 del .qmd, adaptado: acá no hay
 // un archivo fijo conocido de antemano, así que se reporta lo único que
-// SEVERA conserva más allá de la respuesta de un import puntual — ver
+// SIADE conserva más allá de la respuesta de un import puntual — ver
 // OrigenYCalidadDatosInforme en GeneradorDeInformes.ts).
 // ---------------------------------------------------------------------
 
@@ -218,7 +178,7 @@ function dibujarOrigenYCalidad(doc: PDFKit.PDFDocument, datos: DatosInforme): vo
   }
   parrafo(
     doc,
-    'SEVERA no conserva el motivo de cada fila rechazada más allá de la respuesta inmediata de esa importación — ' +
+    'SIADE no conserva el motivo de cada fila rechazada más allá de la respuesta inmediata de esa importación — ' +
       'solo el conteo agregado (importados/rechazados) queda registrado en el historial de auditoría.'
   );
 }
@@ -234,7 +194,7 @@ function dibujarMetodologia(doc: PDFKit.PDFDocument): void {
   parrafo(
     doc,
     'Este informe aplica estadística descriptiva, no inferencial: no se realizan pruebas de hipótesis ni se ' +
-      'generalizan los hallazgos más allá del conjunto de vulnerabilidades cargado en SEVERA al momento de generarlo.'
+      'generalizan los hallazgos más allá del conjunto de vulnerabilidades cargado en SIADE al momento de generarlo.'
   );
   const formulas: Array<[string, string]> = [
     ['Media, mediana, moda', 'nivel de severidad típico, contrastando el promedio con el valor central y el más frecuente.'],
@@ -650,7 +610,7 @@ function dibujarGraficos(doc: PDFKit.PDFDocument, datos: DatosInforme, resumido:
 // ---------------------------------------------------------------------
 // Aplicación práctica (capítulo 10 del .qmd, "Caso de estudio", adaptado:
 // mismo patrón de preguntas concretas respondidas con datos reales, sobre
-// el ranking de urgencia real de SEVERA en vez de un problema de negocio
+// el ranking de urgencia real de SIADE en vez de un problema de negocio
 // inventado).
 // ---------------------------------------------------------------------
 
@@ -805,123 +765,6 @@ function dibujarAnexos(doc: PDFKit.PDFDocument, datos: DatosInforme): void {
   );
 }
 
-// =======================================================================
-// Fase 5 (Mejora 4 — Análisis de Datos General): informe del módulo de
-// dataset genérico. Mismo patrón fórmula -> sustitución con datos reales ->
-// interpretación en prosa que el resto de este archivo, reutilizando los
-// mismos helpers de layout (nuevaSeccion/subseccion/parrafo/formula/
-// dibujarTabla) y los mismos primitivos de dibujo de DibujoDeGraficosPdf.ts
-// (dibujarHistograma para el univariado, dibujarHeatmap — nuevo en esta
-// fase — para la correlación). Sin "Metodología" narrada en 10 pasos, sin
-// "Aplicación práctica"/caso de estudio (no aplica a un dataset arbitrario,
-// decisión confirmada) y sin "Referencias" (esas son específicas de
-// CVSS/NVD).
-// =======================================================================
-
-function dibujarPortadaDataset(doc: PDFKit.PDFDocument, datos: DatosInformeDataset): void {
-  doc.fontSize(20).fillColor('#0f172a').font('Times-Bold').text('Informe SEVERA — Análisis de Datos General', { align: 'center' });
-  doc.moveDown(1);
-  doc.fontSize(12).fillColor('#334155').font('Times-Bold').text(`Generado por SEVERA para ${datos.generadoPara}`, { align: 'center' });
-  doc.moveDown(0.5);
-  doc.fontSize(10).fillColor('#64748b').font('Times-Roman').text(`Generado: ${datos.generadoEn.toLocaleString()}`, { align: 'center' });
-  doc.text(`${datos.totalFilas} fila(s) — ${datos.totalColumnas} columna(s)`, { align: 'center' });
-  doc.moveDown(2);
-}
-
-function dibujarIntroduccionDataset(doc: PDFKit.PDFDocument, datos: DatosInformeDataset): void {
-  nuevaSeccion(doc, '1', 'Introducción');
-  parrafo(
-    doc,
-    `Este informe aplica estadística descriptiva sobre un dataset genérico de ${datos.totalFilas} fila(s) y ` +
-      `${datos.totalColumnas} columna(s), subido y analizado bajo demanda a través del módulo de Análisis de Datos ` +
-      'General de SEVERA — no asume ningún esquema fijo de antemano: el tipo de cada columna (numérica, categórica, ' +
-      'de fecha o de texto libre) se infiere de sus propios valores.'
-  );
-}
-
-function dibujarMetodologiaDataset(doc: PDFKit.PDFDocument): void {
-  nuevaSeccion(doc, '2', 'Metodología');
-  parrafo(
-    doc,
-    'Estadística descriptiva, no inferencial: no se aplican pruebas de hipótesis ni se generalizan los hallazgos ' +
-      'más allá de este dataset.'
-  );
-  const formulas: Array<[string, string]> = [
-    ['Media, mediana, moda', 'valor típico de cada columna numérica.'],
-    ['Cuartiles (Q1/Q3), rango, varianza, desviación estándar', 'reparto y dispersión de cada columna numérica.'],
-    ['Correlación de Pearson', 'grado y dirección de la relación lineal entre cada par de columnas numéricas.'],
-    ['Rango intercuartílico (1.5×IQR)', 'criterio estándar de detección de valores atípicos por columna.']
-  ];
-  formulas.forEach(([nombre, uso]) => {
-    doc.fontSize(9.5).font('Times-Bold').fillColor('#1e293b').text(`${nombre}: `, { continued: true });
-    doc.font('Times-Roman').fillColor('#334155').text(uso);
-  });
-  doc.moveDown(0.4);
-}
-
-function dibujarDescripcionDataset(doc: PDFKit.PDFDocument, datos: DatosInformeDataset): void {
-  nuevaSeccion(doc, '3', 'Descripción del dataset');
-  parrafo(doc, interpretarComposicionDataset(datos));
-
-  dibujarTabla(
-    doc,
-    ['Columna', 'Tipo detectado', 'Faltantes', '% faltante', 'Únicos'],
-    datos.columnas.map((columna) => [
-      columna.nombre,
-      columna.tipo,
-      String(columna.valoresFaltantes),
-      `${columna.porcentajeFaltante.toFixed(1)}%`,
-      String(columna.valoresUnicos)
-    ]),
-    [150, 90, 70, 80, 70]
-  );
-}
-
-function dibujarCalidadDatosDataset(doc: PDFKit.PDFDocument, datos: DatosInformeDataset): void {
-  nuevaSeccion(doc, '4', 'Calidad de los datos');
-
-  formula(doc, '% faltante = (valores faltantes de la columna / total de filas) × 100');
-  parrafo(
-    doc,
-    datos.filasDuplicadas === 0
-      ? 'No se detectaron filas duplicadas exactas.'
-      : `Se detectaron ${datos.filasDuplicadas} fila(s) duplicada(s) exacta(s) (copias exactas de otra fila ya presente).`
-  );
-
-  const peorColumna = [...datos.columnas].sort((a, b) => b.porcentajeFaltante - a.porcentajeFaltante)[0];
-  if (peorColumna && peorColumna.porcentajeFaltante > 0) {
-    parrafo(
-      doc,
-      `La columna con más valores faltantes es "${peorColumna.nombre}": ${peorColumna.valoresFaltantes} de ${datos.totalFilas} ` +
-        `(${peorColumna.porcentajeFaltante.toFixed(1)}%).`
-    );
-  } else {
-    parrafo(doc, 'Ninguna columna tiene valores faltantes.');
-  }
-
-  const columnasConInconsistencias = datos.columnas.filter((columna) => columna.valoresInconsistentes > 0);
-  parrafo(
-    doc,
-    columnasConInconsistencias.length === 0
-      ? 'Ninguna columna tiene valores que no calcen con su tipo mayoritario detectado.'
-      : `Columnas con valores que no calzan con su tipo mayoritario detectado: ${columnasConInconsistencias
-          .map((columna) => `"${columna.nombre}" (${columna.valoresInconsistentes})`)
-          .join(', ')}.`
-  );
-}
-
-function dibujarEstadisticasDescriptivasDataset(doc: PDFKit.PDFDocument, datos: DatosInformeDataset): void {
-  nuevaSeccion(doc, '5', 'Estadísticas descriptivas');
-  parrafo(doc, 'Resumen por columna: medidas de tendencia central y dispersión para columnas numéricas, valores más frecuentes para categóricas/texto, y rango para fechas.');
-
-  dibujarTabla(
-    doc,
-    ['Columna', 'Tipo', 'Resumen'],
-    datos.estadisticasDescriptivas.map((columna) => [columna.nombre, columna.tipo, resumenColumnaComoTexto(columna)]),
-    [130, 70, 260]
-  );
-}
-
 // Exportada (M-10 Ronda 2, Pasada 2-A): InformeUniversalRF130.ts la reusa
 // para la sección "Estadística descriptiva" del pipeline genérico.
 export function resumenColumnaComoTexto(columna: DatosInformeDataset['estadisticasDescriptivas'][number]): string {
@@ -935,154 +778,6 @@ export function resumenColumnaComoTexto(columna: DatosInformeDataset['estadistic
   return top ? `${columna.valoresUnicos} valor(es) único(s); más frecuente: "${top.valor}" (${top.frecuencia})` : 'sin valores';
 }
 
-function dibujarAnalisisUnivariadoDataset(doc: PDFKit.PDFDocument, datos: DatosInformeDataset): void {
-  nuevaSeccion(doc, '6', 'Análisis univariado (columnas numéricas)');
-
-  if (datos.analisisUnivariado.length === 0) {
-    parrafo(doc, 'Este dataset no tiene columnas numéricas para analizar individualmente.');
-    return;
-  }
-
-  datos.analisisUnivariado.forEach((analisis, indice) => {
-    if (analisis.tipo !== 'numerica') return;
-
-    doc.addPage();
-    const r = analisis.resumenCincoNumeros;
-    doc.fontSize(12).font('Times-Bold').fillColor('#0f172a').text(`6.${indice + 1} ${analisis.nombre}`);
-    doc.moveDown(0.3);
-
-    formula(doc, `Media = (suma de ${analisis.valoresValidos} valores) / n = ${r.media.toFixed(2)}`);
-    parrafo(
-      doc,
-      `Mediana = ${r.mediana.toFixed(2)}, Q1 = ${r.q1.toFixed(2)}, Q3 = ${r.q3.toFixed(2)}, mínimo = ${r.minimo.toFixed(2)}, máximo = ${r.maximo.toFixed(2)}. ` +
-        `${analisis.valoresFaltantes} valor(es) faltante(s) de ${analisis.valoresValidos + analisis.valoresFaltantes}.`
-    );
-    if (analisis.desviacionEstandar !== null) {
-      formula(doc, `Desviación estándar = ${analisis.desviacionEstandar.toFixed(4)}    CV = ${(analisis.coeficienteVariacion ?? 0).toFixed(2)}%`);
-    }
-
-    asegurarEspacio(doc, 260);
-    doc.y = dibujarHistograma(
-      doc,
-      analisis.distribucion.map((bin) => ({ intervalo: bin.intervalo, frecuencia: bin.frecuenciaAbsoluta })),
-      r.media,
-      r.mediana,
-      { titulo: `Distribución de "${analisis.nombre}"`, etiquetaEjeX: analisis.nombre, etiquetaEjeY: 'Frecuencia' }
-    );
-    doc.moveDown(0.5);
-
-    const diferencia = Math.abs(r.media - r.mediana);
-    parrafo(
-      doc,
-      diferencia < r.media * 0.05 || diferencia < 0.5
-        ? `La media y la mediana están cerca, lo que sugiere una distribución relativamente simétrica para "${analisis.nombre}".`
-        : `La media (${r.media.toFixed(2)}) se aleja de la mediana (${r.mediana.toFixed(2)}) en "${analisis.nombre}", lo que sugiere asimetría o presencia de valores extremos.`
-    );
-  });
-}
-
-function dibujarCorrelacionDataset(doc: PDFKit.PDFDocument, datos: DatosInformeDataset): void {
-  nuevaSeccion(doc, '7', 'Matriz de correlación');
-
-  const matriz = datos.matrizCorrelacion;
-  if (matriz.columnasExcluidas.length > 0) {
-    parrafo(
-      doc,
-      `Columnas no incluidas: ${matriz.columnasExcluidas.map((columna) => `"${columna.nombre}" (${columna.motivo})`).join(', ')}.`
-    );
-  }
-
-  if (matriz.columnas.length === 0) {
-    parrafo(doc, 'No hay columnas numéricas elegibles para calcular correlaciones.');
-    return;
-  }
-
-  asegurarEspacio(doc, 260);
-  doc.y = dibujarHeatmap(doc, matriz, { titulo: 'Heatmap de correlación de Pearson' });
-  doc.moveDown(0.5);
-
-  parrafo(doc, interpretarCorrelacionMasFuerte(matriz));
-}
-
-function dibujarOutliersDataset(doc: PDFKit.PDFDocument, datos: DatosInformeDataset): void {
-  nuevaSeccion(doc, '8', 'Valores atípicos (outliers)');
-  // Guion ASCII, no el signo menos U+2212: WinAnsiEncoding (la codificación
-  // que usan las fuentes estándar de pdfkit, Helvetica) no lo tiene — mismo
-  // bug de mojibake documentado en dibujarTendenciaCentral (Fase 1),
-  // confirmado leyendo el PDF real generado para esta fase. "×" sí es
-  // WinAnsi-seguro (cp1252 0xD7), a diferencia del signo menos.
-  formula(doc, 'Atípico si valor < Q1 - 1.5×IQR  o  valor > Q3 + 1.5×IQR, con IQR = Q3 - Q1');
-
-  if (datos.outliers.columnasExcluidas.length > 0) {
-    parrafo(
-      doc,
-      `Columnas no evaluadas: ${datos.outliers.columnasExcluidas.map((columna) => `"${columna.nombre}" (${columna.motivo})`).join(', ')}.`
-    );
-  }
-
-  if (datos.outliers.columnas.length === 0) {
-    parrafo(doc, 'No hay columnas numéricas para evaluar.');
-    return;
-  }
-
-  dibujarTabla(
-    doc,
-    ['Columna', 'Q1', 'Q3', 'Límite inf.', 'Límite sup.', 'Cant. atípicos'],
-    datos.outliers.columnas.map((columna) => [
-      columna.columna,
-      columna.q1.toFixed(2),
-      columna.q3.toFixed(2),
-      columna.limiteInferior.toFixed(2),
-      columna.limiteSuperior.toFixed(2),
-      String(columna.cantidadValoresAtipicos)
-    ]),
-    [110, 70, 70, 80, 80, 90]
-  );
-
-  const totalAtipicos = datos.outliers.columnas.reduce((acumulado, columna) => acumulado + columna.cantidadValoresAtipicos, 0);
-  parrafo(
-    doc,
-    totalAtipicos === 0
-      ? 'No se detectaron valores atípicos en ninguna columna numérica.'
-      : `Se detectaron ${totalAtipicos} valor(es) atípico(s) en total, con el criterio 1.5×IQR.`
-  );
-}
-
-function dibujarConclusionesDataset(doc: PDFKit.PDFDocument, datos: DatosInformeDataset): void {
-  nuevaSeccion(doc, '9', 'Conclusiones');
-
-  subseccion(doc, 'Síntesis de hallazgos');
-  dibujarEtiquetaTipoAnalisis(doc, 'Descriptivo');
-  datos.interpretacion.forEach((parrafoTexto) => {
-    doc.fontSize(9.5).fillColor('#334155').font('Times-Roman').text(`•  ${parrafoTexto}`, { align: 'justify' });
-    doc.moveDown(0.3);
-  });
-
-  // RF-81/RF-134 (M-10 Ronda 2, Pasada 1): a diferencia del informe CVSS
-  // (que sí tiene una comparación entre grupos etiquetada "Inferencial",
-  // ver Aplicación práctica), el pipeline genérico HOY no ejecuta ningún
-  // análisis de comparación entre grupos — decisión confirmada: se muestra
-  // "Pendiente" explícitamente en vez de omitir la distinción en silencio,
-  // mismo criterio que RF-130 exige para toda sección sin contenido
-  // aplicable.
-  subseccion(doc, 'Análisis inferencial');
-  dibujarEtiquetaTipoAnalisis(doc, 'Pendiente');
-  parrafo(doc, 'El sistema no realiza comparación entre grupos sobre datasets genéricos en esta versión.');
-
-  subseccion(doc, 'Predicción');
-  dibujarEtiquetaTipoAnalisis(doc, 'Pendiente');
-  parrafo(
-    doc,
-    'M-16 (Predicción y Modelado) está pendiente de material académico antes de implementar o sugerir cualquier método (ver IMotorPrediccion.ts).'
-  );
-
-  subseccion(doc, 'Limitaciones conocidas');
-  datos.limitacionesConocidas.forEach((limitacion) => {
-    doc.fontSize(9).fillColor('#64748b').font('Times-Roman').text(`•  ${limitacion}`, { align: 'justify' });
-    doc.moveDown(0.3);
-  });
-}
-
 // Valores de un dataset genérico pueden ser de cualquier tipo (number,
 // string, Date, null/undefined por celdas faltantes) — se normalizan a texto
 // para la tabla del Anexo A sin asumir un formato de columna en particular.
@@ -1092,43 +787,4 @@ export function celdaComoTexto(valor: unknown): string {
   if (valor === null || valor === undefined || valor === '') return '—';
   if (valor instanceof Date) return valor.toLocaleDateString();
   return String(valor);
-}
-
-function dibujarAnexosDataset(doc: PDFKit.PDFDocument, datos: DatosInformeDataset): void {
-  nuevaSeccion(doc, '10', 'Anexos');
-  parrafo(doc, 'Material de respaldo del informe: una muestra cruda de filas del dataset y el índice de las figuras generadas.');
-
-  subseccion(doc, 'Anexo A: Muestra de filas');
-  const anexo = datos.anexoMuestraFilas;
-  parrafo(
-    doc,
-    anexo.totalColumnas > anexo.columnasMostradas.length
-      ? `Se muestran las primeras ${anexo.columnasMostradas.length} de ${anexo.totalColumnas} columnas y las primeras ` +
-        `${anexo.filas.length} de ${anexo.totalFilas} filas, para mantener la tabla legible dentro del ancho de una página.`
-      : `Se muestran las primeras ${anexo.filas.length} de ${anexo.totalFilas} filas del dataset.`
-  );
-  if (anexo.filas.length === 0) {
-    parrafo(doc, 'El dataset no tiene filas.');
-  } else {
-    dibujarTabla(
-      doc,
-      anexo.columnasMostradas,
-      anexo.filas.map((fila) => anexo.columnasMostradas.map((columna) => celdaComoTexto(fila[columna])))
-    );
-  }
-
-  subseccion(doc, 'Anexo B: Índice de figuras generadas');
-  const figuras: string[][] = [
-    ...datos.analisisUnivariado
-      .filter((analisis) => analisis.tipo === 'numerica')
-      .map((analisis, indice): [string, string] => [String(indice + 1), `Distribución de "${analisis.nombre}"`]),
-  ];
-  if (datos.matrizCorrelacion.columnas.length > 0) {
-    figuras.push([String(figuras.length + 1), 'Heatmap de correlación de Pearson']);
-  }
-  if (figuras.length === 0) {
-    parrafo(doc, 'Este dataset no generó ninguna figura (sin columnas numéricas).');
-  } else {
-    dibujarTabla(doc, ['#', 'Título'], figuras, [40, 400]);
-  }
 }

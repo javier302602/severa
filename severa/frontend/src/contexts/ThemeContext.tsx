@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 export type Tema = 'light' | 'dark';
 
-const CLAVE_TEMA = 'severa.tema';
+const CLAVE_TEMA = 'siade.tema';
 
 interface ThemeContextValor {
   tema: Tema;
