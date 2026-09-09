@@ -1,3 +1,4 @@
+import PDFDocument from 'pdfkit';
 import { recopilarDatosDeInforme } from '../../../../../src/application/usecases/module_reportes_exportacion/RecopilarDatosDeInforme';
 import { recopilarDatosDeInformeDataset } from '../../../../../src/application/usecases/module_reportes_exportacion/RecopilarDatosDeInformeDataset';
 import { VulnerabilidadRepository } from '../../../../../src/application/ports/out/persistencia/repositorios/VulnerabilidadRepository';
@@ -24,6 +25,39 @@ jest.mock('../../../../../src/infrastructure/adapters/out/reportes/LayoutInforme
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const LayoutInformePdf = require('../../../../../src/infrastructure/adapters/out/reportes/LayoutInformePdf');
 import { renderizarInformeUniversal, ContextoInformeUniversal } from '../../../../../src/infrastructure/adapters/out/reportes/InformeUniversalRF130';
+import { nivelDeRiesgoDesdeCvss } from '../../../../../src/infrastructure/adapters/out/reportes/GeneradorInformePDF';
+
+// Ubica, para un número de sección RF-130 dado, el texto literal que
+// PDFKit efectivamente dibujó mientras esa sección era la "actual" — entre
+// su nuevaSeccion() y la siguiente, usando el orden global de invocación
+// compartido por todos los jest.fn()/jest.spyOn() del test (mismo criterio
+// del resto de este archivo: no parsear el PDF binario). subseccion(),
+// parrafo(), dibujarTabla() y los bullets manuales de hallazgos/limitaciones
+// pasan TODOS por doc.text() en algún punto (ver LayoutInformePdf.ts), así
+// que espiar PDFDocument.prototype.text cubre el contenido real de la
+// sección sin necesitar un spy por primitivo.
+function textosPorSeccion(
+  nuevaSeccionMock: jest.Mock,
+  spyTexto: jest.SpyInstance
+): (numero: number) => string[] {
+  const secciones = nuevaSeccionMock.mock.calls.map((llamada, indice) => ({
+    numero: Number(llamada[1]),
+    orden: nuevaSeccionMock.mock.invocationCallOrder[indice]
+  }));
+  return (numero: number) => {
+    const actual = secciones.find((seccion) => seccion.numero === numero);
+    if (!actual) throw new Error(`nuevaSeccion(${numero}) no se llamó`);
+    const siguiente = secciones.filter((seccion) => seccion.orden > actual.orden).sort((a, b) => a.orden - b.orden)[0];
+
+    return spyTexto.mock.calls
+      .filter((_, indice) => {
+        const orden = spyTexto.mock.invocationCallOrder[indice];
+        return orden > actual.orden && (siguiente === undefined || orden < siguiente.orden);
+      })
+      .map((llamada) => llamada[0])
+      .filter((valor): valor is string => typeof valor === 'string');
+  };
+}
 
 function repositorioFalso(vulnerabilidades: Vulnerabilidad[]): VulnerabilidadRepository {
   return {
@@ -263,5 +297,115 @@ describe('InformeUniversalRF130 — Pasada 2-B (RF-130): secciones 4/10/11/12/13
       const numeros = (LayoutInformePdf.nuevaSeccion as jest.Mock).mock.calls.map(([, numero]) => Number(numero));
       expect(numeros).toEqual(Array.from({ length: 19 }, (_, i) => i + 2));
     });
+  });
+});
+
+// M-10 Ronda 2, Pasada 2-C: contenido narrativo nuevo de §2 (Resumen
+// ejecutivo), §17 (Interpretación) y §18 (Conclusiones). Hasta acá estas tres
+// secciones solo estaban cubiertas por los smoke tests genéricos de 2-A/2-B
+// (no explota, orden de nuevaSeccion() correcto) — ninguno confirmaba que el
+// contenido migrado de "Aplicación práctica" (nivel de riesgo, % urgente,
+// tiempo de parche, ranking) efectivamente llegó a §18 CVSS, ni que
+// Limitaciones conocidas aparece en ambos pipelines. Estos tests cierran esa
+// brecha usando textosPorSeccion() (arriba) en vez de parsear el PDF.
+describe('InformeUniversalRF130 — Pasada 2-C (RF-130): secciones 2/17/18 (contenido narrativo nuevo)', () => {
+  let spyTexto: jest.SpyInstance;
+
+  beforeEach(() => {
+    (LayoutInformePdf.nuevaSeccion as jest.Mock).mockClear();
+    spyTexto = jest.spyOn(PDFDocument.prototype, 'text');
+  });
+
+  afterEach(() => {
+    spyTexto.mockRestore();
+  });
+
+  test('CVSS §2 Resumen ejecutivo: cita el total de vulnerabilidades y el nivel de riesgo típico', async () => {
+    const contexto = await contextoCvss();
+    await renderizarInformeUniversal(contexto);
+    const datos = (contexto as Extract<ContextoInformeUniversal, { pipeline: 'cvss' }>).datos;
+
+    const texto = textosPorSeccion(LayoutInformePdf.nuevaSeccion as jest.Mock, spyTexto)(2).join(' | ');
+
+    expect(texto).toContain(String(datos.totalVulnerabilidades));
+    expect(texto).toContain(nivelDeRiesgoDesdeCvss(datos.resumenEstadistico.media));
+  });
+
+  test('genérico §2 Resumen ejecutivo: cita filas y columnas del dataset', async () => {
+    const contexto = contextoGenerico();
+    await renderizarInformeUniversal(contexto);
+    const datos = (contexto as Extract<ContextoInformeUniversal, { pipeline: 'generico' }>).datos;
+
+    const texto = textosPorSeccion(LayoutInformePdf.nuevaSeccion as jest.Mock, spyTexto)(2).join(' | ');
+
+    expect(texto).toContain(String(datos.totalFilas));
+    expect(texto).toContain(String(datos.totalColumnas));
+  });
+
+  test('CVSS §17 Interpretación: contiene los mismos hallazgos que datos.interpretacion, sin recalcular', async () => {
+    const contexto = await contextoCvss();
+    await renderizarInformeUniversal(contexto);
+    const datos = (contexto as Extract<ContextoInformeUniversal, { pipeline: 'cvss' }>).datos;
+
+    expect(datos.interpretacion.length).toBeGreaterThan(0);
+    const textos17 = textosPorSeccion(LayoutInformePdf.nuevaSeccion as jest.Mock, spyTexto)(17);
+    datos.interpretacion.forEach((hallazgo) => {
+      expect(textos17.some((texto) => texto.includes(hallazgo))).toBe(true);
+    });
+  });
+
+  test('genérico §17 Interpretación: contiene los mismos hallazgos que datos.interpretacion, sin recalcular', async () => {
+    const contexto = contextoGenerico();
+    await renderizarInformeUniversal(contexto);
+    const datos = (contexto as Extract<ContextoInformeUniversal, { pipeline: 'generico' }>).datos;
+
+    expect(datos.interpretacion.length).toBeGreaterThan(0);
+    const textos17 = textosPorSeccion(LayoutInformePdf.nuevaSeccion as jest.Mock, spyTexto)(17);
+    datos.interpretacion.forEach((hallazgo) => {
+      expect(textos17.some((texto) => texto.includes(hallazgo))).toBe(true);
+    });
+  });
+
+  test('CVSS §18 Conclusiones: el contenido migrado de "Aplicación práctica" (nivel de riesgo, % urgente, tiempo de parche, ranking top 10) llegó a su nuevo lugar', async () => {
+    const contexto = await contextoCvss();
+    await renderizarInformeUniversal(contexto);
+    const datos = (contexto as Extract<ContextoInformeUniversal, { pipeline: 'cvss' }>).datos;
+    const r = datos.resumenEstadistico;
+
+    const textos18 = textosPorSeccion(LayoutInformePdf.nuevaSeccion as jest.Mock, spyTexto)(18);
+    const texto = textos18.join(' | ');
+
+    // Las 3 preguntas migradas — la pregunta 3 (Remoto/Local) ya se extrajo
+    // a §14 en la Pasada 2-B y NO debe repetirse acá.
+    expect(texto).toContain('¿Cuál es el nivel típico de riesgo?');
+    expect(texto).toContain(`Media CVSS = ${r.media.toFixed(2)}, mediana = ${r.mediana.toFixed(2)}`);
+    expect(texto).toContain('¿Qué proporción requiere atención urgente?');
+    expect(texto).toContain('¿Cuánto tiempo toma en promedio disponer de un parche?');
+    expect(texto).not.toContain('¿Influye el acceso remoto en la severidad?');
+
+    // Ranking de urgencia: top 10 completo, con las filas reales del fixture.
+    expect(texto).toContain('Ranking de urgencia de remediación (top 10)');
+    datos.rankingUrgencia.slice(0, 10).forEach((entrada) => {
+      expect(texto).toContain(entrada.vulnerabilidad.cve.valor);
+    });
+
+    // Limitaciones conocidas, en el mismo cierre.
+    expect(texto).toContain('Limitaciones conocidas');
+    datos.limitacionesConocidas.forEach((limitacion) => expect(texto).toContain(limitacion));
+  });
+
+  test('genérico §18 Conclusiones: sin contenido de "Aplicación práctica" (específico de CVSS) pero con Limitaciones conocidas', async () => {
+    const contexto = contextoGenerico();
+    await renderizarInformeUniversal(contexto);
+    const datos = (contexto as Extract<ContextoInformeUniversal, { pipeline: 'generico' }>).datos;
+
+    const textos18 = textosPorSeccion(LayoutInformePdf.nuevaSeccion as jest.Mock, spyTexto)(18);
+    const texto = textos18.join(' | ');
+
+    expect(texto).not.toContain('¿Cuál es el nivel típico de riesgo?');
+    expect(texto).not.toContain('Ranking de urgencia de remediación');
+
+    expect(texto).toContain('Limitaciones conocidas');
+    datos.limitacionesConocidas.forEach((limitacion) => expect(texto).toContain(limitacion));
   });
 });

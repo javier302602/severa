@@ -66,12 +66,13 @@ function dibujarSeccionNoAplicable(doc: PDFKit.PDFDocument, motivo: string): voi
   parrafo(doc, motivo);
 }
 
-// Placeholder temporal para las 9 secciones que todavía no se migraron
-// (Pasada 2-B/2-C) — mantiene el documento generable de punta a punta desde
-// esta sub-pasada (útil para probar índice/paginación con el esqueleto
-// completo), pero NUNCA llega a un analista real: esta función no está
-// conectada al puerto público, y cada entrada se borra de SECCIONES a medida
-// que su sub-pasada la completa.
+// Placeholder histórico de las secciones sin migrar durante 2-A/2-B/2-C —
+// con las 20 secciones ya completas (2-C, Pasada 2-C final) SECCIONES cubre
+// todos los números y esta función queda sin invocar en la práctica; se
+// conserva como red de seguridad si se agrega un número nuevo al mapeo sin
+// darle función propia todavía. NUNCA llega a un analista real de todos
+// modos: este archivo entero sigue sin conectar al puerto público (ver nota
+// de renderizarInformeUniversal).
 function dibujarSeccionEnConstruccion(doc: PDFKit.PDFDocument, numero: number, nombre: string): void {
   parrafo(doc, `Sección "${nombre}" (#${numero}) pendiente de migrar en una sub-pasada posterior de RF-130.`);
 }
@@ -104,6 +105,64 @@ function dibujarSeccionPortada(doc: PDFKit.PDFDocument, contexto: ContextoInform
       doc.fontSize(10).fillColor('#64748b').font('Times-Roman').text(`Generado: ${datos.generadoEn.toLocaleString()}`, { align: 'center' });
       doc.text(`${datos.totalFilas} fila(s) — ${datos.totalColumnas} columna(s)`, { align: 'center' });
       doc.moveDown(2);
+      return;
+    }
+    default: {
+      const exhaustivo: never = contexto;
+      throw new Error(`Pipeline no manejado: ${JSON.stringify(exhaustivo)}`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------
+// 2. Resumen ejecutivo — M-10 Ronda 2, Pasada 2-C: contenido narrativo nuevo
+// (decisión ya tomada: no hay nada que reusar para una síntesis corta — el
+// único "resumen ejecutivo" que existe hoy es RF-82/GenerarResumenEjecutivo.ts,
+// que es un DOCUMENTO APARTE completo con resumido=true, no una sección corta
+// dentro del informe completo; esta función no lo toca ni reusa su prosa).
+// Los NÚMEROS que cita sí son datos/lógica ya calculados en otro lado (mismo
+// criterio que el resto de la plantilla): CVSS reusa resumenEstadistico +
+// nivelDeRiesgoDesdeCvss (igual que §9/§18); genérico reusa
+// interpretarCorrelacionMasFuerte (igual que §12/§13) y detectarVocabularioDataset
+// (igual que §3). Ambos cierran citando la longitud de datos.interpretacion/
+// limitacionesConocidas como adelanto de §17/§18, sin repetir su contenido.
+// ---------------------------------------------------------------------
+function dibujarSeccionResumenEjecutivo(doc: PDFKit.PDFDocument, contexto: ContextoInformeUniversal): void {
+  switch (contexto.pipeline) {
+    case 'cvss': {
+      const datos = contexto.datos;
+      const r = datos.resumenEstadistico;
+      parrafo(
+        doc,
+        `Este informe analiza ${datos.totalVulnerabilidades} vulnerabilidad(es) registradas en SEVERA para ${datos.generadoPara}. ` +
+          `La severidad promedio observada es ${r.media.toFixed(2)} en la escala CVSS, un nivel de riesgo típico ` +
+          `"${nivelDeRiesgoDesdeCvss(r.media)}".`
+      );
+      parrafo(
+        doc,
+        'Las secciones siguientes desarrollan la metodología completa, la estadística descriptiva e inferencial y las ' +
+          `visualizaciones que sustentan estos resultados; el cierre del documento (secciones 17-18) reúne ` +
+          `${datos.interpretacion.length} hallazgo(s) principal(es) y ${datos.limitacionesConocidas.length} limitación(es) ` +
+          'conocida(s) del análisis.'
+      );
+      return;
+    }
+    case 'generico': {
+      const datos = contexto.datos;
+      const vocabulario = detectarVocabularioDataset(datos.columnas.map((columna) => columna.nombre));
+      const unidad = datos.totalFilas === 1 ? vocabulario.unidadSingular : vocabulario.unidadPlural;
+      parrafo(
+        doc,
+        `Este informe analiza un dataset de ${datos.totalFilas} ${unidad} y ${datos.totalColumnas} columna(s) para ` +
+          `${datos.generadoPara}.`
+      );
+      parrafo(
+        doc,
+        `${interpretarCorrelacionMasFuerte(datos.matrizCorrelacion)} Las secciones siguientes desarrollan la calidad de ` +
+          'datos, la estadística descriptiva y las relaciones entre variables que sustentan este resultado; el cierre ' +
+          `del documento (secciones 17-18) reúne ${datos.interpretacion.length} hallazgo(s) principal(es) y ` +
+          `${datos.limitacionesConocidas.length} limitación(es) conocida(s) del análisis.`
+      );
       return;
     }
     default: {
@@ -892,6 +951,141 @@ function dibujarSeccionEvaluacionDeModelos(doc: PDFKit.PDFDocument, contexto: Co
 }
 
 // ---------------------------------------------------------------------
+// 17. Interpretación — M-10 Ronda 2, Pasada 2-C: split genuino de lo que hoy
+// es una sola sección "Conclusiones" (dibujarConclusiones/
+// dibujarConclusionesDataset en GeneradorInformePDF.ts, código vivo, no
+// tocado). Esa función mezcla dos cosas conceptualmente distintas: la lista
+// de hallazgos ya interpretados (datos.interpretacion, calculada por
+// InterpretadorDeResultadosGenerico.ts) y el cierre real del documento
+// (limitaciones + recomendaciones). RF-130 las separa en dos números: acá
+// (17, "Interpretación") se queda SOLO con la lista de hallazgos — reuso
+// directo, sin cálculo nuevo. El resto (limitaciones, y en CVSS el contenido
+// de Aplicación práctica migrado) va a §18 Conclusiones. La asimetría de
+// badge entre pipelines (CVSS sin 'Descriptivo' antes de la lista, genérico
+// con él) reproduce fielmente el código viejo — no es una inconsistencia
+// nueva de esta pasada.
+// ---------------------------------------------------------------------
+function dibujarSeccionInterpretacion(doc: PDFKit.PDFDocument, contexto: ContextoInformeUniversal): void {
+  switch (contexto.pipeline) {
+    case 'cvss': {
+      const datos = contexto.datos;
+      datos.interpretacion.forEach((parrafoTexto) => {
+        doc.fontSize(9.5).fillColor('#334155').font('Times-Roman').text(`•  ${parrafoTexto}`, { align: 'justify' });
+        doc.moveDown(0.3);
+      });
+      return;
+    }
+    case 'generico': {
+      const datos = contexto.datos;
+      dibujarEtiquetaTipoAnalisis(doc, 'Descriptivo');
+      datos.interpretacion.forEach((parrafoTexto) => {
+        doc.fontSize(9.5).fillColor('#334155').font('Times-Roman').text(`•  ${parrafoTexto}`, { align: 'justify' });
+        doc.moveDown(0.3);
+      });
+      return;
+    }
+    default: {
+      const exhaustivo: never = contexto;
+      throw new Error(`Pipeline no manejado: ${JSON.stringify(exhaustivo)}`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------
+// 18. Conclusiones — la otra mitad del split de §17, más el resto de
+// "Aplicación práctica" que RF-130 no le da slot propio (decisión ya tomada:
+// nivel típico de riesgo, % urgente y tiempo de parche promedio migran acá;
+// la pregunta 3 — Remoto/Local — ya se extrajo a §14 en la Pasada 2-B, y NO
+// se repite acá). CVSS: cierre nuevo + las 3 preguntas restantes de
+// dibujarAplicacionPractica (GeneradorInformePDF.ts, código vivo, no tocado)
+// con el ranking de urgencia completo (top 10 fijo — este documento nunca es
+// la versión resumida, mismo criterio que §3) + Limitaciones conocidas
+// (datos.limitacionesConocidas, ya calculada, sin home propio en los otros
+// 19 números de RF-130 — por eso se queda acá, junto al resto del cierre).
+// Genérico: no tiene equivalente de "Aplicación práctica" (es contenido
+// específico del dominio CVSS) — cierre nuevo + Limitaciones conocidas
+// únicamente.
+// ---------------------------------------------------------------------
+function dibujarSeccionConclusiones(doc: PDFKit.PDFDocument, contexto: ContextoInformeUniversal): void {
+  switch (contexto.pipeline) {
+    case 'cvss': {
+      const datos = contexto.datos;
+      const r = datos.resumenEstadistico;
+      const criticasYAltas = datos.graficos.barrasSeveridad
+        .filter((item) => item.etiqueta === 'Crítica' || item.etiqueta === 'Alta')
+        .reduce((total, item) => total + item.valor, 0);
+      const porcentajeUrgente = datos.totalVulnerabilidades === 0 ? 0 : (criticasYAltas / datos.totalVulnerabilidades) * 100;
+
+      parrafo(
+        doc,
+        'A partir de los hallazgos de la sección anterior, este cierre reúne los indicadores prácticos de priorización ' +
+          'y las limitaciones a tener en cuenta al usar este informe para tomar decisiones de remediación.'
+      );
+
+      subseccion(doc, '¿Cuál es el nivel típico de riesgo?');
+      dibujarEtiquetaTipoAnalisis(doc, 'Descriptivo');
+      parrafo(doc, `Media CVSS = ${r.media.toFixed(2)}, mediana = ${r.mediana.toFixed(2)} — riesgo típico "${nivelDeRiesgoDesdeCvss(r.media)}".`);
+
+      subseccion(doc, '¿Qué proporción requiere atención urgente?');
+      dibujarEtiquetaTipoAnalisis(doc, 'Descriptivo');
+      parrafo(doc, `${criticasYAltas} de ${datos.totalVulnerabilidades} vulnerabilidades (${porcentajeUrgente.toFixed(1)}%) son Crítica o Alta.`);
+
+      subseccion(doc, '¿Cuánto tiempo toma en promedio disponer de un parche?');
+      dibujarEtiquetaTipoAnalisis(doc, 'Descriptivo');
+      parrafo(
+        doc,
+        datos.graficos.histogramaDiasParche.bins.length === 0
+          ? 'No hay vulnerabilidades con "Días para Parche" registrado en este conjunto.'
+          : `${datos.graficos.histogramaDiasParche.media.toFixed(1)} días en promedio.`
+      );
+
+      subseccion(doc, 'Ranking de urgencia de remediación (top 10)');
+      dibujarTabla(
+        doc,
+        ['#', 'CVE', 'CVSS', 'Nivel de riesgo', 'Estado'],
+        datos.rankingUrgencia
+          .slice(0, 10)
+          .map((entrada) => [
+            String(entrada.posicion),
+            entrada.vulnerabilidad.cve.valor,
+            entrada.vulnerabilidad.cvssScore.valor.toFixed(1),
+            entrada.nivelDeRiesgo,
+            entrada.vulnerabilidad.estadoRemediacion.valor
+          ]),
+        [40, 130, 60, 110, 110]
+      );
+
+      subseccion(doc, 'Limitaciones conocidas');
+      datos.limitacionesConocidas.forEach((limitacion) => {
+        doc.fontSize(9).fillColor('#64748b').font('Times-Roman').text(`•  ${limitacion}`, { align: 'justify' });
+        doc.moveDown(0.3);
+      });
+      return;
+    }
+    case 'generico': {
+      const datos = contexto.datos;
+      parrafo(
+        doc,
+        'A partir de los hallazgos de la sección anterior, este cierre reúne las limitaciones a tener en cuenta al usar ' +
+          'este informe: SEVERA diagnostica el dataset tal cual fue importado, sin ajustar el análisis a un caso de uso ' +
+          'de negocio específico.'
+      );
+
+      subseccion(doc, 'Limitaciones conocidas');
+      datos.limitacionesConocidas.forEach((limitacion) => {
+        doc.fontSize(9).fillColor('#64748b').font('Times-Roman').text(`•  ${limitacion}`, { align: 'justify' });
+        doc.moveDown(0.3);
+      });
+      return;
+    }
+    default: {
+      const exhaustivo: never = contexto;
+      throw new Error(`Pipeline no manejado: ${JSON.stringify(exhaustivo)}`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------
 // 19. Recomendaciones — CVSS: subsección trasladada de dibujarConclusiones.
 // Genérico: no aplica (decisión ya documentada — no hay caso de uso
 // conocido de antemano para un dataset arbitrario sobre el cual recomendar).
@@ -1041,11 +1235,12 @@ function dibujarSeccionReferenciasYAnexos(doc: PDFKit.PDFDocument, contexto: Con
   }
 }
 
-// Mapa numero RF-130 -> función de sección. Solo las 10 de Pasada 2-A tienen
-// entrada acá — el resto cae en dibujarSeccionEnConstruccion hasta que
-// 2-B/2-C las agregue. La sección 1 (Portada) NO va acá — se dibuja aparte,
-// antes del loop (ver renderizarInformeUniversal).
+// Mapa numero RF-130 -> función de sección. Con la Pasada 2-C (§2, §17, §18)
+// las 20 secciones de la plantilla están completas — dibujarSeccionEnConstruccion
+// ya no debería activarse en la práctica. La sección 1 (Portada) NO va acá —
+// se dibuja aparte, antes del loop (ver renderizarInformeUniversal).
 const SECCIONES: Partial<Record<number, FuncionDeSeccion>> = {
+  2: dibujarSeccionResumenEjecutivo,
   3: dibujarSeccionDescripcionDataset,
   4: dibujarSeccionNumeroDeRegistrosYVariables,
   5: dibujarSeccionTiposDeVariables,
@@ -1060,6 +1255,8 @@ const SECCIONES: Partial<Record<number, FuncionDeSeccion>> = {
   14: dibujarSeccionAnalisisInferencial,
   15: dibujarSeccionPrediccion,
   16: dibujarSeccionEvaluacionDeModelos,
+  17: dibujarSeccionInterpretacion,
+  18: dibujarSeccionConclusiones,
   19: dibujarSeccionRecomendaciones,
   20: dibujarSeccionReferenciasYAnexos
 };
