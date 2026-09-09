@@ -5,6 +5,7 @@ import type { DescargadorDeArchivos } from '../../../src/application/ports/out/d
 import type { SincronizarConApiNvdUseCase } from '../../../src/application/ports/in/module_carga_gestion_datasets/SincronizarConApiNvdUseCase';
 import type { VulnerabilidadRepository } from '../../../src/application/ports/out/persistencia/repositorios/VulnerabilidadRepository';
 import type { AuditoriaRepository } from '../../../src/application/ports/out/persistencia/repositorios/AuditoriaRepository';
+import type { AnalistaRepository, UmbralCriticoPersistido } from '../../../src/application/ports/out/persistencia/repositorios/AnalistaRepository';
 import type { ServicioDeNotificaciones } from '../../../src/application/ports/out/notificaciones/ServicioDeNotificaciones';
 import { LectorExcelDataset, FilaProcesada } from '../../../src/infrastructure/adapters/out/dataset/parsers/LectorExcelDataset';
 import { Vulnerabilidad } from '../../../src/domain/entities/Vulnerabilidad';
@@ -44,11 +45,26 @@ function auditoriaFalsa(): AuditoriaRepository {
 function servicioDeNotificacionesFalso(): ServicioDeNotificaciones {
   return {
     notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
+    notificarPlazoProximoAVencer: jest.fn().mockResolvedValue(undefined),
     notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
     notificarInformeListo: jest.fn().mockResolvedValue(undefined),
     notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
     notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
   notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
+  };
+}
+
+// RF-99 (M-13, retoma): por defecto sin umbral configurado (null) — mismo
+// comportamiento que un analista que nunca llamó PATCH /analistas/me/umbral-critico.
+function analistaRepositoryFalso(umbral: UmbralCriticoPersistido | null = null): AnalistaRepository {
+  return {
+    guardar: jest.fn().mockResolvedValue(undefined),
+    buscarPorCorreo: jest.fn().mockResolvedValue(null),
+    buscarPorId: jest.fn().mockResolvedValue(null),
+    eliminar: jest.fn().mockResolvedValue(undefined),
+    actualizarUmbralCritico: jest.fn().mockResolvedValue(undefined),
+    obtenerUmbralCritico: jest.fn().mockResolvedValue(umbral),
+    listarTodos: jest.fn().mockResolvedValue([])
   };
 }
 
@@ -78,9 +94,10 @@ describe('ImportarDatasetDesdeUrl', () => {
     const usecase = new ImportarDatasetDesdeUrl(
       descargadorDeArchivos,
       lectorExcel,
-      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso()),
+      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso(), analistaRepositoryFalso()),
       sincronizarConApiNvdUseCase,
-      vulnerabilidadRepository
+      vulnerabilidadRepository,
+      analistaRepositoryFalso()
     );
 
     await expect(usecase.ejecutar('http://storage.googleapis.com/bucket/dataset.csv', 'analista-1')).rejects.toThrow(
@@ -100,9 +117,10 @@ describe('ImportarDatasetDesdeUrl', () => {
     const usecase = new ImportarDatasetDesdeUrl(
       descargadorDeArchivos,
       lectorExcel,
-      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso()),
+      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso(), analistaRepositoryFalso()),
       sincronizarConApiNvdUseCase,
-      vulnerabilidadRepository
+      vulnerabilidadRepository,
+      analistaRepositoryFalso()
     );
 
     const urlPegada = 'https://services.nvd.nist.gov/rest/json/cves/2.0?pubStartDate=2024-01-01T00:00:00.000&pubEndDate=2024-04-30T00:00:00.000';
@@ -135,9 +153,10 @@ describe('ImportarDatasetDesdeUrl', () => {
     const usecase = new ImportarDatasetDesdeUrl(
       descargadorDeArchivos,
       lectorExcel,
-      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaRepository, servicioDeNotificacionesFalso()),
+      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaRepository, servicioDeNotificacionesFalso(), analistaRepositoryFalso()),
       sincronizarConApiNvdUseCase,
-      vulnerabilidadRepository
+      vulnerabilidadRepository,
+      analistaRepositoryFalso()
     );
 
     const resultado = await usecase.ejecutar('https://docs.google.com/spreadsheets/d/ID123/edit#gid=0', 'analista-1');
@@ -177,9 +196,10 @@ describe('ImportarDatasetDesdeUrl', () => {
     const usecase = new ImportarDatasetDesdeUrl(
       descargadorDeArchivos,
       lectorExcel,
-      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso()),
+      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso(), analistaRepositoryFalso()),
       sincronizarConApiNvdUseCase,
-      vulnerabilidadRepository
+      vulnerabilidadRepository,
+      analistaRepositoryFalso()
     );
 
     await usecase.ejecutar(urlFirmada, 'analista-1');
@@ -212,9 +232,10 @@ describe('ImportarDatasetDesdeUrl', () => {
     const usecase = new ImportarDatasetDesdeUrl(
       descargadorDeArchivos,
       lectorExcel,
-      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso()),
+      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso(), analistaRepositoryFalso()),
       { ejecutar: jest.fn() },
-      vulnerabilidadRepository
+      vulnerabilidadRepository,
+      analistaRepositoryFalso()
     );
 
     await usecase.ejecutar('https://ejemplo.example.com/dataset.csv', 'analista-1', mapeo);
@@ -240,9 +261,10 @@ describe('ImportarDatasetDesdeUrl', () => {
     const usecase = new ImportarDatasetDesdeUrl(
       descargadorDeArchivos,
       lectorExcel,
-      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso()),
+      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso(), analistaRepositoryFalso()),
       { ejecutar: jest.fn() },
-      vulnerabilidadRepository
+      vulnerabilidadRepository,
+      analistaRepositoryFalso()
     );
 
     await usecase.ejecutar('https://ejemplo.example.com/dataset.xlsx', 'analista-1', mapeo);
@@ -278,9 +300,10 @@ describe('ImportarDatasetDesdeUrl', () => {
     const usecase = new ImportarDatasetDesdeUrl(
       descargadorDeArchivos,
       lectorExcel,
-      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaRepository, servicioDeNotificaciones),
+      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaRepository, servicioDeNotificaciones, analistaRepositoryFalso()),
       sincronizarConApiNvdUseCase,
-      vulnerabilidadRepository
+      vulnerabilidadRepository,
+      analistaRepositoryFalso()
     );
 
     const resultado = await usecase.ejecutar(urlFirmada, 'analista-1');
@@ -338,9 +361,10 @@ describe('ImportarDatasetDesdeUrl', () => {
     const usecase = new ImportarDatasetDesdeUrl(
       descargadorDeArchivos,
       lectorExcel,
-      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso()),
+      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso(), analistaRepositoryFalso()),
       { ejecutar: jest.fn() },
-      vulnerabilidadRepository
+      vulnerabilidadRepository,
+      analistaRepositoryFalso()
     );
 
     const resultado = await usecase.ejecutar('https://ejemplo.example.com/dataset-grande.csv', 'analista-1');
@@ -351,5 +375,52 @@ describe('ImportarDatasetDesdeUrl', () => {
     expect((vulnerabilidadRepository.guardarLote as jest.Mock).mock.calls[0][0]).toHaveLength(1000);
     expect((vulnerabilidadRepository.guardarLote as jest.Mock).mock.calls[1][0]).toHaveLength(1000);
     expect((vulnerabilidadRepository.guardarLote as jest.Mock).mock.calls[2][0]).toHaveLength(500);
+  });
+
+  // RF-99 (M-13, retoma): el umbral se resuelve UNA vez antes de
+  // leerArchivoCsvEnStreaming, no una vez por fila — clave para el volumen
+  // real que streamea este camino (cientos de miles de filas).
+  test('con umbral crítico configurado, obtenerUmbralCritico se resuelve UNA sola vez, no por fila', async () => {
+    const filas: FilaProcesada[] = Array.from({ length: 50 }, (_, i) => ({
+      tipo: 'importable' as const,
+      dato: { vulnerabilidad: vulnerabilidad(`CVE-2024-${20000 + i}`, 3.0), fuente: 'excel' }
+    }));
+
+    const descargadorDeArchivos: DescargadorDeArchivos = {
+      descargar: jest.fn().mockResolvedValue({
+        rutaArchivo: '/tmp/dataset.csv',
+        contentType: 'text/csv',
+        urlFinal: 'https://ejemplo.example.com/dataset.csv'
+      })
+    };
+    const lectorExcel = {
+      leerArchivo: jest.fn(),
+      leerArchivoCsvEnStreaming: mockLeerCsvEnStreaming(filas)
+    } as unknown as LectorExcelDataset;
+    const vulnerabilidadRepository = vulnerabilidadRepositoryFalso();
+    const servicioDeNotificaciones = servicioDeNotificacionesFalso();
+    const analistaRepository = analistaRepositoryFalso({ variable: 'cvssScore', valor: 2.0 });
+
+    const usecase = new ImportarDatasetDesdeUrl(
+      descargadorDeArchivos,
+      lectorExcel,
+      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificaciones, analistaRepository),
+      { ejecutar: jest.fn() },
+      vulnerabilidadRepository,
+      analistaRepository
+    );
+
+    await usecase.ejecutar('https://ejemplo.example.com/dataset.csv', 'analista-1');
+
+    // UNA sola consulta pese a 50 filas — no una por fila.
+    expect(analistaRepository.obtenerUmbralCritico).toHaveBeenCalledTimes(1);
+    expect(analistaRepository.obtenerUmbralCritico).toHaveBeenCalledWith('analista-1');
+    // Con umbral cvssScore >= 2.0, las 50 filas (CVSS 3.0) son críticas —
+    // con el default (CVSS >= 9.0) ninguna lo sería.
+    expect(servicioDeNotificaciones.notificarImportacionCompletada).toHaveBeenCalledWith('analista-1', {
+      importados: 50,
+      rechazados: 0,
+      criticas: 50
+    });
   });
 });

@@ -29,6 +29,16 @@ export class ConsolaServicioDeNotificaciones implements ServicioDeNotificaciones
     }
   }
 
+  async notificarPlazoProximoAVencer(vulnerabilidad: Vulnerabilidad, analistaId: string): Promise<void> {
+    const mensaje =
+      `Plazo de remediación próximo a vencer (dentro de 48hs): ${vulnerabilidad.cve.valor} ` +
+      `(CVSS ${vulnerabilidad.cvssScore.valor}, estado ${vulnerabilidad.estadoRemediacion.valor})`;
+    console.log(`[ALERTA RF-100] ${mensaje}`);
+    await this.notificacionRepository.guardar(
+      new Notificacion(randomUUID(), 'PlazoProximoAVencer', analistaId, false, new Date(), mensaje)
+    );
+  }
+
   async notificarVulnerabilidadCritica(vulnerabilidad: Vulnerabilidad, analistaId: string): Promise<void> {
     const mensaje = `Vulnerabilidad crítica detectada: ${vulnerabilidad.cve.valor} (CVSS ${vulnerabilidad.cvssScore.valor})`;
     console.log(`[ALERTA RF-99] ${mensaje}`);

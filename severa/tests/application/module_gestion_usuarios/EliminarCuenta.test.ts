@@ -10,7 +10,10 @@ function repositorioFalso(analista: Analista | null): AnalistaRepository {
     guardar: jest.fn().mockResolvedValue(undefined),
     buscarPorCorreo: jest.fn().mockResolvedValue(null),
     buscarPorId: jest.fn().mockResolvedValue(analista),
-    eliminar: jest.fn().mockResolvedValue(undefined)
+    eliminar: jest.fn().mockResolvedValue(undefined),
+    actualizarUmbralCritico: jest.fn().mockResolvedValue(undefined),
+    obtenerUmbralCritico: jest.fn().mockResolvedValue(null),
+    listarTodos: jest.fn().mockResolvedValue([])
   };
 }
 

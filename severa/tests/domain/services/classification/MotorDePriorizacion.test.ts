@@ -1,4 +1,4 @@
-import { generarRanking, estimarPlazoRecomendado, estaPlazoExcedido, evaluarRelacionPlazoReal } from '../../../../src/domain/services/classification/MotorDePriorizacion';
+import { generarRanking, estimarPlazoRecomendado, estaPlazoExcedido, estaPlazoProximoAVencer, evaluarRelacionPlazoReal } from '../../../../src/domain/services/classification/MotorDePriorizacion';
 import { Vulnerabilidad } from '../../../../src/domain/entities/Vulnerabilidad';
 import { IdentificadorCVE } from '../../../../src/domain/shared/value-objects/IdentificadorCVE';
 import { CvssScore } from '../../../../src/domain/shared/value-objects/CvssScore';
@@ -197,6 +197,58 @@ describe('MotorDePriorizacion', () => {
       const resultado = evaluarRelacionPlazoReal(vulnerabilidad, { Crítico: 3, Alto: 30, Moderado: 90, Bajo: 180 });
 
       expect(resultado).toEqual({ aplicable: true, plazoRecomendado: 3, diasReales: 5, diferenciaDias: 2, cumplioPlazo: false });
+    });
+  });
+
+  // RF-100 (M-13, retoma): hermana de estaPlazoExcedido, mismo "reloj"
+  // (fechaCarga + plazo recomendado) pero avisa ANTES del vencimiento, no
+  // después. Plazo de Crítico = 7 días -> vencimiento el 2026-01-08T00:00:00Z
+  // para fechaCarga 2026-01-01T00:00:00Z.
+  describe('RF-100 — estaPlazoProximoAVencer', () => {
+    const fechaCarga = new Date('2026-01-01T00:00:00Z');
+    const critica = new Vulnerabilidad(
+      '1', new IdentificadorCVE('CVE-2021-44228'), new CvssScore(10.0), 'Apache Log4j',
+      new TipoAccesoValue('Sí'), 5, undefined, undefined, undefined, fechaCarga
+    );
+
+    test('dentro de las 48hs previas al vencimiento: true', () => {
+      // Vence el 08 a las 00:00. El 07 a las 00:00 faltan exactamente 24hs.
+      expect(estaPlazoProximoAVencer(critica, new Date('2026-01-07T00:00:00Z'))).toBe(true);
+    });
+
+    test('más de 48hs antes del vencimiento: false', () => {
+      // El 05 a las 00:00 faltan 3 días — fuera de la ventana de 48hs.
+      expect(estaPlazoProximoAVencer(critica, new Date('2026-01-05T00:00:00Z'))).toBe(false);
+    });
+
+    test('ya vencido (no solo "próximo"): false — ese caso lo cubre estaPlazoExcedido, no este', () => {
+      expect(estaPlazoProximoAVencer(critica, new Date('2026-01-09T00:00:00Z'))).toBe(false);
+    });
+
+    test('remediada: siempre false, aunque esté dentro de la ventana', () => {
+      const remediada = new Vulnerabilidad(
+        '1', new IdentificadorCVE('CVE-2021-44228'), new CvssScore(10.0), 'Apache Log4j',
+        new TipoAccesoValue('Sí'), 5, undefined, undefined,
+        new EstadoRemediacionValue('Pendiente').transicionarA('EnProceso').transicionarA('Remediada'),
+        fechaCarga
+      );
+
+      expect(estaPlazoProximoAVencer(remediada, new Date('2026-01-07T00:00:00Z'))).toBe(false);
+    });
+
+    test('respeta un horasDeAntelacion distinto de 48 (default)', () => {
+      // A 3 días del vencimiento (05 a las 00:00): fuera de 48hs, pero
+      // dentro de una ventana de 96hs.
+      expect(estaPlazoProximoAVencer(critica, new Date('2026-01-05T00:00:00Z'), 96)).toBe(true);
+    });
+
+    test('respeta plazosPersonalizados, igual que estaPlazoExcedido', () => {
+      const fechaActual = new Date('2026-01-01T12:00:00Z'); // 12hs transcurridas
+      // Con plazo default de Crítico (7 días), a las 12hs no está ni cerca de vencer.
+      expect(estaPlazoProximoAVencer(critica, fechaActual)).toBe(false);
+      // Con un plazo personalizado de 1 día (vence a las 24hs), a las 12hs
+      // faltan 12hs — dentro de la ventana de 48hs.
+      expect(estaPlazoProximoAVencer(critica, fechaActual, 48, { Crítico: 1, Alto: 30, Moderado: 90, Bajo: 180 })).toBe(true);
     });
   });
 });

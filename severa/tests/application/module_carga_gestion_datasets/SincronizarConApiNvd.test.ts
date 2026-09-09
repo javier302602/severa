@@ -4,6 +4,7 @@ import { ImportarDatasetConAuditoria } from '../../../src/application/usecases/m
 import { NvdApiClient } from '../../../src/application/ports/out/fuentes-externas/NvdApiClient';
 import { VulnerabilidadRepository } from '../../../src/application/ports/out/persistencia/repositorios/VulnerabilidadRepository';
 import { AuditoriaRepository } from '../../../src/application/ports/out/persistencia/repositorios/AuditoriaRepository';
+import { AnalistaRepository } from '../../../src/application/ports/out/persistencia/repositorios/AnalistaRepository';
 import { ServicioDeNotificaciones } from '../../../src/application/ports/out/notificaciones/ServicioDeNotificaciones';
 import { Vulnerabilidad } from '../../../src/domain/entities/Vulnerabilidad';
 import { IdentificadorCVE } from '../../../src/domain/shared/value-objects/IdentificadorCVE';
@@ -41,11 +42,24 @@ function auditoriaFalsa(): AuditoriaRepository {
 function servicioDeNotificacionesFalso(): ServicioDeNotificaciones {
   return {
     notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
+    notificarPlazoProximoAVencer: jest.fn().mockResolvedValue(undefined),
     notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
     notificarInformeListo: jest.fn().mockResolvedValue(undefined),
     notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
     notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
   notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
+  };
+}
+
+function analistaRepositoryFalso(): AnalistaRepository {
+  return {
+    guardar: jest.fn().mockResolvedValue(undefined),
+    buscarPorCorreo: jest.fn().mockResolvedValue(null),
+    buscarPorId: jest.fn().mockResolvedValue(null),
+    eliminar: jest.fn().mockResolvedValue(undefined),
+    actualizarUmbralCritico: jest.fn().mockResolvedValue(undefined),
+    obtenerUmbralCritico: jest.fn().mockResolvedValue(null),
+    listarTodos: jest.fn().mockResolvedValue([])
   };
 }
 
@@ -78,7 +92,8 @@ describe('SincronizarConApiNvd', () => {
     const importarDatasetUseCase = new ImportarDatasetConAuditoria(
       new ImportarDataset(vulnerabilidadRepository),
       auditoriaRepository,
-      servicioDeNotificaciones
+      servicioDeNotificaciones,
+      analistaRepositoryFalso()
     );
 
     const usecase = new SincronizarConApiNvd(nvdApiClient, importarDatasetUseCase, servicioDeNotificaciones);
@@ -114,7 +129,8 @@ describe('SincronizarConApiNvd', () => {
     const importarDatasetUseCase = new ImportarDatasetConAuditoria(
       new ImportarDataset(vulnerabilidadRepository),
       auditoriaRepository,
-      servicioDeNotificaciones
+      servicioDeNotificaciones,
+      analistaRepositoryFalso()
     );
 
     const usecase = new SincronizarConApiNvd(nvdApiClient, importarDatasetUseCase, servicioDeNotificaciones);
@@ -145,7 +161,8 @@ describe('SincronizarConApiNvd', () => {
     const importarDatasetUseCase = new ImportarDatasetConAuditoria(
       new ImportarDataset(vulnerabilidadRepository),
       auditoriaRepository,
-      servicioDeNotificaciones
+      servicioDeNotificaciones,
+      analistaRepositoryFalso()
     );
 
     const usecase = new SincronizarConApiNvd(nvdApiClient, importarDatasetUseCase, servicioDeNotificaciones);

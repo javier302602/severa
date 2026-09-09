@@ -44,6 +44,7 @@ describe('GenerarRankingUrgencia', () => {
     const repo = repoFalso(dataset);
     const servicioDeNotificaciones: ServicioDeNotificaciones = {
       notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
+      notificarPlazoProximoAVencer: jest.fn().mockResolvedValue(undefined),
       notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
       notificarInformeListo: jest.fn().mockResolvedValue(undefined),
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
@@ -83,6 +84,7 @@ describe('GenerarRankingUrgencia', () => {
     const repo = repoFalso([excedida, dentroDePlazo, remediadaAunqueVieja]);
     const servicioDeNotificaciones: ServicioDeNotificaciones = {
       notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
+      notificarPlazoProximoAVencer: jest.fn().mockResolvedValue(undefined),
       notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
       notificarInformeListo: jest.fn().mockResolvedValue(undefined),
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
@@ -109,6 +111,7 @@ describe('GenerarRankingUrgencia', () => {
     const repo = repoFalso([excedida]);
     const servicioDeNotificaciones: ServicioDeNotificaciones = {
       notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
+      notificarPlazoProximoAVencer: jest.fn().mockResolvedValue(undefined),
       notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
       notificarInformeListo: jest.fn().mockResolvedValue(undefined),
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
@@ -134,6 +137,7 @@ describe('GenerarRankingUrgencia', () => {
     (repo.filtrarPorSeveridad as jest.Mock).mockResolvedValue([critica]);
     const servicioDeNotificaciones: ServicioDeNotificaciones = {
       notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
+      notificarPlazoProximoAVencer: jest.fn().mockResolvedValue(undefined),
       notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
       notificarInformeListo: jest.fn().mockResolvedValue(undefined),
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
@@ -154,6 +158,7 @@ describe('GenerarRankingUrgencia', () => {
     const repo = repoFalso(dataset);
     const servicioDeNotificaciones: ServicioDeNotificaciones = {
       notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
+      notificarPlazoProximoAVencer: jest.fn().mockResolvedValue(undefined),
       notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
       notificarInformeListo: jest.fn().mockResolvedValue(undefined),
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
@@ -201,6 +206,7 @@ describe('GenerarRankingUrgencia', () => {
         await Promise.resolve();
         enCurso--;
       }),
+      notificarPlazoProximoAVencer: jest.fn().mockResolvedValue(undefined),
       notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
       notificarInformeListo: jest.fn().mockResolvedValue(undefined),
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
@@ -230,6 +236,7 @@ describe('GenerarRankingUrgencia', () => {
     const repo = repoFalso([vulnerabilidad]);
     const servicioDeNotificaciones: ServicioDeNotificaciones = {
       notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
+      notificarPlazoProximoAVencer: jest.fn().mockResolvedValue(undefined),
       notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
       notificarInformeListo: jest.fn().mockResolvedValue(undefined),
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
@@ -254,6 +261,7 @@ describe('GenerarRankingUrgencia', () => {
     const repo = repoFalso([menosCvssMasDias, masCvssMenosDias]);
     const servicioDeNotificaciones: ServicioDeNotificaciones = {
       notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
+      notificarPlazoProximoAVencer: jest.fn().mockResolvedValue(undefined),
       notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
       notificarInformeListo: jest.fn().mockResolvedValue(undefined),
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),

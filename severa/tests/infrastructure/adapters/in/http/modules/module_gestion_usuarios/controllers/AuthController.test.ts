@@ -29,7 +29,10 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => {
     }),
     buscarPorCorreo: jest.fn(async (correo: string) => analistasPorCorreo.get(correo) ?? null),
     buscarPorId: jest.fn(async (id: string) => analistasPorId.get(id) ?? null),
-    eliminar: jest.fn().mockResolvedValue(undefined)
+    eliminar: jest.fn().mockResolvedValue(undefined),
+    actualizarUmbralCritico: jest.fn().mockResolvedValue(undefined),
+    obtenerUmbralCritico: jest.fn().mockResolvedValue(null),
+    listarTodos: jest.fn().mockResolvedValue([])
   };
 
   // comparar() valida contra el mismo esquema falso que usa generarHash()

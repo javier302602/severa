@@ -1,7 +1,7 @@
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import type { Analista } from '../../../../../../../../src/domain/entities/Analista';
-import type { AnalistaRepository } from '../../../../../../../../src/application/ports/out/persistencia/repositorios/AnalistaRepository';
+import type { AnalistaRepository, UmbralCriticoPersistido } from '../../../../../../../../src/application/ports/out/persistencia/repositorios/AnalistaRepository';
 import type { AuditoriaRepository } from '../../../../../../../../src/application/ports/out/persistencia/repositorios/AuditoriaRepository';
 
 // Igual que AuthController.test.ts: usa las clases REALES AsignarRol,
@@ -18,6 +18,9 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => {
   const {
     EliminarCuentaConAuditoria
   } = require('../../../../../../../../src/application/usecases/module_seguridad_auditoria/decoradores/EliminarCuentaConAuditoria');
+  const {
+    ConfigurarUmbralCritico
+  } = require('../../../../../../../../src/application/usecases/module_notificaciones_alertas/ConfigurarUmbralCritico');
   const { Analista } = require('../../../../../../../../src/domain/entities/Analista');
   const { Correo } = require('../../../../../../../../src/domain/shared/value-objects/Correo');
 
@@ -30,6 +33,11 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => {
     ['cuenta-clave-incorrecta', new Analista('cuenta-clave-incorrecta', 'Beto', new Correo('beto@example.com'), 'hash-real', 'analista')]
   ]);
 
+  // RF-99: Map separado (analistaId -> umbral) en vez de agregar campos a
+  // Analista — mismo motivo que la migración real (columnas dedicadas en
+  // `analistas`, no tocar el aggregate/constructor).
+  const umbralesCriticos = new Map<string, UmbralCriticoPersistido>();
+
   const analistaRepository: AnalistaRepository = {
     guardar: jest.fn(async (analista: Analista) => {
       analistasPorId.set(analista.id, analista);
@@ -38,7 +46,12 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => {
     buscarPorId: jest.fn(async (id: string) => analistasPorId.get(id) ?? null),
     eliminar: jest.fn(async (id: string) => {
       analistasPorId.delete(id);
-    })
+    }),
+    actualizarUmbralCritico: jest.fn(async (analistaId: string, variable: UmbralCriticoPersistido['variable'], valor: number) => {
+      umbralesCriticos.set(analistaId, { variable, valor });
+    }),
+    obtenerUmbralCritico: jest.fn(async (analistaId: string) => umbralesCriticos.get(analistaId) ?? null),
+    listarTodos: jest.fn(async () => Array.from(analistasPorId.values()))
   };
 
   const auditoriaRepository: AuditoriaRepository = {
@@ -62,6 +75,7 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => {
         analistaRepository,
         auditoriaRepository
       ),
+      configurarUmbralCriticoUseCase: new ConfigurarUmbralCritico(analistaRepository),
       __auditoriaRepository: auditoriaRepository,
       __analistaRepository: analistaRepository
     }
@@ -163,5 +177,60 @@ describe('DELETE /analistas/me — RF-15', () => {
 
     expect(res.status).toBe(400);
     expect(await container.__analistaRepository.buscarPorId('cuenta-clave-incorrecta')).not.toBeNull();
+  });
+});
+
+describe('PATCH /analistas/me/umbral-critico — RF-99 (M-13, retoma)', () => {
+  test('un analista autenticado configura su propio umbral crítico', async () => {
+    const conAnalista = conToken('analista', 'analista-1');
+
+    const res = await conAnalista(
+      conHttps(request(app).patch('/analistas/me/umbral-critico')).send({ variable: 'diasParaParche', valor: 30 })
+    );
+
+    expect(res.status).toBe(204);
+    expect(await container.__analistaRepository.obtenerUmbralCritico('analista-1')).toEqual({
+      variable: 'diasParaParche',
+      valor: 30
+    });
+  });
+
+  test('rechaza una variable que no es numérica válida (400, vía el error-handler genérico)', async () => {
+    const conAnalista = conToken('analista', 'analista-1');
+
+    const res = await conAnalista(
+      conHttps(request(app).patch('/analistas/me/umbral-critico')).send({ variable: 'severidad', valor: 5 })
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  test('rechaza un valor no numérico', async () => {
+    const conAnalista = conToken('analista', 'analista-1');
+
+    const res = await conAnalista(
+      conHttps(request(app).patch('/analistas/me/umbral-critico')).send({ variable: 'cvssScore', valor: 'no-es-un-numero' })
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  // El id sale del token (req.analistaAutenticado!.id), la ruta no recibe
+  // ningún id en la URL/body — imposible configurar el umbral de otra cuenta.
+  test('el umbral queda asociado al analista del token, nunca a otro id', async () => {
+    const conAnalista = conToken('analista', 'cuenta-a-eliminar');
+
+    await conAnalista(
+      conHttps(request(app).patch('/analistas/me/umbral-critico')).send({ variable: 'cvssScore', valor: 7.5 })
+    );
+
+    expect(await container.__analistaRepository.obtenerUmbralCritico('cuenta-a-eliminar')).toEqual({
+      variable: 'cvssScore',
+      valor: 7.5
+    });
+    expect(await container.__analistaRepository.obtenerUmbralCritico('analista-1')).not.toEqual({
+      variable: 'cvssScore',
+      valor: 7.5
+    });
   });
 });

@@ -1,7 +1,17 @@
 import { createApp } from './app';
 import { config } from './env';
+import { container } from './container';
 
 const app = createApp();
+
+// RF-100 (M-13, retoma): a diferencia de programarInformePeriodicoUseCase
+// (opt-in, registrado por el controller cuando un analista lo pide), esta
+// tarea es proactiva y global — se registra una sola vez al arrancar,
+// reutilizando el mismo ProgramadorDeTareas/NodeCronProgramadorDeTareas de
+// RF-83 (ya implementado y conectado, ver container.ts), sin scheduler nuevo.
+container.programadorDeTareas.programar('plazos-proximos-a-vencer', '0 8 * * *', () =>
+  container.notificarPlazosProximosAVencerUseCase.ejecutar()
+);
 
 const servidor = app.listen(config.port, () => {
   console.log(`SEVERA running on http://localhost:${config.port}`);

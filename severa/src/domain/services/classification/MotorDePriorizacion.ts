@@ -178,6 +178,36 @@ export function estaPlazoExcedido(
   return diasTranscurridos > plazo;
 }
 
+/**
+ * RF-100 (M-13, retoma): hermana de estaPlazoExcedido, mismo "reloj" (fechaCarga
+ * + plazo recomendado por nivel de riesgo, misma LIMITACIÓN CONOCIDA
+ * documentada arriba) pero para el lado "antes" en vez de "después" — avisa
+ * cuando faltan `horasDeAntelacion` horas o menos para el vencimiento, no
+ * cuando ya se excedió. No acepta un plazo personalizado persistido por
+ * analista porque esa persistencia no existe (plazosPersonalizados es
+ * puramente query-param, ver PriorizacionController.ts — confirmado en la
+ * auditoría de retoma M-13); el parámetro queda listo para recibirlo el día
+ * que exista.
+ */
+export function estaPlazoProximoAVencer(
+  vulnerabilidad: Vulnerabilidad,
+  fechaActual: Date = new Date(),
+  horasDeAntelacion = 48,
+  plazosPersonalizados?: PlazosPersonalizados
+): boolean {
+  if (vulnerabilidad.estadoRemediacion.valor === 'Remediada') {
+    return false;
+  }
+
+  const nivelDeRiesgo = clasificar(vulnerabilidad.cvssScore).valor;
+  const plazoEnDias = estimarPlazoRecomendado(nivelDeRiesgo, plazosPersonalizados);
+  const msPorHora = 1000 * 60 * 60;
+  const vencimiento = vulnerabilidad.fechaCarga.getTime() + plazoEnDias * 24 * msPorHora;
+  const msRestantes = vencimiento - fechaActual.getTime();
+
+  return msRestantes > 0 && msRestantes <= horasDeAntelacion * msPorHora;
+}
+
 export type RelacionPlazoReal =
   | { aplicable: true; plazoRecomendado: number; diasReales: number; diferenciaDias: number; cumplioPlazo: boolean }
   | { aplicable: false; motivo: string };

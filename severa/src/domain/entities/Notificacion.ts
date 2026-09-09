@@ -1,6 +1,7 @@
 export type TipoNotificacion =
   | 'VulnerabilidadCritica'
   | 'PlazoVencido'
+  | 'PlazoProximoAVencer'
   | 'InformeListo'
   | 'ActualizacionNVD'
   | 'ImportacionCompletada'

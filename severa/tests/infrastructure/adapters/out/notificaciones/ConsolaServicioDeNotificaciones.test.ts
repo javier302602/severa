@@ -76,6 +76,24 @@ describe('ConsolaServicioDeNotificaciones — notificarImportacionCompletada (RF
   });
 });
 
+// RF-100 (M-13, retoma): distinto de notificarPlazoExcedido a propósito
+// (tipo/mensaje en tiempo pasado allá, "próximo a vencer" acá).
+describe('ConsolaServicioDeNotificaciones — notificarPlazoProximoAVencer (RF-100)', () => {
+  test('persiste una notificación de tipo PlazoProximoAVencer, distinta de PlazoVencido', async () => {
+    const notificacionRepository = notificacionRepositoryEnMemoria();
+    const servicio = new ConsolaServicioDeNotificaciones(notificacionRepository);
+    const vulnerabilidad = new Vulnerabilidad('1', new IdentificadorCVE('CVE-2021-44228'), new CvssScore(9.5), 'Apache Log4j', new TipoAccesoValue('Sí'));
+
+    await servicio.notificarPlazoProximoAVencer(vulnerabilidad, 'analista-7');
+
+    const propias = await notificacionRepository.listarPorAnalista('analista-7');
+    expect(propias).toHaveLength(1);
+    expect(propias[0].tipo).toBe('PlazoProximoAVencer');
+    expect(propias[0].mensaje).toContain('CVE-2021-44228');
+    expect(propias[0].mensaje).toContain('próximo a vencer');
+  });
+});
+
 describe('ConsolaServicioDeNotificaciones — notificarVulnerabilidadCritica (RF-99)', () => {
   test('persiste una notificación de tipo VulnerabilidadCritica con CVE y CVSS en el mensaje', async () => {
     const notificacionRepository = notificacionRepositoryEnMemoria();

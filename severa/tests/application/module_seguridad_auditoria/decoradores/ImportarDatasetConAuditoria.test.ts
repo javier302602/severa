@@ -1,6 +1,7 @@
 import { ImportarDatasetConAuditoria } from '../../../../src/application/usecases/module_seguridad_auditoria/decoradores/ImportarDatasetConAuditoria';
 import { ImportarDatasetUseCase, ResumenImportacion } from '../../../../src/application/ports/in/module_carga_gestion_datasets/ImportarDatasetUseCase';
 import { AuditoriaRepository } from '../../../../src/application/ports/out/persistencia/repositorios/AuditoriaRepository';
+import { AnalistaRepository, UmbralCriticoPersistido } from '../../../../src/application/ports/out/persistencia/repositorios/AnalistaRepository';
 import { ServicioDeNotificaciones } from '../../../../src/application/ports/out/notificaciones/ServicioDeNotificaciones';
 import { Vulnerabilidad } from '../../../../src/domain/entities/Vulnerabilidad';
 import { IdentificadorCVE } from '../../../../src/domain/shared/value-objects/IdentificadorCVE';
@@ -17,6 +18,7 @@ function auditoriaFalsa(): AuditoriaRepository {
 function servicioDeNotificacionesFalso(): ServicioDeNotificaciones {
   return {
     notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
+    notificarPlazoProximoAVencer: jest.fn().mockResolvedValue(undefined),
     notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
     notificarInformeListo: jest.fn().mockResolvedValue(undefined),
     notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
@@ -27,6 +29,20 @@ function servicioDeNotificacionesFalso(): ServicioDeNotificaciones {
 
 function usecaseFalso(resumen: ResumenImportacion): ImportarDatasetUseCase {
   return { ejecutar: jest.fn().mockResolvedValue(resumen) };
+}
+
+// RF-99 (M-13, retoma): por defecto sin umbral configurado (null) — mismo
+// comportamiento que un analista que nunca llamó PATCH /analistas/me/umbral-critico.
+function analistaRepositoryFalso(umbral: UmbralCriticoPersistido | null = null): AnalistaRepository {
+  return {
+    guardar: jest.fn().mockResolvedValue(undefined),
+    buscarPorCorreo: jest.fn().mockResolvedValue(null),
+    buscarPorId: jest.fn().mockResolvedValue(null),
+    eliminar: jest.fn().mockResolvedValue(undefined),
+    actualizarUmbralCritico: jest.fn().mockResolvedValue(undefined),
+    obtenerUmbralCritico: jest.fn().mockResolvedValue(umbral),
+    listarTodos: jest.fn().mockResolvedValue([])
+  };
 }
 
 describe('ImportarDatasetConAuditoria', () => {
@@ -41,7 +57,8 @@ describe('ImportarDatasetConAuditoria', () => {
     const decorator = new ImportarDatasetConAuditoria(
       usecaseFalso({ importados: 1, rechazados: 0, errores: [], excelDescartadosBase64: null }),
       auditoriaRepository,
-      servicioDeNotificaciones
+      servicioDeNotificaciones,
+      analistaRepositoryFalso()
     );
 
     await decorator.ejecutar(resultado, 'analista-7');
@@ -63,7 +80,8 @@ describe('ImportarDatasetConAuditoria', () => {
     const decorator = new ImportarDatasetConAuditoria(
       usecaseFalso({ importados: 1, rechazados: 0, errores: [], excelDescartadosBase64: null }),
       auditoriaFalsa(),
-      servicioDeNotificaciones
+      servicioDeNotificaciones,
+      analistaRepositoryFalso()
     );
 
     await decorator.ejecutar(resultado, 'analista-7');
@@ -95,7 +113,8 @@ describe('ImportarDatasetConAuditoria', () => {
     const decorator = new ImportarDatasetConAuditoria(
       usecaseFalso({ importados: 3, rechazados: 0, errores: [], excelDescartadosBase64: null }),
       auditoriaFalsa(),
-      servicioDeNotificaciones
+      servicioDeNotificaciones,
+      analistaRepositoryFalso()
     );
 
     await decorator.ejecutar(resultado, 'analista-7');
@@ -114,7 +133,8 @@ describe('ImportarDatasetConAuditoria', () => {
     const decorator = new ImportarDatasetConAuditoria(
       usecaseFalso({ importados: 0, rechazados: 0, errores: [], excelDescartadosBase64: null }),
       auditoriaRepository,
-      servicioDeNotificaciones
+      servicioDeNotificaciones,
+      analistaRepositoryFalso()
     );
 
     await decorator.ejecutar({ importables: [], rechazadas: [] }, 'analista-7');
@@ -136,7 +156,8 @@ describe('ImportarDatasetConAuditoria', () => {
     const decorator = new ImportarDatasetConAuditoria(
       usecaseFalso({ importados: 2, rechazados: 1, errores: [], excelDescartadosBase64: null }),
       auditoriaRepository,
-      servicioDeNotificacionesFalso()
+      servicioDeNotificacionesFalso(),
+      analistaRepositoryFalso()
     );
 
     await decorator.ejecutar({ importables: [], rechazadas: [] }, 'analista-7', 'dataset-julio.xlsx');
@@ -151,7 +172,8 @@ describe('ImportarDatasetConAuditoria', () => {
     const decorator = new ImportarDatasetConAuditoria(
       usecaseFalso({ importados: 2, rechazados: 1, errores: [], excelDescartadosBase64: null }),
       auditoriaRepository,
-      servicioDeNotificacionesFalso()
+      servicioDeNotificacionesFalso(),
+      analistaRepositoryFalso()
     );
 
     await decorator.ejecutar({ importables: [], rechazadas: [] }, 'analista-7');
@@ -159,5 +181,42 @@ describe('ImportarDatasetConAuditoria', () => {
     expect(auditoriaRepository.registrar).toHaveBeenCalledWith(
       expect.objectContaining({ detalle: '2 importados, 1 rechazados' })
     );
+  });
+
+  // RF-99 (M-13, retoma): con un umbral configurado (diasParaParche >= 30),
+  // el conteo de críticas usa ESE umbral, no el default CVSS >= 9.0 — y lo
+  // resuelve UNA sola vez (ver expect de obtenerUmbralCritico más abajo), no
+  // una vez por vulnerabilidad del array.
+  test('con umbral crítico configurado por el analista, usa esa variable/valor en vez del default CVSS >= 9.0', async () => {
+    const bajoCvssAltoDiasParaParche = new Vulnerabilidad(
+      '1',
+      new IdentificadorCVE('CVE-2024-00001'),
+      new CvssScore(3.0),
+      'desc',
+      new TipoAccesoValue('No'),
+      45
+    );
+    const resultado = {
+      importables: [{ vulnerabilidad: bajoCvssAltoDiasParaParche, fuente: 'excel' }],
+      rechazadas: []
+    };
+    const servicioDeNotificaciones = servicioDeNotificacionesFalso();
+    const analistaRepository = analistaRepositoryFalso({ variable: 'diasParaParche', valor: 30 });
+    const decorator = new ImportarDatasetConAuditoria(
+      usecaseFalso({ importados: 1, rechazados: 0, errores: [], excelDescartadosBase64: null }),
+      auditoriaFalsa(),
+      servicioDeNotificaciones,
+      analistaRepository
+    );
+
+    await decorator.ejecutar(resultado, 'analista-7');
+
+    expect(analistaRepository.obtenerUmbralCritico).toHaveBeenCalledTimes(1);
+    expect(analistaRepository.obtenerUmbralCritico).toHaveBeenCalledWith('analista-7');
+    expect(servicioDeNotificaciones.notificarImportacionCompletada).toHaveBeenCalledWith('analista-7', {
+      importados: 1,
+      rechazados: 0,
+      criticas: 1
+    });
   });
 });

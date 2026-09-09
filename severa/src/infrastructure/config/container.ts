@@ -90,6 +90,8 @@ import { ExportarDatasetGenerico } from '../../application/usecases/module_carga
 import { AnalizarDatasetGenericoConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/AnalizarDatasetGenericoConAuditoria';
 import { ConfigurarCriterioDeClasificacion } from '../../application/usecases/module_carga_gestion_datasets/ConfigurarCriterioDeClasificacion';
 import { VerificarIntegridadDataset } from '../../application/usecases/module_carga_gestion_datasets/VerificarIntegridadDataset';
+import { ConfigurarUmbralCritico } from '../../application/usecases/module_notificaciones_alertas/ConfigurarUmbralCritico';
+import { NotificarPlazosProximosAVencer } from '../../application/usecases/module_notificaciones_alertas/NotificarPlazosProximosAVencer';
 
 const pool = new Pool({ connectionString: config.databaseUrl });
 const analistaRepository = new PostgresAnalistaRepository(pool);
@@ -127,7 +129,8 @@ const sesionAnalisisStore = new SesionAnalisisStoreEnMemoria();
 const importarDatasetConAuditoria = new ImportarDatasetConAuditoria(
   new ImportarDataset(vulnerabilidadRepository),
   auditoriaRepository,
-  servicioDeNotificaciones
+  servicioDeNotificaciones,
+  analistaRepository
 );
 // Hoisteado (en vez de construirse inline dentro de `container`) porque
 // `importarDatasetDesdeUrlUseCase` también lo necesita, para el caso de un
@@ -229,7 +232,8 @@ export const container = {
     lectorExcelDataset,
     importarDatasetConAuditoria,
     sincronizarConApiNvdUseCase,
-    vulnerabilidadRepository
+    vulnerabilidadRepository,
+    analistaRepository
   ),
   // RF-24: primera ruta HTTP para exportar el dataset validado (GET /dataset/exportar).
   exportarDatasetValidadoUseCase: new ExportarDatasetValidado(vulnerabilidadRepository),
@@ -324,5 +328,24 @@ export const container = {
   // "Convertir link a Excel": reutiliza exactamente los mismos adaptadores de
   // seguridad ya conectados arriba (descargadorDeArchivos, nvdApiClient) —
   // no crea ninguna instancia nueva ni relaja ningún control de SSRF/allowlist.
-  convertirUrlAExcelUseCase: new ConvertirUrlAExcel(descargadorDeArchivos, nvdApiClient)
+  convertirUrlAExcelUseCase: new ConvertirUrlAExcel(descargadorDeArchivos, nvdApiClient),
+  // RF-99 (M-13, retoma): sin decorador de auditoría — es configuración de
+  // preferencias propias, mismo criterio que editarPerfilUseCase en cuanto a
+  // "acción sobre uno mismo", pero no está en el alcance de RF-94 (auditoría
+  // de vulnerabilidades) ni RF-16 (notificación de cambio de perfil).
+  configurarUmbralCriticoUseCase: new ConfigurarUmbralCritico(analistaRepository),
+  // RF-100 (M-13, retoma): expuesto en el container para que server.ts lo
+  // registre en el cron al arrancar (ver más abajo) — no tiene ruta HTTP,
+  // es exclusivamente disparado por ProgramadorDeTareas.
+  notificarPlazosProximosAVencerUseCase: new NotificarPlazosProximosAVencer(
+    analistaRepository,
+    vulnerabilidadRepository,
+    servicioDeNotificaciones
+  ),
+  // RF-100 (M-13, retoma): expuesto para que server.ts registre la tarea
+  // cron de plazos próximos a vencer al arrancar — antes era una variable
+  // privada del módulo, solo usada acá adentro para programarInformePeriodicoUseCase
+  // (que sigue siendo opt-in, registrado por el propio controller cuando el
+  // analista lo pide).
+  programadorDeTareas
 };

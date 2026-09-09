@@ -1,6 +1,7 @@
 import { FilaImportable, FilaRechazada } from '../../../../infrastructure/adapters/out/dataset/parsers/LectorExcelDataset';
 import { ImportarDatasetUseCase, ResumenImportacion } from '../../../ports/in/module_carga_gestion_datasets/ImportarDatasetUseCase';
 import { AuditoriaRepository } from '../../../ports/out/persistencia/repositorios/AuditoriaRepository';
+import { AnalistaRepository } from '../../../ports/out/persistencia/repositorios/AnalistaRepository';
 import { ServicioDeNotificaciones } from '../../../ports/out/notificaciones/ServicioDeNotificaciones';
 import { esVulnerabilidadCritica } from '../../../../domain/services/DetectorDeEventosNotificables';
 
@@ -15,7 +16,11 @@ export class ImportarDatasetConAuditoria {
   constructor(
     private readonly usecase: ImportarDatasetUseCase,
     private readonly auditoriaRepository: AuditoriaRepository,
-    private readonly servicioDeNotificaciones: ServicioDeNotificaciones
+    private readonly servicioDeNotificaciones: ServicioDeNotificaciones,
+    // RF-99 (M-13, retoma): UNA sola consulta por importación (no por fila)
+    // para resolver el umbral crítico configurado por el analista — ver el
+    // uso más abajo, antes del .filter().
+    private readonly analistaRepository: AnalistaRepository
   ) {}
 
   async ejecutar(
@@ -57,7 +62,8 @@ export class ImportarDatasetConAuditoria {
     // con el conteo de críticas incluido. Se revisa `resultado.importables`
     // (lo que efectivamente se guardó), no el resumen, porque el resumen
     // solo trae conteos totales.
-    const cantidadCriticas = (resultado?.importables ?? []).filter((item) => esVulnerabilidadCritica(item.vulnerabilidad)).length;
+    const umbral = (await this.analistaRepository.obtenerUmbralCritico(analistaId)) ?? undefined;
+    const cantidadCriticas = (resultado?.importables ?? []).filter((item) => esVulnerabilidadCritica(item.vulnerabilidad, umbral)).length;
     await this.servicioDeNotificaciones.notificarImportacionCompletada(analistaId, {
       importados: resumen.importados,
       rechazados: resumen.rechazados,

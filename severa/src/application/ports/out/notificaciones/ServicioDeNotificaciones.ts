@@ -15,6 +15,11 @@ export interface ServicioDeNotificaciones {
   // Sprint 14; cuando sí, además queda en el centro de notificaciones del
   // destinatario (PriorizacionController ya lo pasa siempre).
   notificarPlazoExcedido(vulnerabilidad: Vulnerabilidad, analistaId?: string): Promise<void>;
+  // RF-100 (M-13, retoma): distinto de notificarPlazoExcedido a propósito —
+  // ese método ya tiene mensaje/tipo en tiempo pasado ("excedido",
+  // 'PlazoVencido'), reusarlo para "está por vencer" confundiría al analista
+  // sobre si ya venció o no (ver auditoría de retoma M-13, punto 7).
+  notificarPlazoProximoAVencer(vulnerabilidad: Vulnerabilidad, analistaId: string): Promise<void>;
   // RF-99: alerta de vulnerabilidad crítica (CVSS >= 9.0) recién importada.
   // Ya no se dispara una vez por fila crítica (bug real reportado: importar
   // un dataset con muchas críticas inundaba el centro de notificaciones con

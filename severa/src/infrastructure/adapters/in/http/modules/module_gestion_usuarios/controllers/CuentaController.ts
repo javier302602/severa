@@ -49,3 +49,14 @@ cuentaRouter.patch('/analistas/:id/rol', requiereRol('administrador'), async (re
   const analista = await container.asignarRolUseCase.ejecutar({ analistaId: req.params.id, nuevoRol: rol }, asignadoPor);
   res.json({ id: analista.id, nombre: analista.nombre, correo: analista.correo.valor, rol: analista.rol });
 });
+
+// RF-99 (M-13, retoma): el id sale del token, nunca del body/URL — mismo
+// criterio que DELETE /analistas/me, es imposible configurar el umbral de
+// otra cuenta. Sin try/catch: un VariableDeConsultaInvalidaError (variable u
+// valor inválidos) cae al error-handler genérico de app.ts, que ya responde
+// 400 — mismo mecanismo que BusquedaController/PriorizacionController.
+cuentaRouter.patch('/analistas/me/umbral-critico', async (req, res) => {
+  const { variable, valor } = req.body;
+  await container.configurarUmbralCriticoUseCase.ejecutar(req.analistaAutenticado!.id, variable, Number(valor));
+  res.status(204).send();
+});

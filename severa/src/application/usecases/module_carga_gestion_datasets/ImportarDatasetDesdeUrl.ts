@@ -7,6 +7,7 @@ import { SincronizarConApiNvdUseCase } from '../../ports/in/module_carga_gestion
 import { ResumenImportacion } from '../../ports/in/module_carga_gestion_datasets/ImportarDatasetUseCase';
 import { DescargadorDeArchivos } from '../../ports/out/dataset/DescargadorDeArchivos';
 import { VulnerabilidadRepository } from '../../ports/out/persistencia/repositorios/VulnerabilidadRepository';
+import { AnalistaRepository } from '../../ports/out/persistencia/repositorios/AnalistaRepository';
 import {
   LectorExcelDataset,
   MapeoColumnas,
@@ -43,7 +44,11 @@ export class ImportarDatasetDesdeUrl implements ImportarDatasetDesdeUrlUseCase {
     private readonly lectorExcel: LectorExcelDataset,
     private readonly importarDatasetUseCase: ImportarDatasetConAuditoria,
     private readonly sincronizarConApiNvdUseCase: SincronizarConApiNvdUseCase,
-    private readonly vulnerabilidadRepository: VulnerabilidadRepository
+    private readonly vulnerabilidadRepository: VulnerabilidadRepository,
+    // RF-99 (M-13, retoma): mismo motivo que ImportarDatasetConAuditoria —
+    // acá el umbral se resuelve antes de leerArchivoCsvEnStreaming, no
+    // adentro del callback por fila (ver importarCsvEnStreaming).
+    private readonly analistaRepository: AnalistaRepository
   ) {}
 
   async ejecutar(url: string, analistaId: string, mapeoColumnas?: MapeoColumnas): Promise<ResumenImportacion> {
@@ -91,6 +96,10 @@ export class ImportarDatasetDesdeUrl implements ImportarDatasetDesdeUrlUseCase {
     origenLink: string,
     mapeoColumnas?: MapeoColumnas
   ): Promise<ResumenImportacion> {
+    // RF-99: UNA sola consulta antes del streaming, no una por fila —
+    // el resultado viaja por closure dentro del callback de abajo.
+    const umbral = (await this.analistaRepository.obtenerUmbralCritico(analistaId)) ?? undefined;
+
     let lote: Vulnerabilidad[] = [];
     let importados = 0;
     let rechazados = 0;
@@ -117,7 +126,7 @@ export class ImportarDatasetDesdeUrl implements ImportarDatasetDesdeUrlUseCase {
       // alerta por fila crítica en el momento — ahora solo se cuenta, y se
       // notifica UNA vez al terminar todo el streaming (ver
       // registrarImportacionPorLink, más abajo).
-      if (esVulnerabilidadCritica(vulnerabilidad)) {
+      if (esVulnerabilidadCritica(vulnerabilidad, umbral)) {
         criticas++;
       }
 

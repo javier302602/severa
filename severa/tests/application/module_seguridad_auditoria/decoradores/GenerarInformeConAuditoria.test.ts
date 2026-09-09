@@ -15,6 +15,7 @@ function auditoriaFalsa(): AuditoriaRepository {
 function servicioDeNotificacionesFalso(): ServicioDeNotificaciones {
   return {
     notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
+    notificarPlazoProximoAVencer: jest.fn().mockResolvedValue(undefined),
     notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
     notificarInformeListo: jest.fn().mockResolvedValue(undefined),
     notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),

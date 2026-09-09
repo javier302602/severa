@@ -10,7 +10,10 @@ describe('VerPerfil', () => {
       guardar: jest.fn(),
       buscarPorCorreo: jest.fn(),
       buscarPorId: jest.fn().mockResolvedValue(analistaA),
-      eliminar: jest.fn()
+      eliminar: jest.fn(),
+      actualizarUmbralCritico: jest.fn(),
+      obtenerUmbralCritico: jest.fn(),
+      listarTodos: jest.fn()
     };
 
     const usecase = new VerPerfil(analistaRepository);
@@ -27,7 +30,10 @@ describe('VerPerfil', () => {
       guardar: jest.fn(),
       buscarPorCorreo: jest.fn(),
       buscarPorId,
-      eliminar: jest.fn()
+      eliminar: jest.fn(),
+      actualizarUmbralCritico: jest.fn(),
+      obtenerUmbralCritico: jest.fn(),
+      listarTodos: jest.fn()
     };
 
     const usecase = new VerPerfil(analistaRepository);
@@ -42,7 +48,10 @@ describe('VerPerfil', () => {
       guardar: jest.fn(),
       buscarPorCorreo: jest.fn(),
       buscarPorId: jest.fn().mockResolvedValue(null),
-      eliminar: jest.fn()
+      eliminar: jest.fn(),
+      actualizarUmbralCritico: jest.fn(),
+      obtenerUmbralCritico: jest.fn(),
+      listarTodos: jest.fn()
     };
 
     const usecase = new VerPerfil(analistaRepository);
