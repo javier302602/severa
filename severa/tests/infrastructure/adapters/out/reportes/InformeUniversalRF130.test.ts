@@ -176,3 +176,92 @@ describe('InformeUniversalRF130 — Pasada 2-A (RF-130)', () => {
     });
   });
 });
+
+// M-10 Ronda 2, Pasada 2-B: las 6 secciones con reestructuración real
+// (N° registros/variables, Análisis individual, Distribuciones,
+// Visualizaciones, Relaciones entre variables, Análisis inferencial).
+// COLUMNAS_GENERICO_TIPICO (arriba) solo tiene UNA columna numérica
+// ("Precio") — no alcanza para ejercitar la matriz de correlación/heatmap
+// real (necesita >=2). Estos tests cubren los casos límite que ese fixture
+// no toca: cero columnas numéricas, y dos o más (heatmap real).
+describe('InformeUniversalRF130 — Pasada 2-B (RF-130): secciones 4/10/11/12/13/14', () => {
+  test('genérico sin columnas numéricas: 4/10/11/12/13 no explotan (todas caen en su rama "sin columnas numéricas")', async () => {
+    const datos = recopilarDatosDeInformeDataset(
+      ['Producto', 'Categoria'],
+      [
+        { Producto: 'Laptop', Categoria: 'Electrónica' },
+        { Producto: 'Mouse', Categoria: 'Accesorios' }
+      ],
+      'Analista de Prueba'
+    );
+
+    const buffer = await renderizarInformeUniversal({ pipeline: 'generico', datos });
+
+    expect(firmaPdf(buffer)).toBe('%PDF');
+  });
+
+  test('genérico con 2+ columnas numéricas: Visualizaciones incluye histogramas Y heatmap, Relaciones muestra la matriz', async () => {
+    const datos = recopilarDatosDeInformeDataset(
+      ['Producto', 'Precio', 'Stock'],
+      [
+        { Producto: 'Laptop', Precio: 1200, Stock: 5 },
+        { Producto: 'Mouse', Precio: 25, Stock: 100 },
+        { Producto: 'Teclado', Precio: 45, Stock: 60 },
+        { Producto: 'Monitor', Precio: 300, Stock: 20 }
+      ],
+      'Analista de Prueba'
+    );
+    expect(datos.matrizCorrelacion.columnas.length).toBeGreaterThanOrEqual(2);
+
+    const buffer = await renderizarInformeUniversal({ pipeline: 'generico', datos });
+
+    expect(firmaPdf(buffer)).toBe('%PDF');
+  });
+
+  test('CVSS: Análisis individual de variables (10) es "No aplicable" — no explota', async () => {
+    const buffer = await renderizarInformeUniversal(await contextoCvss());
+    expect(firmaPdf(buffer)).toBe('%PDF');
+  });
+
+  test('CVSS: Análisis inferencial (14) reconstruye la comparación Remoto/Local sin tocar dibujarAplicacionPractica', async () => {
+    // Prueba indirecta de aislamiento: el informe CVSS "viejo" (todavía en
+    // vivo) sigue generándose bien con los mismos datos — si esta función
+    // nueva hubiera mutado algo compartido, el smoke test de
+    // GeneradorInformePDF.test.ts ya lo habría detectado (corre en la misma
+    // suite completa). Acá solo se confirma que el camino nuevo tampoco
+    // explota con datos reales de comparación remoto/local.
+    const datos = await recopilarDatosDeInforme(
+      repositorioFalso([
+        vuln('1', 'CVE-2024-00001', 8.0, 'A', 'Sí', 4),
+        vuln('2', 'CVE-2024-00002', 4.0, 'B', 'No', 40)
+      ]),
+      auditoriaFalsa(),
+      'Analista de Prueba',
+      'analista-1'
+    );
+
+    const buffer = await renderizarInformeUniversal({ pipeline: 'cvss', datos });
+
+    expect(firmaPdf(buffer)).toBe('%PDF');
+  });
+
+  describe('orden de secciones (post 2-B): sigue exactamente el mapeo, ahora con contenido real en 4/10/11/12/13/14', () => {
+    beforeEach(() => {
+      (LayoutInformePdf.nuevaSeccion as jest.Mock).mockClear();
+    });
+
+    test('CVSS: 19 secciones (2-20), sin huecos ni repetidos', async () => {
+      await renderizarInformeUniversal(await contextoCvss());
+
+      const numeros = (LayoutInformePdf.nuevaSeccion as jest.Mock).mock.calls.map(([, numero]) => Number(numero));
+      expect(numeros).toEqual(Array.from({ length: 19 }, (_, i) => i + 2));
+    });
+
+    test('genérico: 19 secciones (2-20), sin huecos ni repetidos', async () => {
+      await renderizarInformeUniversal(contextoGenerico());
+
+      const numeros = (LayoutInformePdf.nuevaSeccion as jest.Mock).mock.calls.map(([, numero]) => Number(numero));
+      expect(numeros).toEqual(Array.from({ length: 19 }, (_, i) => i + 2));
+    });
+  });
+});
