@@ -285,6 +285,43 @@ describe('PostgresVulnerabilidadRepository — integración real (Sprint 16 + mi
     });
   });
 
+  // M-11 (retoma, RF-86): mismo motivo que el resto de este archivo — el
+  // mapeo de variableComponente a columna SQL real (software vs.
+  // tipo_vulnerabilidad) solo se puede demostrar contra Postgres de verdad;
+  // un mock de VulnerabilidadRepository nunca ejecuta este SQL.
+  describe('buscarConFiltros — variableComponente (RF-86)', () => {
+    const CVES_COMPONENTE = ['CVE-1999-9501', 'CVE-1999-9502'];
+
+    afterEach(async () => {
+      await pool.query('DELETE FROM vulnerabilidades WHERE cve = ANY($1)', [CVES_COMPONENTE]);
+    });
+
+    test('RETROCOMPATIBILIDAD: sin variableComponente, componente sigue filtrando por software', async () => {
+      await repository.guardar(
+        new Vulnerabilidad(CVES_COMPONENTE[0], new IdentificadorCVE(CVES_COMPONENTE[0]), new CvssScore(5.0), 'Apache Log4j', new TipoAccesoValue('Sí'), undefined, 'Apache Log4j', 'RCE').asignarAnalista(ANALISTA_DE_PRUEBA)
+      );
+
+      const filtro = new FiltroVulnerabilidad({ componente: 'Apache Log4j' });
+      const resultado = await repository.buscarConFiltros(filtro, ANALISTA_DE_PRUEBA);
+
+      expect(resultado.map((v) => v.cve.valor)).toEqual([CVES_COMPONENTE[0]]);
+    });
+
+    test('con variableComponente="tipoVulnerabilidad", filtra por la columna tipo_vulnerabilidad en vez de software', async () => {
+      await repository.guardar(
+        new Vulnerabilidad(CVES_COMPONENTE[0], new IdentificadorCVE(CVES_COMPONENTE[0]), new CvssScore(5.0), 'Software Cualquiera', new TipoAccesoValue('Sí'), undefined, 'Software Cualquiera', 'RCE').asignarAnalista(ANALISTA_DE_PRUEBA)
+      );
+      await repository.guardar(
+        new Vulnerabilidad(CVES_COMPONENTE[1], new IdentificadorCVE(CVES_COMPONENTE[1]), new CvssScore(5.0), 'Otro Software', new TipoAccesoValue('Sí'), undefined, 'Otro Software', 'DoS').asignarAnalista(ANALISTA_DE_PRUEBA)
+      );
+
+      const filtro = new FiltroVulnerabilidad({ componente: 'RCE', variableComponente: 'tipoVulnerabilidad' });
+      const resultado = await repository.buscarConFiltros(filtro, ANALISTA_DE_PRUEBA);
+
+      expect(resultado.map((v) => v.cve.valor)).toEqual([CVES_COMPONENTE[0]]);
+    });
+  });
+
   // Bug real reportado: comparar "Apache Log4j" vs "log4j" (nombre parcial)
   // no encontraba nada porque listarPorSoftware hacía ILIKE exacto (sin
   // comodines) — confirmado contra Postgres real, no solo contra un mock.

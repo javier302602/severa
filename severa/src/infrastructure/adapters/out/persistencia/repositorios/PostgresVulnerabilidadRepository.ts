@@ -11,6 +11,7 @@ import {
   VariableCategoricaVulnerabilidad,
   obtenerSeveridadPorDefecto
 } from '../../../../../domain/services/classification/VariablesVulnerabilidad';
+import { VariableCategoricaAbiertaVulnerabilidad } from '../../../../../domain/services/inferential-statistics/ComparacionPorCategoriasGenerico';
 
 // Multi-tenancy a nivel de dueño (migración 006): TODA consulta/modificación
 // de esta tabla lleva WHERE/columna analista_id — no hay ningún método acá
@@ -256,8 +257,14 @@ export class PostgresVulnerabilidadRepository implements VulnerabilidadRepositor
       condiciones.push(`fecha_carga <= $${valores.length}`);
     }
     if (filtro.componente) {
+      // RF-86: filtro.variableComponente ya viene resuelta con su default
+      // ('software') desde el constructor de FiltroVulnerabilidad — acá solo
+      // se traduce a nombre de columna real, mismo criterio de coincidencia
+      // exacta (ILIKE sin comodines) que ya usaba este filtro antes de esta
+      // retoma, sin cambiarlo.
+      const columnaComponente = PostgresVulnerabilidadRepository.COLUMNA_SQL_COMPONENTE[filtro.variableComponente ?? 'software'];
       valores.push(filtro.componente);
-      condiciones.push(`software ILIKE $${valores.length}`);
+      condiciones.push(`${columnaComponente} ILIKE $${valores.length}`);
     }
     if (filtro.estadoRemediacion) {
       valores.push(filtro.estadoRemediacion);
@@ -323,6 +330,13 @@ export class PostgresVulnerabilidadRepository implements VulnerabilidadRepositor
     tipoAcceso: 'acceso_remoto',
     estadoRemediacion: 'estado_remediacion',
     severidad: 'severidad'
+  };
+
+  // RF-86 (M-11, retoma): mismo patrón que las dos de arriba, para la
+  // variable ABIERTA (M-08) que FiltroVulnerabilidad.componente compara.
+  private static readonly COLUMNA_SQL_COMPONENTE: Record<VariableCategoricaAbiertaVulnerabilidad, string> = {
+    tipoVulnerabilidad: 'tipo_vulnerabilidad',
+    software: 'software'
   };
 
   async filtrarPorRango(variable: VariableNumericaVulnerabilidad, minimo: number, maximo: number, analistaId: string): Promise<Vulnerabilidad[]> {

@@ -173,6 +173,43 @@ describe('GET /vulnerabilidades/buscar — RF-84 a RF-88', () => {
     expect(repo.buscarConFiltros.mock.calls[0][2].limite).toBe(500);
   });
 
+  // M-11 (retoma, RF-86): variableComponente generaliza `componente` más
+  // allá de "software" — reutiliza VariableCategoricaAbiertaVulnerabilidad
+  // (M-08) tal cual.
+  test('RETROCOMPATIBILIDAD: componente sin variableComponente resuelve a "software" (comportamiento de siempre)', async () => {
+    repo.buscarConFiltros.mockClear();
+
+    await conToken('analista-busqueda-A')(
+      conHttps(request(app).get('/vulnerabilidades/buscar').query({ componente: 'Apache Log4j' }))
+    );
+
+    const filtroRecibido = repo.buscarConFiltros.mock.calls[0][0];
+    expect(filtroRecibido.componente).toBe('Apache Log4j');
+    expect(filtroRecibido.variableComponente).toBe('software');
+  });
+
+  test('con variableComponente="tipoVulnerabilidad" explícito, se pasa esa variable al filtro', async () => {
+    repo.buscarConFiltros.mockClear();
+
+    await conToken('analista-busqueda-A')(
+      conHttps(request(app).get('/vulnerabilidades/buscar').query({ componente: 'RCE', variableComponente: 'tipoVulnerabilidad' }))
+    );
+
+    const filtroRecibido = repo.buscarConFiltros.mock.calls[0][0];
+    expect(filtroRecibido.variableComponente).toBe('tipoVulnerabilidad');
+  });
+
+  test('variableComponente inválida responde 400 sin llamar al repositorio', async () => {
+    repo.buscarConFiltros.mockClear();
+
+    const res = await conToken('analista-busqueda-A')(
+      conHttps(request(app).get('/vulnerabilidades/buscar').query({ componente: 'Apache', variableComponente: 'noExiste' }))
+    );
+
+    expect(res.status).toBe(400);
+    expect(repo.buscarConFiltros).not.toHaveBeenCalled();
+  });
+
   test('sin ningún criterio real responde 400 (FiltroVacioError)', async () => {
     const res = await conToken('analista-busqueda-A')(conHttps(request(app).get('/vulnerabilidades/buscar')));
     expect(res.status).toBe(400);
@@ -242,6 +279,19 @@ describe('POST /filtros-favoritos — RF-89', () => {
 
     expect(res.status).toBe(400);
     expect(repoFavoritos.guardar).not.toHaveBeenCalled();
+  });
+
+  // M-11 (retoma, RF-86): un favorito con la forma vieja (solo `componente`,
+  // sin `variableComponente`) se sigue guardando y validando exactamente
+  // igual que antes de esta retoma — no se le agrega el campo nuevo de
+  // oficio, ni la validación lo exige.
+  test('un favorito con componente pero sin variableComponente (forma vieja) se guarda igual que siempre', async () => {
+    const res = await conToken('analista-busqueda-A')(
+      conHttps(request(app).post('/filtros-favoritos').send({ nombre: 'Por componente', criterios: { componente: 'OpenSSL' } }))
+    );
+
+    expect(res.status).toBe(201);
+    expect(res.body.criterios).toEqual({ componente: 'OpenSSL' });
   });
 
   test('IDOR: un analistaId falso en el body se ignora, se guarda con el id real del token', async () => {

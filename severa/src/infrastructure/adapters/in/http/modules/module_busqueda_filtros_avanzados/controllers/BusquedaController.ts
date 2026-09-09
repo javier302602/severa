@@ -13,6 +13,11 @@ export const busquedaRouter = express.Router();
 function parseCriterios(input: Record<string, unknown>): CriteriosFiltroVulnerabilidad {
   const criterios: CriteriosFiltroVulnerabilidad = {};
 
+  // RF-84 (M-11, retoma): cerrado sin cambios funcionales — este criterio
+  // `cve` (comparación exacta, mismo índice que GET /vulnerabilidades/:cve)
+  // ya es el segundo camino válido de "búsqueda rápida por identificador",
+  // junto al endpoint de M-04 (ver ConsultarVulnerabilidadPorCVE.ts). No hay
+  // nada que generalizar acá: `cve` sigue siendo el único identificador real.
   if (typeof input.cve === 'string' && input.cve !== '') {
     criterios.cve = input.cve;
   }
@@ -33,6 +38,14 @@ function parseCriterios(input: Record<string, unknown>): CriteriosFiltroVulnerab
   }
   if (typeof input.componente === 'string' && input.componente !== '') {
     criterios.componente = input.componente;
+  }
+  // RF-86 (M-11, retoma): string crudo, sin validar acá — FiltroVulnerabilidad
+  // (constructor) es quien valida contra VariableCategoricaAbiertaVulnerabilidad
+  // (M-08) y aplica el default 'software' si no viene. Un valor inválido cae
+  // en VariableDeConsultaInvalidaError, capturado por el catch de esta misma
+  // ruta (sin try/catch nuevo).
+  if (typeof input.variableComponente === 'string' && input.variableComponente !== '') {
+    criterios.variableComponente = input.variableComponente;
   }
   if (typeof input.estadoRemediacion === 'string' && input.estadoRemediacion !== '') {
     criterios.estadoRemediacion = input.estadoRemediacion as EstadoRemediacion;

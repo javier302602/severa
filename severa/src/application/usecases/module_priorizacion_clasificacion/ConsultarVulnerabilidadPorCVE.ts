@@ -13,6 +13,15 @@ import { VulnerabilidadRepository } from '../../ports/out/persistencia/repositor
 // "generalización" que pedía el SDS para este RF ya está satisfecha por el
 // renombre/reencuadre del propio RF; no hay código pendiente que escribir
 // acá (ver auditoría de retoma de M-04).
+//
+// RF-84 (M-11, retoma): mismo cierre, por el mismo motivo — "búsqueda rápida
+// por identificador" ya está satisfecha por ESTE endpoint (GET /vulnerabilidades/:cve,
+// lookup directo O(1) vía UNIQUE(analista_id, cve)). Existe un segundo camino
+// equivalente, GET /vulnerabilidades/buscar?cve=X (BusquedaController.ts,
+// M-11), con la misma comparación exacta y el mismo índice — no es una
+// duplicación a resolver, son dos entradas HTTP distintas al mismo criterio
+// (ficha completa vs. resultado dentro del filtro combinable). Ninguno de
+// los dos cambia en esta retoma.
 
 export class ConsultarVulnerabilidadPorCVE implements ConsultarVulnerabilidadPorCVEUseCase {
   constructor(private readonly vulnerabilidadRepository: VulnerabilidadRepository) {}
