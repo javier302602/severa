@@ -595,18 +595,20 @@ function dibujarDistribucionDeDatos(doc: PDFKit.PDFDocument, datos: DatosInforme
 // incluyen 3 gráficos clave (histograma, boxplot, pastel).
 // ---------------------------------------------------------------------
 
-// RF-131: distingue visualmente qué contenido es descriptivo puro de qué es
-// una comparación entre grupos — hoy son tipográficamente idénticos pese a
-// ser conceptualmente distintos (una comparación de medias entre Remoto y
-// Local, aunque sin pruebas de hipótesis, no es lo mismo que describir un
-// único conjunto). Deliberadamente sin 'Predictivo': M-16 sigue bloqueado
-// (ver IMotorPrediccion.ts), no se menciona predicción en ningún lado del
-// informe.
-type TipoDeAnalisis = 'Descriptivo' | 'Comparación entre grupos';
+// RF-131/RF-81 (M-10 Ronda 2, Pasada 1): distingue visualmente qué contenido
+// es descriptivo puro, cuál es una comparación entre grupos (etiquetada
+// "Inferencial" — decisión confirmada: sigue siendo una comparación
+// descriptiva de medias SIN prueba de hipótesis formal, ver el "Fundamento
+// estadístico"/caveat de cada uso más abajo, la etiqueta cambia de nombre
+// pero no de naturaleza) y cuál está deliberadamente pendiente (M-16 sigue
+// bloqueado, ver IMotorPrediccion.ts — "Pendiente" para no omitir en
+// silencio la ausencia de análisis predictivo, mismo criterio que RF-130).
+type TipoDeAnalisis = 'Descriptivo' | 'Inferencial' | 'Pendiente';
 
 const COLOR_ETIQUETA_TIPO_ANALISIS: Record<TipoDeAnalisis, string> = {
   Descriptivo: '#0369a1',
-  'Comparación entre grupos': '#7c3aed'
+  Inferencial: '#7c3aed',
+  Pendiente: '#64748b'
 };
 
 // Badge en miniatura, mismo lenguaje visual que el encabezado de dibujarTabla
@@ -701,7 +703,7 @@ function construirDefinicionesGraficos(datos: DatosInforme): DefinicionGrafico[]
     {
       numero: 6,
       titulo: 'Comparación de CVSS por tipo de acceso',
-      tipo: 'Comparación entre grupos',
+      tipo: 'Inferencial',
       objetivo: 'comparar la severidad entre vulnerabilidades de acceso remoto y de acceso local.',
       fundamento: 'dos boxplots lado a lado permiten comparar mediana, dispersión y atípicos de cada grupo sin una prueba estadística formal.',
       relacion: `las medias (remoto=${formatearEstadistico(remotoVsLocal.mediaA)}, local=${formatearEstadistico(remotoVsLocal.mediaB)}) son las mismas de la Comparación acceso remoto/local.`,
@@ -816,11 +818,12 @@ function dibujarAplicacionPractica(doc: PDFKit.PDFDocument, datos: DatosInforme,
   parrafo(doc, `${criticasYAltas} de ${datos.totalVulnerabilidades} vulnerabilidades (${porcentajeUrgente.toFixed(1)}%) son Crítica o Alta.`);
 
   subseccion(doc, '¿Influye el acceso remoto en la severidad?');
-  dibujarEtiquetaTipoAnalisis(doc, 'Comparación entre grupos');
+  dibujarEtiquetaTipoAnalisis(doc, 'Inferencial');
   parrafo(
     doc,
     `Media CVSS remoto = ${formatearEstadistico(remotoVsLocal.mediaA)}, local = ${formatearEstadistico(remotoVsLocal.mediaB)} ` +
-      `(diferencia de ${formatearEstadistico(remotoVsLocal.diferenciaMedias)} puntos).`
+      `(diferencia de ${formatearEstadistico(remotoVsLocal.diferenciaMedias)} puntos). Comparación descriptiva de medias, ` +
+      'sin prueba de hipótesis formal.'
   );
 
   subseccion(doc, '¿Cuánto tiempo toma en promedio disponer de un parche?');
@@ -1192,10 +1195,29 @@ function dibujarConclusionesDataset(doc: PDFKit.PDFDocument, datos: DatosInforme
   nuevaSeccion(doc, '9', 'Conclusiones');
 
   subseccion(doc, 'Síntesis de hallazgos');
+  dibujarEtiquetaTipoAnalisis(doc, 'Descriptivo');
   datos.interpretacion.forEach((parrafoTexto) => {
     doc.fontSize(9.5).fillColor('#334155').font('Times-Roman').text(`•  ${parrafoTexto}`, { align: 'justify' });
     doc.moveDown(0.3);
   });
+
+  // RF-81/RF-134 (M-10 Ronda 2, Pasada 1): a diferencia del informe CVSS
+  // (que sí tiene una comparación entre grupos etiquetada "Inferencial",
+  // ver Aplicación práctica), el pipeline genérico HOY no ejecuta ningún
+  // análisis de comparación entre grupos — decisión confirmada: se muestra
+  // "Pendiente" explícitamente en vez de omitir la distinción en silencio,
+  // mismo criterio que RF-130 exige para toda sección sin contenido
+  // aplicable.
+  subseccion(doc, 'Análisis inferencial');
+  dibujarEtiquetaTipoAnalisis(doc, 'Pendiente');
+  parrafo(doc, 'El sistema no realiza comparación entre grupos sobre datasets genéricos en esta versión.');
+
+  subseccion(doc, 'Predicción');
+  dibujarEtiquetaTipoAnalisis(doc, 'Pendiente');
+  parrafo(
+    doc,
+    'M-16 (Predicción y Modelado) está pendiente de material académico antes de implementar o sugerir cualquier método (ver IMotorPrediccion.ts).'
+  );
 
   subseccion(doc, 'Limitaciones conocidas');
   datos.limitacionesConocidas.forEach((limitacion) => {

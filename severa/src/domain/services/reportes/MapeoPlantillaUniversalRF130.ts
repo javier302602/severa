@@ -112,9 +112,9 @@ export const MAPEO_PLANTILLA_UNIVERSAL_RF130: MapeoSeccionRF130[] = [
   {
     numero: 14,
     nombreRF130: 'Análisis inferencial',
-    estado: 'no-existe',
-    cubiertaPor: [],
-    nota: 'El informe declara explícitamente "no inferencial" (sin pruebas de hipótesis). Lo más cercano es la comparación de medias Remoto/Local (RF-131 ya la distingue visualmente como "Comparación entre grupos", no como inferencia formal).'
+    estado: 'parcial',
+    cubiertaPor: ['Inferencial'],
+    nota: 'RF-81/RF-134 (M-10 Ronda 2, Pasada 1): el informe CVSS etiqueta explícitamente "Inferencial" la comparación de medias Remoto/Local (antes "Comparación entre grupos", RF-131) — sigue siendo una comparación descriptiva de medias SIN prueba de hipótesis formal, aclarado en el propio texto de esa sección (Fundamento estadístico + el párrafo de Aplicación práctica). El informe de dataset genérico no ejecuta ningún análisis de este tipo hoy — muestra "Pendiente" explícitamente en su sección "Análisis inferencial" (Conclusiones) en vez de omitirlo en silencio.'
   },
   {
     numero: 15,

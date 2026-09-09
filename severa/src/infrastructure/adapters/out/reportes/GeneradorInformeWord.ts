@@ -675,11 +675,25 @@ function construirContenidoDataset(datos: DatosInformeDataset): Array<ElementoDo
     contenido.push(texto('No hay columnas numéricas para evaluar.'));
   }
 
-  // 9. Conclusiones
+  // 9. Conclusiones. RF-81/RF-134 (M-10 Ronda 2, Pasada 1): mismo criterio
+  // de distinción Descriptivo/Inferencial/Pendiente que GeneradorInformePDF.ts
+  // (dibujarConclusionesDataset) — acá sin el badge de color de PDFKit
+  // (Word no tiene ese lenguaje visual), con una etiqueta en negrita en su
+  // lugar, mismo patrón ya usado para "Objetivo del gráfico"/"Fundamento
+  // estadístico" más arriba en este archivo.
   contenido.push(
     heading('9. Conclusiones', HeadingLevel.HEADING_1),
     heading('Síntesis de hallazgos', HeadingLevel.HEADING_2),
+    new Paragraph({ children: [new TextRun({ text: 'Tipo: ', bold: true }), new TextRun('Descriptivo')] }),
     ...datos.interpretacion.map((parrafo) => new Paragraph({ text: parrafo, bullet: { level: 0 } })),
+    heading('Análisis inferencial', HeadingLevel.HEADING_2),
+    new Paragraph({ children: [new TextRun({ text: 'Tipo: ', bold: true }), new TextRun('Pendiente')] }),
+    texto('El sistema no realiza comparación entre grupos sobre datasets genéricos en esta versión.'),
+    heading('Predicción', HeadingLevel.HEADING_2),
+    new Paragraph({ children: [new TextRun({ text: 'Tipo: ', bold: true }), new TextRun('Pendiente')] }),
+    texto(
+      'M-16 (Predicción y Modelado) está pendiente de material académico antes de implementar o sugerir cualquier método (ver IMotorPrediccion.ts).'
+    ),
     heading('Limitaciones conocidas', HeadingLevel.HEADING_2),
     ...datos.limitacionesConocidas.map((limitacion) => new Paragraph({ text: limitacion, bullet: { level: 0 } }))
   );

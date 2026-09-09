@@ -263,4 +263,23 @@ describe('GeneradorInformePDF — informe de dataset genérico (Fase 5)', () => 
 
     expect(firmaPdf(buffer)).toBe('%PDF');
   });
+
+  // RF-134/RF-81 (M-10 Ronda 2, Pasada 1): dataset con columnas de un dominio
+  // reconocible (biología) — smoke test de que el vocabulario derivado y los
+  // badges nuevos ("Descriptivo"/"Inferencial: Pendiente"/"Predictivo:
+  // Pendiente") no rompen la generación. Mismo criterio que el resto de esta
+  // suite: no se parsea el PDF, solo se confirma que produce un PDF real.
+  test('dataset con columnas de dominio detectable (biología) no explota', async () => {
+    const columnas = ['especie', 'peso_kg', 'habitat'];
+    const filas = [
+      { especie: 'Puma concolor', peso_kg: 62, habitat: 'Bosque' },
+      { especie: 'Lynx rufus', peso_kg: 9, habitat: 'Matorral' },
+      { especie: 'Puma concolor', peso_kg: 58, habitat: 'Bosque' }
+    ];
+    const datos = recopilarDatosDeInformeDataset(columnas, filas, 'Analista de Prueba');
+
+    const buffer = await new GeneradorInformePDF().generarInformeDataset(datos);
+
+    expect(firmaPdf(buffer)).toBe('%PDF');
+  });
 });

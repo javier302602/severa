@@ -1,6 +1,7 @@
 import { DiagnosticoDataset } from './data-cleaning/CalidadDeDatosGenerico';
 import { MatrizCorrelacion } from './descriptive-statistics/CorrelacionGenerico';
 import { ResultadoDeteccionOutliers } from './data-cleaning/DeteccionOutliersGenerico';
+import { VocabularioDataset, VOCABULARIO_NEUTRO, detectarVocabularioDataset } from './reportes/VocabularioDeDominioGenerico';
 
 // Mejora 4 (Análisis de Datos General) — Fase 5. Mismo rol que
 // InterpretadorDeResultados.ts (RF-81) pero para el módulo de dataset
@@ -20,28 +21,66 @@ export function generarInterpretacionDataset(
   matrizCorrelacion: MatrizCorrelacion,
   outliers: ResultadoDeteccionOutliers
 ): string[] {
+  // RF-134: se deriva UNA sola vez acá (no en cada interpretarX por
+  // separado) a partir de los nombres de columna del propio diagnóstico —
+  // el llamador (RecopilarDatosDeInformeDataset.ts) no necesita saber que
+  // esto existe ni pasar nada nuevo.
+  const vocabulario = detectarVocabularioDataset(diagnostico.columnas.map((columna) => columna.nombre));
+
   return [
-    interpretarComposicionDataset(diagnostico),
-    interpretarCalidadDatos(diagnostico),
+    interpretarComposicionDataset(diagnostico, vocabulario),
+    interpretarCalidadDatos(diagnostico, vocabulario),
     interpretarCorrelacionMasFuerte(matrizCorrelacion),
     interpretarOutliers(outliers)
   ];
 }
 
-export function interpretarComposicionDataset(diagnostico: DiagnosticoDataset): string {
+export function interpretarComposicionDataset(
+  diagnostico: DiagnosticoDataset,
+  vocabulario: VocabularioDataset = VOCABULARIO_NEUTRO
+): string {
   const conteoPorTipo = new Map<string, number>();
   diagnostico.columnas.forEach((columna) => {
     conteoPorTipo.set(columna.tipo, (conteoPorTipo.get(columna.tipo) ?? 0) + 1);
   });
   const composicion = [...conteoPorTipo.entries()].map(([tipo, cantidad]) => `${cantidad} ${tipo}`).join(', ');
+  // RF-134: con vocabulario neutro se mantiene "fila(s)" (redacción de
+  // siempre, sin distinguir singular/plural) — con un dominio detectado sí
+  // tiene sentido distinguir singular/plural porque la palabra cambia de
+  // verdad (1 espécimen / 2 especímenes), a diferencia de "fila(s)" que
+  // nunca lo hizo.
+  const unidad =
+    vocabulario.dominio === VOCABULARIO_NEUTRO.dominio
+      ? 'fila(s)'
+      : diagnostico.totalFilas === 1
+        ? vocabulario.unidadSingular
+        : vocabulario.unidadPlural;
 
-  return `El dataset contiene ${diagnostico.totalFilas} fila(s) y ${diagnostico.columnas.length} columna(s) (${composicion}).`;
+  return `El dataset contiene ${diagnostico.totalFilas} ${unidad} y ${diagnostico.columnas.length} columna(s) (${composicion}).`;
 }
 
-export function interpretarCalidadDatos(diagnostico: DiagnosticoDataset): string {
-  const baseDuplicados = diagnostico.filasDuplicadas === 0
-    ? 'No se detectaron filas duplicadas exactas.'
-    : `Se detectaron ${diagnostico.filasDuplicadas} fila(s) duplicada(s) exacta(s).`;
+export function interpretarCalidadDatos(
+  diagnostico: DiagnosticoDataset,
+  vocabulario: VocabularioDataset = VOCABULARIO_NEUTRO
+): string {
+  // RF-134: con vocabulario neutro (el caso de siempre, sin cambios) se
+  // mantiene la redacción EXACTA de antes — "fila(s) duplicada(s)" es
+  // gramaticalmente correcta porque "fila" es femenino, y así no se rompe
+  // ningún texto ya generado para el caso default. Con un dominio detectado,
+  // "duplicado(s) exacto(s)" pasa a sustantivo masculino invariable (no un
+  // adjetivo pegado a la unidad) y la unidad va en frase preposicional —
+  // gramaticalmente segura sin importar el género real de esa palabra (ver
+  // nota de alcance en VocabularioDeDominioGenerico.ts: sin campo de género,
+  // se evita el problema en vez de resolverlo con más diccionario).
+  const esNeutro = vocabulario.dominio === VOCABULARIO_NEUTRO.dominio;
+  const baseDuplicados =
+    diagnostico.filasDuplicadas === 0
+      ? esNeutro
+        ? 'No se detectaron filas duplicadas exactas.'
+        : `No se detectaron duplicados exactos de ${vocabulario.unidadPlural}.`
+      : esNeutro
+        ? `Se detectaron ${diagnostico.filasDuplicadas} fila(s) duplicada(s) exacta(s).`
+        : `Se detectaron ${diagnostico.filasDuplicadas} duplicado(s) exacto(s) de ${vocabulario.unidadPlural}.`;
 
   const columnasConFaltantesAltos = diagnostico.columnas.filter(
     (columna) => columna.porcentajeFaltante > UMBRAL_FALTANTE_ALTO_PORCENTAJE

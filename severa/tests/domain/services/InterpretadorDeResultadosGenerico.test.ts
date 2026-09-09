@@ -8,6 +8,7 @@ import {
 import { DiagnosticoDataset } from '../../../src/domain/services/data-cleaning/CalidadDeDatosGenerico';
 import { MatrizCorrelacion } from '../../../src/domain/services/descriptive-statistics/CorrelacionGenerico';
 import { ResultadoDeteccionOutliers } from '../../../src/domain/services/data-cleaning/DeteccionOutliersGenerico';
+import { detectarVocabularioDataset } from '../../../src/domain/services/reportes/VocabularioDeDominioGenerico';
 
 function diagnosticoDePrueba(overrides: Partial<DiagnosticoDataset> = {}): DiagnosticoDataset {
   return {
@@ -115,5 +116,58 @@ describe('InterpretadorDeResultadosGenerico — Mejora 4 (Análisis de Datos Gen
     const resultado = generarInterpretacionDataset(diagnosticoDePrueba(), matriz, outliers);
     expect(resultado).toHaveLength(4);
     resultado.forEach((parrafo) => expect(typeof parrafo).toBe('string'));
+  });
+
+  // RF-134 (M-10 Ronda 2, Pasada 1): vocabulario derivado de nombres de
+  // columna — los tests de arriba (columnas 'precio'/'ciudad', sin dominio
+  // reconocible) quedan intactos porque resuelven al vocabulario neutro
+  // ("fila(s)"), idéntico al comportamiento de siempre.
+  describe('RF-134 — vocabulario adaptado al dominio', () => {
+    test('interpretarComposicionDataset usa la unidad del dominio detectado en vez de "fila(s)"', () => {
+      const diagnostico = diagnosticoDePrueba({
+        totalFilas: 5,
+        columnas: [
+          { nombre: 'especie', tipo: 'categorica', valoresFaltantes: 0, porcentajeFaltante: 0, valoresUnicos: 5, valoresInconsistentes: 0 },
+          { nombre: 'peso_kg', tipo: 'numerica', valoresFaltantes: 0, porcentajeFaltante: 0, valoresUnicos: 5, valoresInconsistentes: 0 }
+        ]
+      });
+
+      const vocabulario = detectarVocabularioDataset(diagnostico.columnas.map((columna) => columna.nombre));
+      const texto = interpretarComposicionDataset(diagnostico, vocabulario);
+
+      expect(texto).toContain('5 espec');
+      expect(texto).not.toContain('fila');
+    });
+
+    test('interpretarCalidadDatos usa la unidad del dominio detectado, sin adjetivo pegado (sin problema de género)', () => {
+      const diagnostico = diagnosticoDePrueba({
+        filasDuplicadas: 3,
+        columnas: [
+          { nombre: 'cliente_id', tipo: 'texto', valoresFaltantes: 0, porcentajeFaltante: 0, valoresUnicos: 10, valoresInconsistentes: 0 },
+          { nombre: 'producto', tipo: 'categorica', valoresFaltantes: 0, porcentajeFaltante: 0, valoresUnicos: 4, valoresInconsistentes: 0 }
+        ]
+      });
+
+      const vocabulario = detectarVocabularioDataset(diagnostico.columnas.map((columna) => columna.nombre));
+      const texto = interpretarCalidadDatos(diagnostico, vocabulario);
+
+      expect(texto).toContain('3 duplicado(s) exacto(s) de clientes');
+      expect(texto).not.toContain('fila');
+    });
+
+    test('generarInterpretacionDataset propaga el vocabulario detectado a composición y calidad, sin afectar correlación/outliers', () => {
+      const diagnostico = diagnosticoDePrueba({
+        columnas: [
+          { nombre: 'especie', tipo: 'categorica', valoresFaltantes: 0, porcentajeFaltante: 0, valoresUnicos: 3, valoresInconsistentes: 0 }
+        ]
+      });
+      const matriz: MatrizCorrelacion = { columnas: [], filas: [], columnasExcluidas: [] };
+      const outliers: ResultadoDeteccionOutliers = { columnas: [], columnasExcluidas: [] };
+
+      const [composicion, calidad] = generarInterpretacionDataset(diagnostico, matriz, outliers);
+
+      expect(composicion).toContain('espec');
+      expect(calidad).toContain('espec');
+    });
   });
 });
