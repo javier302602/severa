@@ -144,7 +144,7 @@ describe('InterpretadorDeResultadosGenerico — Mejora 4 (Análisis de Datos Gen
         filasDuplicadas: 3,
         columnas: [
           { nombre: 'cliente_id', tipo: 'texto', valoresFaltantes: 0, porcentajeFaltante: 0, valoresUnicos: 10, valoresInconsistentes: 0 },
-          { nombre: 'producto', tipo: 'categorica', valoresFaltantes: 0, porcentajeFaltante: 0, valoresUnicos: 4, valoresInconsistentes: 0 }
+          { nombre: 'ciudad', tipo: 'categorica', valoresFaltantes: 0, porcentajeFaltante: 0, valoresUnicos: 4, valoresInconsistentes: 0 }
         ]
       });
 
