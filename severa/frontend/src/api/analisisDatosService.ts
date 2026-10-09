@@ -1,4 +1,5 @@
 import { httpClient } from './httpClient';
+import { parametrosDeInforme, type OpcionesDescargaDeInforme } from './formatosDeInforme';
 
 // Mejora 4 (Análisis de Datos General). Contrato verificado contra
 // AnalisisDatasetController.ts real — módulo nuevo y separado del resto de
@@ -148,7 +149,6 @@ export interface ResultadoOutliers {
   columnasExcluidas: ColumnaExcluida[];
 }
 
-export type FormatoInformeDataset = 'pdf' | 'docx';
 
 export const analisisDatosService = {
   analizar: (archivo: File): Promise<DiagnosticoDataset> => {
@@ -166,6 +166,6 @@ export const analisisDatosService = {
   obtenerMatrizCorrelacion: (sesionId: string): Promise<MatrizCorrelacion> =>
     httpClient.get(`/analisis-datos/${sesionId}/correlacion`),
   obtenerOutliers: (sesionId: string): Promise<ResultadoOutliers> => httpClient.get(`/analisis-datos/${sesionId}/outliers`),
-  descargarInforme: (sesionId: string, formato: FormatoInformeDataset): Promise<Blob> =>
-    httpClient.get(`/analisis-datos/${sesionId}/informe`, { formato })
+  descargarInforme: (sesionId: string, opciones: OpcionesDescargaDeInforme): Promise<Blob> =>
+    httpClient.get(`/analisis-datos/${sesionId}/informe`, parametrosDeInforme(opciones))
 };

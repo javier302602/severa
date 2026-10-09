@@ -2,7 +2,7 @@ import { GenerarInformeUseCase } from '../../ports/in/module_reportes_exportacio
 import { VulnerabilidadRepository } from '../../ports/out/persistencia/repositorios/VulnerabilidadRepository';
 import { AuditoriaRepository } from '../../ports/out/persistencia/repositorios/AuditoriaRepository';
 import { AnalistaRepository } from '../../ports/out/persistencia/repositorios/AnalistaRepository';
-import { GeneradorDeInformes } from '../../ports/out/reportes/GeneradorDeInformes';
+import { GeneradorDeInformes, ArchivoGenerado, FormatoDeInforme, OpcionesDeInforme } from '../../ports/out/reportes/GeneradorDeInformes';
 import { recopilarDatosDeInforme } from './RecopilarDatosDeInforme';
 import { resolverNombreAnalistaParaInforme } from '../../utils/ResolverNombreAnalistaParaInforme';
 
@@ -14,12 +14,10 @@ export class GenerarInforme implements GenerarInformeUseCase {
     private readonly analistaRepository: AnalistaRepository
   ) {}
 
-  async ejecutar(formato: 'pdf' | 'docx', analistaId: string): Promise<Buffer> {
+  async ejecutar(formato: FormatoDeInforme, analistaId: string, opciones: OpcionesDeInforme = {}): Promise<ArchivoGenerado> {
     const generadoPara = await resolverNombreAnalistaParaInforme(this.analistaRepository, analistaId);
     const datos = await recopilarDatosDeInforme(this.vulnerabilidadRepository, this.auditoriaRepository, generadoPara, analistaId);
 
-    return formato === 'pdf'
-      ? this.geradorDeInformes.generarInformeCompleto(datos)
-      : this.geradorDeInformes.generarInformeWord(datos);
+    return this.geradorDeInformes.generarInformeEnFormato({ pipeline: 'cvss', datos }, formato, opciones);
   }
 }

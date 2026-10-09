@@ -3,6 +3,7 @@ import { Vulnerabilidad } from '../../../../domain/entities/Vulnerabilidad';
 import { Notificacion } from '../../../../domain/entities/Notificacion';
 import { ServicioDeNotificaciones } from '../../../../application/ports/out/notificaciones/ServicioDeNotificaciones';
 import { NotificacionRepository } from '../../../../application/ports/out/persistencia/repositorios/NotificacionRepository';
+import { FormatoDeInforme } from '../../../../application/ports/out/reportes/GeneradorDeInformes';
 
 // Stub de Sprint 09 (RF-76), ampliado en Sprint 13 (RF-99 a RF-102): el envío
 // real (correo/Slack/etc.) sigue pendiente, pero ahora además de escribir en
@@ -60,7 +61,7 @@ export class ConsolaServicioDeNotificaciones implements ServicioDeNotificaciones
     );
   }
 
-  async notificarInformeListo(analistaId: string, formato: 'pdf' | 'docx'): Promise<void> {
+  async notificarInformeListo(analistaId: string, formato: FormatoDeInforme): Promise<void> {
     const mensaje = `Informe generado (${formato})`;
     console.log(`[RF-101] ${mensaje} para el analista ${analistaId}`);
     await this.notificacionRepository.guardar(

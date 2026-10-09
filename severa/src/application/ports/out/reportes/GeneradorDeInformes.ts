@@ -154,12 +154,45 @@ export interface DatosInformeDataset {
   anexoMuestraFilas: AnexoMuestraFilasDataset;
 }
 
+// M-10 Ronda 2, Pasada 3: los dos "documentos de datos" bajo un mismo tipo.
+// Unión discriminada (no un DTO fusionado — ver la nota de DatosInformeDataset
+// arriba): un informe es de un pipeline O del otro, y cada renderer resuelve
+// los dos con chequeo de exhaustividad.
+export type InformeSolicitado = { pipeline: 'cvss'; datos: DatosInforme } | { pipeline: 'generico'; datos: DatosInformeDataset };
+
+// Formatos del informe completo de 20 secciones (RF-130):
+//   pdf   RF-77        docx  RF-78        html  RF-132 (página autocontenida)
+//   latex RF-133 (fuente .tex + figuras, en un .zip)
+//   xlsx  RF-79 (todas las tablas del informe, una por hoja)
+export const FORMATOS_DE_INFORME = ['pdf', 'docx', 'html', 'latex', 'xlsx'] as const;
+export type FormatoDeInforme = (typeof FORMATOS_DE_INFORME)[number];
+
+export function esFormatoDeInforme(valor: unknown): valor is FormatoDeInforme {
+  return typeof valor === 'string' && (FORMATOS_DE_INFORME as readonly string[]).includes(valor);
+}
+
+export interface OpcionesDeInforme {
+  // RF-80: además del informe, incluir cada gráfico como archivo
+  // independiente (PNG y SVG). El resultado pasa a ser un .zip con el informe
+  // en el formato pedido más una carpeta de gráficos.
+  adjuntarGraficos?: boolean;
+}
+
+// Lo que se le entrega al cliente: el contenido y cómo nombrarlo/servirlo.
+// No siempre coincide con el formato pedido — LaTeX y "con gráficos" se
+// entregan como .zip — así que es el generador quien lo informa, no el
+// controller quien lo deduce.
+export interface ArchivoGenerado {
+  contenido: Buffer;
+  tipoMime: string;
+  extension: string;
+}
+
 export interface GeneradorDeInformes {
-  generarInformeCompleto(datos: DatosInforme): Promise<Buffer>;
-  generarInformeWord(datos: DatosInforme): Promise<Buffer>;
+  // Informe completo de 20 secciones, de cualquiera de los dos pipelines, en
+  // cualquiera de los formatos.
+  generarInformeEnFormato(informe: InformeSolicitado, formato: FormatoDeInforme, opciones?: OpcionesDeInforme): Promise<ArchivoGenerado>;
+  // RF-82: documento aparte (PDF corto), no una variante de formato del
+  // informe completo.
   generarResumenEjecutivo(datos: DatosInforme): Promise<Buffer>;
-  // Fase 5: mismo puerto, "documento de datos" distinto — ver
-  // DatosInformeDataset arriba.
-  generarInformeDataset(datos: DatosInformeDataset): Promise<Buffer>;
-  generarInformeDatasetWord(datos: DatosInformeDataset): Promise<Buffer>;
 }

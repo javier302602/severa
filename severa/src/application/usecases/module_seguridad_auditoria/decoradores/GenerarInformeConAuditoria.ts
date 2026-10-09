@@ -1,4 +1,5 @@
 import { GenerarInformeUseCase } from '../../../ports/in/module_reportes_exportacion/GenerarInformeUseCase';
+import { ArchivoGenerado, FormatoDeInforme, OpcionesDeInforme } from '../../../ports/out/reportes/GeneradorDeInformes';
 import { AuditoriaRepository } from '../../../ports/out/persistencia/repositorios/AuditoriaRepository';
 import { ServicioDeNotificaciones } from '../../../ports/out/notificaciones/ServicioDeNotificaciones';
 import { RegistrarAnalisisRealizadoUseCase } from '../../../ports/in/module_perfil_analista/RegistrarAnalisisRealizadoUseCase';
@@ -26,13 +27,13 @@ export class GenerarInformeConAuditoria {
     private readonly registrarAnalisisRealizadoUseCase: RegistrarAnalisisRealizadoUseCase
   ) {}
 
-  async ejecutar(formato: 'pdf' | 'docx', analistaId: string): Promise<Buffer> {
-    const buffer = await this.usecase.ejecutar(formato, analistaId);
+  async ejecutar(formato: FormatoDeInforme, analistaId: string, opciones: OpcionesDeInforme = {}): Promise<ArchivoGenerado> {
+    const archivo = await this.usecase.ejecutar(formato, analistaId, opciones);
 
     await this.auditoriaRepository.registrar({
       usuario: analistaId,
       accion: 'GenerarInforme',
-      detalle: `Informe completo (${formato})`
+      detalle: `Informe completo (${formato}${opciones.adjuntarGraficos ? ', con gráficos adjuntos' : ''})`
     });
 
     await this.registrarAnalisisRealizadoUseCase.ejecutar({
@@ -43,6 +44,6 @@ export class GenerarInformeConAuditoria {
 
     await this.servicioDeNotificaciones.notificarInformeListo(analistaId, formato);
 
-    return buffer;
+    return archivo;
   }
 }

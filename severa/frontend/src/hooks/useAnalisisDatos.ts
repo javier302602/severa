@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { analisisDatosService, type FormatoInformeDataset } from '../api/analisisDatosService';
+import { analisisDatosService } from '../api/analisisDatosService';
+import type { OpcionesDescargaDeInforme } from '../api/formatosDeInforme';
 
 // Mejora 4 (Análisis de Datos General) — Fase 6. sesionId vive en el estado
 // del componente (AnalisisDatosPage), no en localStorage ni en la query key
@@ -46,7 +47,7 @@ export function useOutliersDataset(sesionId: string | null) {
 
 export function useDescargarInformeDataset() {
   return useMutation({
-    mutationFn: ({ sesionId, formato }: { sesionId: string; formato: FormatoInformeDataset }) =>
-      analisisDatosService.descargarInforme(sesionId, formato)
+    mutationFn: ({ sesionId, opciones }: { sesionId: string; opciones: OpcionesDescargaDeInforme }) =>
+      analisisDatosService.descargarInforme(sesionId, opciones)
   });
 }

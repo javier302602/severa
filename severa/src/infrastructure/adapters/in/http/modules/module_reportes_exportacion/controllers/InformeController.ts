@@ -1,29 +1,26 @@
 import express from 'express';
 import { container } from '../../../../../../config/container';
+import { enviarArchivoGenerado, leerSolicitudDeInforme } from '../../../shared/enviarArchivoGenerado';
 
 export const informeRouter = express.Router();
 
-const CONTENT_TYPE_POR_FORMATO: Record<'pdf' | 'docx', string> = {
-  pdf: 'application/pdf',
-  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-};
-
+// RF-77/78/79/132/133: informe completo en cualquiera de los formatos del
+// puerto (pdf, docx, html, latex, xlsx). RF-80: con adjuntarGraficos=true el
+// resultado es un .zip con el informe más cada gráfico como archivo suelto.
 informeRouter.get('/informes/completo', async (req, res) => {
-  const formato = req.query.formato;
-
-  if (formato !== 'pdf' && formato !== 'docx') {
-    res.status(400).json({ error: 'Parámetro "formato" inválido. Valores permitidos: pdf, docx.' });
+  const solicitud = leerSolicitudDeInforme(req);
+  if ('error' in solicitud) {
+    res.status(400).json({ error: solicitud.error });
     return;
   }
 
-  const buffer = await container.generarInformeUseCase.ejecutar(formato, req.analistaAutenticado!.id);
-  res.setHeader('Content-Type', CONTENT_TYPE_POR_FORMATO[formato]);
-  res.send(buffer);
+  const archivo = await container.generarInformeUseCase.ejecutar(solicitud.formato, req.analistaAutenticado!.id, solicitud.opciones);
+  enviarArchivoGenerado(res, archivo, 'informe-siade');
 });
 
 informeRouter.get('/informes/resumen-ejecutivo', async (req, res) => {
   const buffer = await container.generarResumenEjecutivoUseCase.ejecutar(req.analistaAutenticado!.id);
-  res.setHeader('Content-Type', CONTENT_TYPE_POR_FORMATO.pdf);
+  res.setHeader('Content-Type', 'application/pdf');
   res.send(buffer);
 });
 

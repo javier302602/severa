@@ -62,11 +62,8 @@ describe('GenerarResumenEjecutivo', () => {
   test('arma los datos y llama únicamente a generarResumenEjecutivo', async () => {
     let datosRecibidos: DatosInforme | undefined;
     const geradorDeInformes: GeneradorDeInformes = {
-      generarInformeCompleto: jest.fn().mockResolvedValue(Buffer.from('')),
-      generarInformeWord: jest.fn().mockResolvedValue(Buffer.from('')),
-      generarResumenEjecutivo: jest.fn(async (datos: DatosInforme) => { datosRecibidos = datos; return Buffer.from('resumen-falso'); }),
-      generarInformeDataset: jest.fn().mockResolvedValue(Buffer.from('')),
-      generarInformeDatasetWord: jest.fn().mockResolvedValue(Buffer.from(''))
+      generarInformeEnFormato: jest.fn(),
+      generarResumenEjecutivo: jest.fn(async (datos: DatosInforme) => { datosRecibidos = datos; return Buffer.from('resumen-falso'); })
     };
 
     const usecase = new GenerarResumenEjecutivo(repoFalso(dataset), geradorDeInformes, auditoriaRepositoryFalso(), analistaRepositoryFalso());
@@ -74,8 +71,7 @@ describe('GenerarResumenEjecutivo', () => {
 
     expect(resultado.toString()).toBe('resumen-falso');
     expect(geradorDeInformes.generarResumenEjecutivo).toHaveBeenCalledTimes(1);
-    expect(geradorDeInformes.generarInformeCompleto).not.toHaveBeenCalled();
-    expect(geradorDeInformes.generarInformeWord).not.toHaveBeenCalled();
+    expect(geradorDeInformes.generarInformeEnFormato).not.toHaveBeenCalled();
     expect(datosRecibidos?.totalVulnerabilidades).toBe(4);
     expect(datosRecibidos?.interpretacion).toHaveLength(4);
     expect(datosRecibidos?.generadoPara).toBe('Ana Torres');

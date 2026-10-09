@@ -1,7 +1,8 @@
 import { Document, Packer } from 'docx';
 import { DatosInforme, DatosInformeDataset } from '../../../../application/ports/out/reportes/GeneradorDeInformes';
 import { ESTILOS_APA7, MARGEN_APA7_TWIPS, ElementoDocumento } from './LayoutInformeWord';
-import { construirContenidoWord } from './InformeUniversalRF130Word';
+import { construirContenidoWord, renderizarBloquesWord } from './InformeUniversalRF130Word';
+import { BloqueDeInforme } from './BloquesDeInforme';
 
 // RF-78: genera el .docx real con la librería "docx". No implementa
 // GeneradorDeInformes directamente: es un colaborador interno que
@@ -47,5 +48,12 @@ export class GeneradorInformeWord {
   // de datos" distinto — ver DatosInformeDataset en GeneradorDeInformes.ts.
   async generarDataset(datos: DatosInformeDataset): Promise<Buffer> {
     return empaquetar(await construirContenidoWord({ pipeline: 'generico', datos }));
+  }
+
+  // Pasada 3: cuando el llamador ya armó los bloques del informe (porque
+  // además necesita sus figuras, RF-80), no hace falta construirlos de nuevo
+  // — y con ellos, rasterizar otra vez todos los gráficos.
+  async generarDesdeBloques(bloques: BloqueDeInforme[]): Promise<Buffer> {
+    return empaquetar(renderizarBloquesWord(bloques));
   }
 }

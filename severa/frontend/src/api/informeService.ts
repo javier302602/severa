@@ -1,15 +1,17 @@
 import { httpClient } from './httpClient';
 
-// Contrato verificado contra InformeController.ts. Ninguna de las 3 rutas
-// manda Content-Disposition, solo Content-Type — httpClient ya devuelve un
+import { parametrosDeInforme, type OpcionesDescargaDeInforme } from './formatosDeInforme';
+
+// Contrato verificado contra InformeController.ts. httpClient ya devuelve un
 // Blob para cualquier respuesta cuyo content-type no sea json/csv/svg (ver
 // leerCuerpoDeRespuesta en httpClient.ts), así que alcanza con tipar la
-// promesa como Blob, sin tocar el cliente HTTP.
-export type FormatoInforme = 'pdf' | 'docx';
+// promesa como Blob. El backend manda Content-Disposition, pero el nombre de
+// archivo lo decide el frontend (ver nombreDeArchivoDeInforme): esa cabecera
+// no es legible desde otro origen sin exponerla por CORS.
 export type FrecuenciaInformePeriodico = 'semanal' | 'mensual';
 
 export const informeService = {
-  descargarCompleto: (formato: FormatoInforme): Promise<Blob> => httpClient.get('/informes/completo', { formato }),
+  descargarCompleto: (opciones: OpcionesDescargaDeInforme): Promise<Blob> => httpClient.get('/informes/completo', parametrosDeInforme(opciones)),
   descargarResumenEjecutivo: (): Promise<Blob> => httpClient.get('/informes/resumen-ejecutivo'),
   // RF-83: ya viaja scopeado por analista del lado del backend
   // (req.analistaAutenticado.id, ver InformeController.ts) — el frontend no

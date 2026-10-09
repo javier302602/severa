@@ -9,7 +9,9 @@ import { EstadisticasDescriptivasSeccion } from './EstadisticasDescriptivasSecci
 import { AnalisisUnivariadoSeccion } from './AnalisisUnivariadoSeccion';
 import { CorrelacionSeccion } from './CorrelacionSeccion';
 import { OutliersSeccion } from './OutliersSeccion';
-import type { DiagnosticoDataset, FormatoInformeDataset } from '../../api/analisisDatosService';
+import type { DiagnosticoDataset } from '../../api/analisisDatosService';
+import { nombreDeArchivoDeInforme, type OpcionesDescargaDeInforme } from '../../api/formatosDeInforme';
+import { DescargaDeInforme } from '../../components/ui/DescargaDeInforme';
 
 type Pestana = 'descriptivas' | 'univariado' | 'correlacion' | 'outliers';
 
@@ -61,11 +63,6 @@ function DiagnosticoInicial({ diagnostico }: { diagnostico: DiagnosticoDataset }
   );
 }
 
-const NOMBRE_ARCHIVO_INFORME: Record<FormatoInformeDataset, string> = {
-  pdf: 'informe-analisis-datos.pdf',
-  docx: 'informe-analisis-datos.docx'
-};
-
 // Mejora 4 (Análisis de Datos General) — Fase 6. sesionId y diagnostico
 // viven acá, en el estado del componente — nunca en localStorage: el store
 // del backend expira a los 30 minutos de inactividad
@@ -76,7 +73,6 @@ export function AnalisisDatosPage() {
   const [diagnostico, setDiagnostico] = useState<DiagnosticoDataset | null>(null);
   const [archivo, setArchivo] = useState<File | null>(null);
   const [pestanaActiva, setPestanaActiva] = useState<Pestana>('descriptivas');
-  const [formatoInforme, setFormatoInforme] = useState<FormatoInformeDataset>('pdf');
 
   const mutacionAnalizar = useAnalizarDataset();
   const mutacionInforme = useDescargarInformeDataset();
@@ -103,11 +99,11 @@ export function AnalisisDatosPage() {
     });
   };
 
-  const onDescargarInforme = () => {
+  const onDescargarInforme = (opciones: OpcionesDescargaDeInforme) => {
     if (!sesionId) return;
     mutacionInforme.mutate(
-      { sesionId, formato: formatoInforme },
-      { onSuccess: (blob) => descargarArchivo(blob, NOMBRE_ARCHIVO_INFORME[formatoInforme]) }
+      { sesionId, opciones },
+      { onSuccess: (blob) => descargarArchivo(blob, nombreDeArchivoDeInforme('informe-analisis-datos', blob, opciones)) }
     );
   };
 
@@ -177,30 +173,12 @@ export function AnalisisDatosPage() {
 
           <section className="space-y-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm p-6">
             <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Informe completo</h2>
-            <div className="flex items-end gap-3">
-              <div>
-                <label htmlFor="formato-informe-dataset" className="block text-xs font-medium text-slate-700 dark:text-slate-300">
-                  Formato
-                </label>
-                <select
-                  id="formato-informe-dataset"
-                  value={formatoInforme}
-                  onChange={(evento) => setFormatoInforme(evento.target.value as FormatoInformeDataset)}
-                  className="campo-formulario mt-1 py-1.5"
-                >
-                  <option value="pdf">PDF</option>
-                  <option value="docx">Word (.docx)</option>
-                </select>
-              </div>
-              <button
-                type="button"
-                disabled={mutacionInforme.isPending}
-                onClick={onDescargarInforme}
-                className="rounded-md bg-slate-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-slate-300 disabled:opacity-50"
-              >
-                {mutacionInforme.isPending ? 'Generando…' : 'Descargar informe'}
-              </button>
-            </div>
+            <DescargaDeInforme
+              idBase="informe-dataset"
+              enCurso={mutacionInforme.isPending}
+              etiquetaBoton="Descargar informe"
+              onDescargar={onDescargarInforme}
+            />
             {mutacionInforme.isPending && <Spinner etiqueta="Generando informe…" />}
             {mutacionInforme.isError && <AvisoErrorSeccion error={mutacionInforme.error} onReiniciar={onReiniciar} />}
           </section>

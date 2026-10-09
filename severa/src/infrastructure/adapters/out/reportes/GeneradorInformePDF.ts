@@ -1,5 +1,13 @@
 import PDFDocument from 'pdfkit';
-import { GeneradorDeInformes, DatosInforme, DatosInformeDataset } from '../../../../application/ports/out/reportes/GeneradorDeInformes';
+import {
+  GeneradorDeInformes,
+  DatosInforme,
+  DatosInformeDataset,
+  InformeSolicitado,
+  FormatoDeInforme,
+  OpcionesDeInforme,
+  ArchivoGenerado
+} from '../../../../application/ports/out/reportes/GeneradorDeInformes';
 import { GeneradorInformeWord } from './GeneradorInformeWord';
 import {
   dibujarBarras,
@@ -45,8 +53,40 @@ import {
 // dibujarX() viejas, sin ningún cambio. El cutover del pipeline genérico
 // (generarInformeDataset) es el Paso 2, aparte.
 import { renderizarInformeUniversal } from './InformeUniversalRF130';
+import { construirContenidoInforme } from './ContenidoInformeUniversalRF130';
+import { BloqueDeInforme, BloqueFigura } from './BloquesDeInforme';
+import { renderizarInformeHtml } from './RenderizadorInformeHtml';
+import { renderizarInformeLatex, LEEME_LATEX } from './RenderizadorInformeLatex';
+import { construirExcelDeTablasDeInforme } from './ExportadorTablasDeInformeExcel';
+import { empaquetarZip, nombreDeArchivoSeguro, ArchivoEmpaquetado } from './EmpaquetadorZip';
 import { formatearMomento, formatearDiaCalendario } from './FormatoDeFechasInforme';
 import type { ReferenciasDeSeccionInforme } from '../../../../domain/services/reportes/MapeoPlantillaUniversalRF130';
+
+const TIPO_MIME = {
+  pdf: 'application/pdf',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  html: 'text/html; charset=utf-8',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  zip: 'application/zip'
+} as const;
+
+// RF-80: cada figura del informe como archivo independiente, en PNG (para
+// pegar en una presentación) y en SVG (vectorial, para imprimir o editar).
+// El número va adelante para que la carpeta quede en el orden del informe.
+function archivosDeGraficos(bloques: BloqueDeInforme[]): ArchivoEmpaquetado[] {
+  return bloques
+    .filter((bloque): bloque is BloqueFigura => bloque.tipo === 'figura')
+    .flatMap((figura, posicion) => {
+      // "Gráfico 3: Composición por severidad" -> "03-composicion-por-severidad":
+      // el número ya va adelante, repetirlo dentro del nombre no aporta.
+      const descripcion = figura.titulo.replace(/^(Figura|Gráfico)\s+\d+:\s*/, '');
+      const base = `graficos/${String(posicion + 1).padStart(2, '0')}-${nombreDeArchivoSeguro(descripcion)}`;
+      return [
+        { ruta: `${base}.png`, contenido: figura.png },
+        { ruta: `${base}.svg`, contenido: figura.svg }
+      ];
+    });
+}
 
 // RF-77/RF-82: implementación única del puerto GeneradorDeInformes (mismo
 // patrón de "un solo adaptador por puerto de salida" que SvgGraficosAdapter
@@ -91,6 +131,58 @@ export class GeneradorInformePDF implements GeneradorDeInformes {
 
   async generarInformeDatasetWord(datos: DatosInformeDataset): Promise<Buffer> {
     return this.generadorInformeWord.generarDataset(datos);
+  }
+
+  // M-10 Ronda 2, Pasada 3 (RF-79/RF-80/RF-132/RF-133): única entrada del
+  // puerto para el informe completo, en cualquier formato y de cualquiera de
+  // los dos pipelines. PDF sigue por su renderer propio (pdfkit); los demás
+  // formatos son renderers de los mismos bloques (ver BloquesDeInforme.ts).
+  async generarInformeEnFormato(informe: InformeSolicitado, formato: FormatoDeInforme, opciones: OpcionesDeInforme = {}): Promise<ArchivoGenerado> {
+    // Los bloques hacen falta para todo menos para el PDF solo: es lo único
+    // que se puede generar sin construir (y rasterizar) el contenido neutro.
+    const necesitaBloques = formato !== 'pdf' || opciones.adjuntarGraficos === true;
+    const bloques = necesitaBloques ? await construirContenidoInforme(informe) : [];
+
+    const archivo = await this.generarArchivoBase(informe, formato, bloques);
+    if (!opciones.adjuntarGraficos || formato === 'latex') {
+      // LaTeX ya es un paquete que trae sus figuras como archivos sueltos.
+      return archivo;
+    }
+
+    return {
+      contenido: await empaquetarZip([{ ruta: `informe.${archivo.extension}`, contenido: archivo.contenido }, ...archivosDeGraficos(bloques)]),
+      tipoMime: TIPO_MIME.zip,
+      extension: 'zip'
+    };
+  }
+
+  private async generarArchivoBase(informe: InformeSolicitado, formato: FormatoDeInforme, bloques: BloqueDeInforme[]): Promise<ArchivoGenerado> {
+    switch (formato) {
+      case 'pdf':
+        return { contenido: await renderizarInformeUniversal(informe), tipoMime: TIPO_MIME.pdf, extension: 'pdf' };
+      case 'docx':
+        return { contenido: await this.generadorInformeWord.generarDesdeBloques(bloques), tipoMime: TIPO_MIME.docx, extension: 'docx' };
+      case 'html':
+        return { contenido: Buffer.from(renderizarInformeHtml(bloques), 'utf-8'), tipoMime: TIPO_MIME.html, extension: 'html' };
+      case 'xlsx':
+        return { contenido: await construirExcelDeTablasDeInforme(bloques), tipoMime: TIPO_MIME.xlsx, extension: 'xlsx' };
+      case 'latex': {
+        const { tex, figuras } = renderizarInformeLatex(bloques);
+        return {
+          contenido: await empaquetarZip([
+            { ruta: 'informe.tex', contenido: tex },
+            { ruta: 'LEEME.txt', contenido: LEEME_LATEX },
+            ...figuras.map((figuraLatex) => ({ ruta: figuraLatex.ruta, contenido: figuraLatex.png }))
+          ]),
+          tipoMime: TIPO_MIME.zip,
+          extension: 'zip'
+        };
+      }
+      default: {
+        const exhaustivo: never = formato;
+        throw new Error(`Formato de informe no manejado: ${String(exhaustivo)}`);
+      }
+    }
   }
 
   private renderizarPdf(titulo: string, datos: DatosInforme, resumido: boolean): Promise<Buffer> {

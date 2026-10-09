@@ -1,4 +1,5 @@
 import { Vulnerabilidad } from '../../../../domain/entities/Vulnerabilidad';
+import { FormatoDeInforme } from '../reportes/GeneradorDeInformes';
 
 // RF-76 (Sprint 09) + RF-99 a RF-102 (Sprint 13): único puerto de salida para
 // "algo notificable ocurrió". Cada método es responsable de avisar (hoy,
@@ -38,7 +39,7 @@ export interface ServicioDeNotificaciones {
     resumen: { importados: number; rechazados: number; criticas: number }
   ): Promise<void>;
   // RF-101: informe recién generado.
-  notificarInformeListo(analistaId: string, formato: 'pdf' | 'docx'): Promise<void>;
+  notificarInformeListo(analistaId: string, formato: FormatoDeInforme): Promise<void>;
   // RF-102: sincronización con la API NVD completada.
   notificarActualizacionDisponible(
     analistaId: string,

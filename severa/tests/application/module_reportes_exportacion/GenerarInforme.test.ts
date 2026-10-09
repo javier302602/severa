@@ -4,7 +4,7 @@ import { AuditoriaRepository } from '../../../src/application/ports/out/persiste
 import { AnalistaRepository } from '../../../src/application/ports/out/persistencia/repositorios/AnalistaRepository';
 import { Analista } from '../../../src/domain/entities/Analista';
 import { Correo } from '../../../src/domain/shared/value-objects/Correo';
-import { GeneradorDeInformes, DatosInforme } from '../../../src/application/ports/out/reportes/GeneradorDeInformes';
+import { GeneradorDeInformes, DatosInforme, InformeSolicitado, FormatoDeInforme } from '../../../src/application/ports/out/reportes/GeneradorDeInformes';
 import { Vulnerabilidad } from '../../../src/domain/entities/Vulnerabilidad';
 import { IdentificadorCVE } from '../../../src/domain/shared/value-objects/IdentificadorCVE';
 import { CvssScore } from '../../../src/domain/shared/value-objects/CvssScore';
@@ -52,15 +52,18 @@ function analistaRepositoryFalso(): AnalistaRepository {
   };
 }
 
-function generadorDeInformesFalso(): GeneradorDeInformes & { datosRecibidos: DatosInforme[] } {
+// El puerto tiene una sola entrada para el informe completo
+// (generarInformeEnFormato): el fake devuelve un archivo cuyo contenido dice
+// con qué formato se lo llamó, y guarda los datos recibidos.
+function generadorDeInformesFalso(): jest.Mocked<GeneradorDeInformes> & { datosRecibidos: DatosInforme[] } {
   const datosRecibidos: DatosInforme[] = [];
   return {
     datosRecibidos,
-    generarInformeCompleto: jest.fn(async (datos: DatosInforme) => { datosRecibidos.push(datos); return Buffer.from('pdf-falso'); }),
-    generarInformeWord: jest.fn(async (datos: DatosInforme) => { datosRecibidos.push(datos); return Buffer.from('docx-falso'); }),
-    generarResumenEjecutivo: jest.fn(async (datos: DatosInforme) => { datosRecibidos.push(datos); return Buffer.from('resumen-falso'); }),
-    generarInformeDataset: jest.fn().mockResolvedValue(Buffer.from('')),
-    generarInformeDatasetWord: jest.fn().mockResolvedValue(Buffer.from(''))
+    generarInformeEnFormato: jest.fn(async (informe: InformeSolicitado, formato: FormatoDeInforme) => {
+      if (informe.pipeline === 'cvss') datosRecibidos.push(informe.datos);
+      return { contenido: Buffer.from(`${formato}-falso`), tipoMime: `tipo/${formato}`, extension: formato };
+    }),
+    generarResumenEjecutivo: jest.fn(async (datos: DatosInforme) => { datosRecibidos.push(datos); return Buffer.from('resumen-falso'); })
   };
 }
 
@@ -73,15 +76,15 @@ const dataset = [
 const scores = [10.0, 9.8, 7.8, 5.5];
 
 describe('GenerarInforme', () => {
-  test('formato pdf: arma los datos correctos y llama a generarInformeCompleto', async () => {
+  test('formato pdf: arma los datos correctos y pide el informe del pipeline CVSS en ese formato', async () => {
     const geradorDeInformes = generadorDeInformesFalso();
     const usecase = new GenerarInforme(repoFalso(dataset), geradorDeInformes, auditoriaRepositoryFalso(), analistaRepositoryFalso());
 
     const resultado = await usecase.ejecutar('pdf', 'analista-A');
 
-    expect(resultado.toString()).toBe('pdf-falso');
-    expect(geradorDeInformes.generarInformeCompleto).toHaveBeenCalledTimes(1);
-    expect(geradorDeInformes.generarInformeWord).not.toHaveBeenCalled();
+    expect(resultado.contenido.toString()).toBe('pdf-falso');
+    expect(geradorDeInformes.generarInformeEnFormato).toHaveBeenCalledTimes(1);
+    expect(geradorDeInformes.generarInformeEnFormato).toHaveBeenCalledWith(expect.objectContaining({ pipeline: 'cvss' }), 'pdf', {});
 
     const datos = geradorDeInformes.datosRecibidos[0];
     expect(datos.totalVulnerabilidades).toBe(4);
@@ -105,15 +108,23 @@ describe('GenerarInforme', () => {
     expect(datos.generadoPara).toBe('Ana Torres');
   });
 
-  test('formato docx: llama a generarInformeWord en vez de generarInformeCompleto', async () => {
+  test.each(['docx', 'html', 'latex', 'xlsx'] as const)('formato %s: pasa el formato pedido tal cual al generador y devuelve su archivo', async (formato) => {
     const geradorDeInformes = generadorDeInformesFalso();
     const usecase = new GenerarInforme(repoFalso(dataset), geradorDeInformes, auditoriaRepositoryFalso(), analistaRepositoryFalso());
 
-    const resultado = await usecase.ejecutar('docx', 'analista-A');
+    const resultado = await usecase.ejecutar(formato, 'analista-A');
 
-    expect(resultado.toString()).toBe('docx-falso');
-    expect(geradorDeInformes.generarInformeWord).toHaveBeenCalledTimes(1);
-    expect(geradorDeInformes.generarInformeCompleto).not.toHaveBeenCalled();
+    expect(resultado).toEqual({ contenido: Buffer.from(`${formato}-falso`), tipoMime: `tipo/${formato}`, extension: formato });
+    expect(geradorDeInformes.generarInformeEnFormato).toHaveBeenCalledWith(expect.objectContaining({ pipeline: 'cvss' }), formato, {});
+  });
+
+  test('RF-80: la opción de adjuntar gráficos llega al generador', async () => {
+    const geradorDeInformes = generadorDeInformesFalso();
+    const usecase = new GenerarInforme(repoFalso(dataset), geradorDeInformes, auditoriaRepositoryFalso(), analistaRepositoryFalso());
+
+    await usecase.ejecutar('pdf', 'analista-A', { adjuntarGraficos: true });
+
+    expect(geradorDeInformes.generarInformeEnFormato).toHaveBeenCalledWith(expect.anything(), 'pdf', { adjuntarGraficos: true });
   });
 
   test('si el analista del token ya no existe, usa un nombre por defecto en vez de fallar', async () => {

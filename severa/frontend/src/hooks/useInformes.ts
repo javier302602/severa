@@ -1,9 +1,10 @@
 import { useMutation } from '@tanstack/react-query';
-import { informeService, type FormatoInforme, type FrecuenciaInformePeriodico } from '../api/informeService';
+import { informeService, type FrecuenciaInformePeriodico } from '../api/informeService';
+import type { OpcionesDescargaDeInforme } from '../api/formatosDeInforme';
 
 export function useDescargarInformeCompleto() {
   return useMutation({
-    mutationFn: (formato: FormatoInforme) => informeService.descargarCompleto(formato)
+    mutationFn: (opciones: OpcionesDescargaDeInforme) => informeService.descargarCompleto(opciones)
   });
 }
 

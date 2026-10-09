@@ -1,5 +1,5 @@
 import PDFDocument from 'pdfkit';
-import { DatosInforme, DatosInformeDataset } from '../../../../application/ports/out/reportes/GeneradorDeInformes';
+import { DatosInformeDataset, InformeSolicitado } from '../../../../application/ports/out/reportes/GeneradorDeInformes';
 import { MAPEO_PLANTILLA_UNIVERSAL_RF130, REFERENCIAS_DE_SECCION_RF130 } from '../../../../domain/services/reportes/MapeoPlantillaUniversalRF130';
 import { interpretarComposicionDataset, interpretarCorrelacionMasFuerte, interpretarOutliers } from '../../../../domain/services/InterpretadorDeResultadosGenerico';
 import { detectarVocabularioDataset } from '../../../../domain/services/reportes/VocabularioDeDominioGenerico';
@@ -43,9 +43,11 @@ import { formatearMomento } from './FormatoDeFechasInforme';
 // vez de validar presencia/ausencia a mano. Mismo criterio que
 // RelacionPlazoReal (MotorDePriorizacion.ts) o EstadoSeccionRF130 (el propio
 // mapeo).
-export type ContextoInformeUniversal =
-  | { pipeline: 'cvss'; datos: DatosInforme }
-  | { pipeline: 'generico'; datos: DatosInformeDataset };
+//
+// Desde la Pasada 3 la unión vive en el puerto (InformeSolicitado), porque los
+// casos de uso también la necesitan para pedir un informe en cualquier
+// formato; este alias conserva el nombre que usan los renderers y sus tests.
+export type ContextoInformeUniversal = InformeSolicitado;
 
 type FuncionDeSeccion = (doc: PDFKit.PDFDocument, contexto: ContextoInformeUniversal) => void;
 

@@ -2,7 +2,9 @@ import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useDescargarInformeCompleto, useDescargarResumenEjecutivo, useProgramarInforme } from '../../hooks/useInformes';
 import { useConvertirUrlAExcel } from '../../hooks/useDataset';
-import type { FormatoInforme, FrecuenciaInformePeriodico } from '../../api/informeService';
+import type { FrecuenciaInformePeriodico } from '../../api/informeService';
+import { nombreDeArchivoDeInforme, type OpcionesDescargaDeInforme } from '../../api/formatosDeInforme';
+import { DescargaDeInforme } from '../../components/ui/DescargaDeInforme';
 import { descargarArchivo } from '../../utils/descargarArchivo';
 import { Spinner } from '../../components/ui/Spinner';
 import { MensajeError } from '../../components/ui/MensajeError';
@@ -11,11 +13,6 @@ import { esCatalogoVacio } from '../../utils/esCatalogoVacio';
 import { mensajeDeError } from '../../utils/mensajeDeError';
 import { RUTAS } from '../../routes/paths';
 import { TEXTO_AYUDA_LINK_DATASET } from '../../constants/textosImportacion';
-
-const NOMBRE_ARCHIVO_POR_FORMATO: Record<FormatoInforme, string> = {
-  pdf: 'informe-completo.pdf',
-  docx: 'informe-completo.docx'
-};
 
 function ErrorDeGeneracion({ error }: { error: unknown }) {
   if (esCatalogoVacio(error)) {
@@ -36,7 +33,7 @@ function ErrorDeGeneracion({ error }: { error: unknown }) {
   return <MensajeError mensaje={mensajeDeError(error)} />;
 }
 
-// M-10 (RF-77 a RF-83). Los 3 endpoints exigen el catálogo con datos: tanto
+// M-10 (RF-77 a RF-83, RF-132/133). Los 3 endpoints exigen el catálogo con datos: tanto
 // /informes/completo como /informes/resumen-ejecutivo pasan por
 // recopilarDatosDeInforme (RecopilarDatosDeInforme.ts), que llama a
 // calcularMedia sobre los mismos scores que EstadisticaDescriptiva — mismo
@@ -46,7 +43,6 @@ function ErrorDeGeneracion({ error }: { error: unknown }) {
 // genera recién cuando dispara el cron), así que esa sección no necesita el
 // mismo tratamiento.
 export function InformesPage() {
-  const [formato, setFormato] = useState<FormatoInforme>('pdf');
   const [frecuencia, setFrecuencia] = useState<FrecuenciaInformePeriodico>('semanal');
   const [urlAConvertir, setUrlAConvertir] = useState('');
 
@@ -55,9 +51,9 @@ export function InformesPage() {
   const programar = useProgramarInforme();
   const convertirUrl = useConvertirUrlAExcel();
 
-  const onDescargarCompleto = () => {
-    descargaCompleto.mutate(formato, {
-      onSuccess: (blob) => descargarArchivo(blob, NOMBRE_ARCHIVO_POR_FORMATO[formato])
+  const onDescargarCompleto = (opciones: OpcionesDescargaDeInforme) => {
+    descargaCompleto.mutate(opciones, {
+      onSuccess: (blob) => descargarArchivo(blob, nombreDeArchivoDeInforme('informe-completo', blob, opciones))
     });
   };
 
@@ -93,30 +89,7 @@ export function InformesPage() {
 
       <section className="space-y-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm p-6">
         <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Informe completo</h2>
-        <div className="flex items-end gap-3">
-          <div>
-            <label htmlFor="formato-informe" className="block text-xs font-medium text-slate-700 dark:text-slate-300">
-              Formato
-            </label>
-            <select
-              id="formato-informe"
-              value={formato}
-              onChange={(evento) => setFormato(evento.target.value as FormatoInforme)}
-              className="campo-formulario mt-1 py-1.5"
-            >
-              <option value="pdf">PDF</option>
-              <option value="docx">Word (.docx)</option>
-            </select>
-          </div>
-          <button
-            type="button"
-            disabled={descargaCompleto.isPending}
-            onClick={onDescargarCompleto}
-            className="rounded-md bg-slate-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-slate-300 disabled:opacity-50"
-          >
-            {descargaCompleto.isPending ? 'Generando…' : 'Descargar'}
-          </button>
-        </div>
+        <DescargaDeInforme idBase="informe-completo" enCurso={descargaCompleto.isPending} onDescargar={onDescargarCompleto} />
         {descargaCompleto.isPending && <Spinner etiqueta="Generando informe…" />}
         {descargaCompleto.isError && <ErrorDeGeneracion error={descargaCompleto.error} />}
       </section>
