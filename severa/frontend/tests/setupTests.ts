@@ -15,3 +15,18 @@ import '@testing-library/jest-dom/vitest';
 afterEach(() => {
   cleanup();
 });
+
+// Node 25+ define su propio `localStorage` global (Web Storage experimental),
+// que sin `--localstorage-file` vale `undefined` y tapa al de jsdom: los tests
+// que lo usan caen con "Cannot read properties of undefined (reading 'clear')".
+// Se reponen los de jsdom solo si el global no sirve, así con Node 22 no cambia nada.
+const ventanaJsdom = (globalThis as { jsdom?: { window: Window } }).jsdom?.window;
+for (const nombre of ['localStorage', 'sessionStorage'] as const) {
+  if (ventanaJsdom && !globalThis[nombre]) {
+    Object.defineProperty(globalThis, nombre, {
+      value: ventanaJsdom[nombre],
+      configurable: true,
+      writable: true,
+    });
+  }
+}
