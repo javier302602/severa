@@ -371,7 +371,14 @@ export const container = {
   // Fase 5: mismo geradorDeInformes (GeneradorInformePDF) ya compartido con
   // generarInformeUseCase/generarResumenEjecutivoUseCase — un "documento de
   // datos" distinto (DatosInformeDataset), mismo generador PDF/Word.
-  generarInformeDatasetUseCase: new GenerarInformeDataset(sesionAnalisisStore, geradorDeInformes, analistaRepository),
+  generarInformeDatasetUseCase: new GenerarInformeDataset(
+    sesionAnalisisStore,
+    geradorDeInformes,
+    analistaRepository,
+    // Para decir en el informe de qué versión son los datos y qué limpieza
+    // la produjo (sección 8, RF-123/136).
+    datasetGenericoRepository
+  ),
   // "Restablecer datos": acción administrativa (requiereRol('administrador')
   // en DatasetController.ts) — auditada igual que cualquier otro cambio de
   // dataset (RF-94).

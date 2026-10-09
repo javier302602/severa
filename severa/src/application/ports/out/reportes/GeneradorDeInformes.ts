@@ -138,7 +138,41 @@ export interface AnexoMuestraFilasDataset {
   totalFilas: number;
 }
 
+// Una operación de limpieza que se aplicó para llegar a la versión del
+// dataset sobre la que se calcula el informe (RF-123, sección 8 de RF-130).
+export interface OperacionDeLimpiezaEnInforme {
+  fecha: Date;
+  versionOrigen: number;
+  versionResultado: number;
+  operacion: 'eliminar_registros' | 'eliminar_columna' | 'imputar';
+  variable: string;
+  registrosAfectados: number;
+  metodo: string;
+  // Solo en imputaciones.
+  valorImputado?: number | string | boolean;
+  nota?: string;
+}
+
+// De qué dataset guardado salen los datos del informe y qué se le hizo antes.
+// Un informe de datos limpiados que no dijera que lo son, ni cómo, no se
+// podría reproducir ni interpretar bien (una variable imputada tiene menos
+// dispersión que la observada).
+export interface ProcedenciaDeDatasetEnInforme {
+  nombreArchivo: string;
+  // 0 = el dataset original, tal como se importó.
+  version: number;
+  versionBase: number | null;
+  // En orden de aplicación, desde el original hasta esta versión. Vacío para
+  // el original.
+  operaciones: OperacionDeLimpiezaEnInforme[];
+  // RF-110: solo si el analista la confirmó.
+  variableObjetivo: string | null;
+}
+
 export interface DatosInformeDataset {
+  // Ausente cuando la sesión no está asociada a un dataset guardado (sesiones
+  // anteriores al versionado): en ese caso los datos son los importados.
+  procedencia?: ProcedenciaDeDatasetEnInforme;
   generadoEn: Date;
   generadoPara: string;
   totalFilas: number;

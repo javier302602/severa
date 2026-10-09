@@ -14,10 +14,10 @@ import { generarInterpretacionDataset } from '../../../domain/services/Interpret
 // y filas ya leídas del sesionAnalisisStore — no sabe nada del store ni de
 // IDOR, eso es responsabilidad de GenerarInformeDataset.ts.
 const LIMITACIONES_CONOCIDAS_DATASET: string[] = [
-  'La detección de tipo de columna (numérica/categórica/fecha/texto) es una heurística basada en mayoría (ver DetectorDeTipoDeColumna.ts) — no una declaración de esquema, así que columnas ambiguas pueden clasificarse de forma distinta a la esperada.',
+  'La detección de tipo de columna (numérica/categórica/fecha/texto) es una heurística basada en mayoría (ver DetectorDeTipoDeColumna.ts) — no una declaración de esquema, así que columnas ambiguas pueden clasificarse de forma distinta a la esperada. El analista puede corregir el tipo de cualquier variable; las que corrigió se indican en la sección 5.',
   'El análisis univariado numérico agrupa cada columna en intervalos calculados automáticamente (regla de Sturges, acotada entre 3 y 10 intervalos) — no son los mismos intervalos que usaría un analista eligiéndolos a mano para esa variable en particular.',
   'La matriz de correlación usa eliminación por pares: cada celda se calcula solo con las filas donde ambas columnas tienen un valor numérico válido, así que columnas con muchos valores faltantes en distintas filas pueden correlacionar sobre una base de datos más chica que el total del dataset.',
-  'Este informe se genera a partir de la sesión efímera creada al subir el archivo (ver SesionAnalisisStoreEnMemoria.ts) — si esa sesión expiró (30 minutos de inactividad) hay que volver a subir el archivo.'
+  'Este informe se genera a partir de la sesión de análisis que se abre al cargar un archivo o al reabrir un dataset guardado (ver SesionAnalisisStoreEnMemoria.ts) — si esa sesión expiró (30 minutos de inactividad) hay que volver a abrir el dataset.'
 ];
 
 // Anexo A ("Muestra de filas") del informe de dataset genérico: a diferencia

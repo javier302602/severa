@@ -26,9 +26,16 @@ const RUTA_INFORME_UNIVERSAL = path.join(
   __dirname,
   '../../../../src/infrastructure/adapters/out/reportes/InformeUniversalRF130.ts'
 );
+// La sección 8 (y las frases de RF-110/RF-111) se redacta en un tercer
+// archivo, compartido por el PDF y los demás formatos.
+const RUTA_NARRATIVA_DE_PROCEDENCIA = path.join(
+  __dirname,
+  '../../../../src/infrastructure/adapters/out/reportes/NarrativaDeProcedenciaDataset.ts'
+);
 const CONTENIDO_GENERADOR_PDF = fs.readFileSync(RUTA_GENERADOR_PDF, 'utf-8');
 const CONTENIDO_INFORME_UNIVERSAL = fs.readFileSync(RUTA_INFORME_UNIVERSAL, 'utf-8');
-const CONTENIDO_COMBINADO = `${CONTENIDO_GENERADOR_PDF}\n${CONTENIDO_INFORME_UNIVERSAL}`;
+const CONTENIDO_NARRATIVA_DE_PROCEDENCIA = fs.readFileSync(RUTA_NARRATIVA_DE_PROCEDENCIA, 'utf-8');
+const CONTENIDO_COMBINADO = `${CONTENIDO_GENERADOR_PDF}\n${CONTENIDO_INFORME_UNIVERSAL}\n${CONTENIDO_NARRATIVA_DE_PROCEDENCIA}`;
 
 describe('MapeoPlantillaUniversalRF130', () => {
   test('tiene exactamente 20 entradas, numeradas 1-20 sin huecos ni repetidos', () => {
@@ -45,7 +52,7 @@ describe('MapeoPlantillaUniversalRF130', () => {
 
   test.each(
     MAPEO_PLANTILLA_UNIVERSAL_RF130.filter((entrada) => entrada.estado !== 'no-existe' && entrada.estado !== 'bloqueada-por-M16')
-  )('sección $numero ($nombreRF130): cada título citado en cubiertaPor existe literalmente en GeneradorInformePDF.ts o InformeUniversalRF130.ts', (entrada) => {
+  )('sección $numero ($nombreRF130): cada título citado en cubiertaPor existe literalmente en el código que redacta el informe', (entrada) => {
     expect(entrada.cubiertaPor.length).toBeGreaterThan(0);
     entrada.cubiertaPor.forEach((titulo) => {
       expect(CONTENIDO_COMBINADO).toContain(titulo);

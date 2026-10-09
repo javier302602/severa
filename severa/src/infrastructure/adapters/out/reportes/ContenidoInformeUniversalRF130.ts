@@ -41,6 +41,7 @@ import {
 // ejecución. La unión discriminada es la misma para todos los formatos a
 // propósito — un pipeline nuevo tiene que resolverse en todos.
 import type { ContextoInformeUniversal } from './InformeUniversalRF130';
+import { encabezadoDeColumnaTipo, narrarLimpiezaRealizada, narrarTiposCorregidos, narrarVariableObjetivo } from './NarrativaDeProcedenciaDataset';
 import { formatearMomento, formatearDiaCalendario } from './FormatoDeFechasInforme';
 
 // Contenido del informe de 20 secciones (RF-130) para los dos pipelines,
@@ -783,10 +784,12 @@ function seccionResumenEjecutivoGenerico(datos: DatosInformeDataset): BloqueDeIn
 // vocabulario de dominio (RF-134), que el Word viejo no pasaba.
 function seccionDescripcionDatasetGenerico(datos: DatosInformeDataset): BloqueDeInforme[] {
   const vocabulario = detectarVocabularioDataset(datos.columnas.map((columna) => columna.nombre));
+  const variableObjetivo = narrarVariableObjetivo(datos);
   return [
     texto(interpretarComposicionDataset(datos, vocabulario)),
+    ...(variableObjetivo ? [texto(variableObjetivo)] : []),
     tabla(
-      ['Columna', 'Tipo detectado', 'Faltantes', '% faltante', 'Únicos'],
+      ['Columna', encabezadoDeColumnaTipo(datos), 'Faltantes', '% faltante', 'Únicos'],
       datos.columnas.map((columna) => [
         columna.nombre,
         columna.tipo,
@@ -808,9 +811,13 @@ function seccionTiposDeVariablesGenerico(datos: DatosInformeDataset): BloqueDeIn
   const conteoPorTipo = new Map<string, number>();
   datos.columnas.forEach((columna) => conteoPorTipo.set(columna.tipo, (conteoPorTipo.get(columna.tipo) ?? 0) + 1));
   const composicion = [...conteoPorTipo.entries()].map(([tipo, cantidad]) => `${cantidad} ${tipo}`).join(', ');
+  // RF-111: si el analista fijó algún tipo a mano, se dice cuáles, después
+  // de la tabla (primera frase como párrafo, una viñeta por variable).
+  const [introduccion, ...corregidas] = narrarTiposCorregidos(datos);
   return [
-    texto(`Composición por tipo detectado: ${composicion}.`),
-    tabla(['Columna', 'Tipo detectado'], datos.columnas.map((columna) => [columna.nombre, columna.tipo]))
+    texto(`${introduccion ? 'Composición por tipo vigente:' : 'Composición por tipo detectado:'} ${composicion}.`),
+    tabla(['Columna', encabezadoDeColumnaTipo(datos)], datos.columnas.map((columna) => [columna.nombre, columna.tipo])),
+    ...(introduccion ? [texto(introduccion), ...corregidas.map((frase) => vineta(frase))] : [])
   ];
 }
 
@@ -888,19 +895,16 @@ function seccionValoresFaltantesGenerico(datos: DatosInformeDataset): BloqueDeIn
   ];
 }
 
-// 8. Limpieza realizada.
+// 8. Limpieza realizada. El contenido lo arma narrarLimpiezaRealizada (lo
+// comparte con el PDF): sobre qué versión se calculó el informe y, si es una
+// versión procesada, qué operaciones la produjeron (RF-120 a RF-123, RF-136).
 function seccionLimpiezaRealizadaGenerico(datos: DatosInformeDataset): BloqueDeInforme[] {
+  const narrativa = narrarLimpiezaRealizada(datos);
   return [
-    texto(
-      datos.filasDuplicadas === 0
-        ? 'No se detectó ninguna limpieza necesaria: sin filas duplicadas exactas.'
-        : `Se detectaron ${datos.filasDuplicadas} fila(s) duplicada(s) exacta(s) (ver sección 6) — SIADE no las ` +
-            'elimina ni modifica automáticamente.'
-    ),
-    texto(
-      'SIADE no transforma datos: esta sección reporta únicamente lo que se detectó, no una bitácora de limpieza ' +
-        'aplicada — el análisis se ejecuta siempre sobre el dataset tal cual fue importado.'
-    )
+    ...narrativa.parrafos.map((parrafo) => texto(parrafo)),
+    ...(narrativa.operaciones ? [tabla(narrativa.operaciones.encabezados, narrativa.operaciones.filas)] : []),
+    ...narrativa.notas.map((nota) => vineta(nota)),
+    ...narrativa.advertencias.map((advertencia) => texto(advertencia))
   ];
 }
 

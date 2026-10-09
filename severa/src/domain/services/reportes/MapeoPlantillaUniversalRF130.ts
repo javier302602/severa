@@ -60,7 +60,7 @@ export const MAPEO_PLANTILLA_UNIVERSAL_RF130: MapeoSeccionRF130[] = [
     nombreRF130: 'Tipos de variables',
     estado: 'parcial',
     cubiertaPor: ['Composición por tipo detectado:'],
-    nota: 'Columna "Tipo detectado" de la tabla de §3 del informe genérico. El informe CVSS no aplica: esquema fijo conocido de antemano (CVE, CVSS Score, etc.), no hay "tipos" que detectar.'
+    nota: 'Columna "Tipo detectado" de la tabla de §3 del informe genérico; si el analista corrigió algún tipo (RF-111) la columna pasa a llamarse "Tipo" y la sección lista las variables corregidas con el tipo que se había detectado. El informe CVSS no aplica: esquema fijo conocido de antemano (CVE, CVSS Score, etc.), no hay "tipos" que detectar.'
   },
   {
     numero: 6,
@@ -79,9 +79,9 @@ export const MAPEO_PLANTILLA_UNIVERSAL_RF130: MapeoSeccionRF130[] = [
   {
     numero: 8,
     nombreRF130: 'Limpieza realizada',
-    estado: 'parcial',
-    cubiertaPor: ['No se detectó ninguna limpieza necesaria: sin filas duplicadas exactas.'],
-    nota: 'Solo se reporta el CONTEO de filas duplicadas detectadas (filasDuplicadas) — no existe una bitácora de qué limpieza/transformación se aplicó, porque SIADE no transforma datos, solo diagnostica.'
+    estado: 'cubierta',
+    cubiertaPor: ['no se le aplicó ninguna limpieza ni transformación', 'operación(es) de limpieza, todas elegidas y confirmadas por el analista'],
+    nota: 'Informe genérico: dice sobre qué versión del dataset se calculó. Si es el original, que no se le aplicó ninguna limpieza; si es una versión procesada (M-15, RF-120/121), la tabla de operaciones que la produjeron tomada de la bitácora (RF-123) y cómo afectan la lectura del resto del informe. No aplica al informe CVSS: SIADE no transforma datos de vulnerabilidades.'
   },
   {
     numero: 9,

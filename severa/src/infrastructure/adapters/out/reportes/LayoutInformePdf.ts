@@ -71,23 +71,25 @@ export function completarIndice(doc: PDFKit.PDFDocument, numeroDePagina: number)
   doc.fontSize(18).fillColor('#0f172a').font('Times-Bold').text('Índice', { align: 'center' });
   doc.moveDown(1.5);
 
-  // Una sola llamada a .text() por línea (título + relleno de espacios +
-  // página, ya combinados en un solo string) en vez de dos llamadas
-  // encadenadas con continued/align:'right': se probó esa variante contra un
-  // PDF real generado y el estado de "texto continuado" de pdfkit no se
-  // comportaba de forma confiable entre ambas llamadas (el número de página
-  // de las primeras entradas terminaba en la línea o página equivocada). Un
-  // único string por línea no tiene ese problema.
+  // Título a la izquierda y página a la derecha, en la misma línea, con dos
+  // llamadas independientes que fijan cada una su posición. No se encadenan
+  // con `continued` (se probó contra un PDF real y pdfkit no conserva bien
+  // ese estado entre llamadas: el número de página terminaba en otra línea),
+  // ni se arma un único texto relleno con espacios (la variante anterior):
+  // el ancho del relleno se calculaba a mano y por un error de redondeo
+  // algunas entradas se pasaban del ancho y el número caía a la línea de
+  // abajo.
   const anchoDisponible = doc.page.width - doc.page.margins.left - doc.page.margins.right;
   doc.fontSize(11).font('Times-Roman').fillColor('#334155');
-  const anchoEspacio = doc.widthOfString(' ') || 1;
   entradas.forEach((entrada) => {
-    const izquierda = `${entrada.numero}. ${entrada.titulo}`;
-    const derecha = `pág. ${entrada.pagina}`;
-    const espaciosDisponibles = Math.floor((anchoDisponible - doc.widthOfString(izquierda) - doc.widthOfString(derecha)) / anchoEspacio);
-    const relleno = ' '.repeat(Math.max(1, espaciosDisponibles));
-    doc.text(izquierda + relleno + derecha, doc.page.margins.left, doc.y, { width: anchoDisponible, lineBreak: false });
-    doc.moveDown(1.1);
+    const y = doc.y;
+    doc.text(`${entrada.numero}. ${entrada.titulo}`, doc.page.margins.left, y, { lineBreak: false });
+    doc.text(`pág. ${entrada.pagina}`, doc.page.margins.left, y, { width: anchoDisponible, align: 'right', lineBreak: false });
+    doc.x = doc.page.margins.left;
+    doc.y = y;
+    // La línea recién escrita más 1,1 de separación: el mismo interlineado
+    // que tenía el índice.
+    doc.moveDown(2.1);
   });
 
   doc.switchToPage(ultimaPagina);
@@ -137,36 +139,65 @@ export function asegurarEspacio(doc: PDFKit.PDFDocument, alturaNecesaria: number
   }
 }
 
+// Alto mínimo de una fila (el de una sola línea de texto a 8 pt) y relleno
+// horizontal/vertical de cada celda.
+const ALTURA_MINIMA_DE_FILA = 16;
+const RELLENO_DE_CELDA = 4;
+
+// Alto que necesita una fila para que entre su celda más alta. Antes todas
+// las filas medían 16 pt fijos: una celda cuyo texto no entraba en una línea
+// (un nombre de columna largo, una descripción) seguía escribiendo sobre la
+// fila de abajo. Con una sola línea por celda el resultado es el mismo alto
+// de siempre.
+function alturaDeFila(doc: PDFKit.PDFDocument, celdas: string[], anchos: number[]): number {
+  const alturaDeTexto = celdas.reduce(
+    (mayor, celda, indice) => Math.max(mayor, doc.heightOfString(celda, { width: anchos[indice] - 2 * RELLENO_DE_CELDA })),
+    0
+  );
+  return Math.max(ALTURA_MINIMA_DE_FILA, Math.ceil(alturaDeTexto) + 6);
+}
+
 export function dibujarTabla(doc: PDFKit.PDFDocument, encabezados: string[], filas: string[][], anchosColumna?: number[]): void {
   const anchoTotal = doc.page.width - doc.page.margins.left - doc.page.margins.right;
   const anchos = anchosColumna ?? encabezados.map(() => anchoTotal / encabezados.length);
-  const alturaFila = 16;
 
-  asegurarEspacio(doc, alturaFila * 2);
+  doc.fontSize(8).font('Times-Bold');
+  const alturaEncabezado = alturaDeFila(doc, encabezados, anchos);
+  // El encabezado no se dibuja solo al pie de una página: se pide lugar para
+  // él y para una fila más.
+  asegurarEspacio(doc, alturaEncabezado + ALTURA_MINIMA_DE_FILA);
   let x = doc.page.margins.left;
   const yEncabezado = doc.y;
-  doc.fontSize(8).font('Times-Bold').fillColor('#ffffff');
-  doc.rect(doc.page.margins.left, yEncabezado, anchoTotal, alturaFila).fill('#334155');
+  doc.fillColor('#ffffff');
+  doc.rect(doc.page.margins.left, yEncabezado, anchoTotal, alturaEncabezado).fill('#334155');
   encabezados.forEach((encabezado, indice) => {
-    doc.fillColor('#ffffff').text(encabezado, x + 4, yEncabezado + 4, { width: anchos[indice] - 8 });
+    doc.fillColor('#ffffff').text(encabezado, x + RELLENO_DE_CELDA, yEncabezado + RELLENO_DE_CELDA, { width: anchos[indice] - 2 * RELLENO_DE_CELDA });
     x += anchos[indice];
   });
-  doc.y = yEncabezado + alturaFila;
+  doc.y = yEncabezado + alturaEncabezado;
 
   filas.forEach((fila, indiceFila) => {
-    asegurarEspacio(doc, alturaFila);
+    doc.fontSize(8).font('Times-Roman');
+    const altura = alturaDeFila(doc, fila, anchos);
+    asegurarEspacio(doc, altura);
     const y = doc.y;
     if (indiceFila % 2 === 1) {
-      doc.rect(doc.page.margins.left, y, anchoTotal, alturaFila).fill('#f1f5f9');
+      doc.rect(doc.page.margins.left, y, anchoTotal, altura).fill('#f1f5f9');
     }
     x = doc.page.margins.left;
     doc.fontSize(8).font('Times-Roman').fillColor('#1e293b');
     fila.forEach((celda, indiceColumna) => {
-      doc.text(celda, x + 4, y + 4, { width: anchos[indiceColumna] - 8 });
+      doc.text(celda, x + RELLENO_DE_CELDA, y + RELLENO_DE_CELDA, { width: anchos[indiceColumna] - 2 * RELLENO_DE_CELDA });
       x += anchos[indiceColumna];
     });
-    doc.y = y + alturaFila;
+    doc.y = y + altura;
   });
+
+  // pdfkit recuerda la x de la última celda dibujada: sin esto, el párrafo o
+  // el subtítulo que viniera después de una tabla se escribía dentro del
+  // ancho de la última columna (un texto de una página de ancho quedaba como
+  // una tira angosta contra el margen derecho).
+  doc.x = doc.page.margins.left;
   doc.moveDown(0.6);
 }
 

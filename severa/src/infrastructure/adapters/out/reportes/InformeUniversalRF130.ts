@@ -26,6 +26,7 @@ import {
   dibujarEtiquetaTipoAnalisis
 } from './GeneradorInformePDF';
 import { formatearMomento } from './FormatoDeFechasInforme';
+import { encabezadoDeColumnaTipo, narrarLimpiezaRealizada, narrarTiposCorregidos, narrarVariableObjetivo } from './NarrativaDeProcedenciaDataset';
 
 // M-10 Ronda 2, Pasada 2-A (RF-130): orquestador nuevo de la plantilla
 // universal de 20 secciones. NO ESTÁ CONECTADO al puerto público
@@ -231,10 +232,12 @@ function dibujarSeccionDescripcionDataset(doc: PDFKit.PDFDocument, contexto: Con
       const datos = contexto.datos;
       const vocabulario = detectarVocabularioDataset(datos.columnas.map((columna) => columna.nombre));
       parrafo(doc, interpretarComposicionDataset(datos, vocabulario));
+      const variableObjetivo = narrarVariableObjetivo(datos);
+      if (variableObjetivo) parrafo(doc, variableObjetivo);
 
       dibujarTabla(
         doc,
-        ['Columna', 'Tipo detectado', 'Faltantes', '% faltante', 'Únicos'],
+        ['Columna', encabezadoDeColumnaTipo(datos), 'Faltantes', '% faltante', 'Únicos'],
         datos.columnas.map((columna) => [
           columna.nombre,
           columna.tipo,
@@ -306,14 +309,17 @@ function dibujarSeccionTiposDeVariables(doc: PDFKit.PDFDocument, contexto: Conte
       const conteoPorTipo = new Map<string, number>();
       datos.columnas.forEach((columna) => conteoPorTipo.set(columna.tipo, (conteoPorTipo.get(columna.tipo) ?? 0) + 1));
       const composicion = [...conteoPorTipo.entries()].map(([tipo, cantidad]) => `${cantidad} ${tipo}`).join(', ');
-      parrafo(doc, `Composición por tipo detectado: ${composicion}.`);
+      // RF-111: si el analista fijó algún tipo a mano, se dice cuáles.
+      const tiposCorregidos = narrarTiposCorregidos(datos);
+      parrafo(doc, `${tiposCorregidos.length > 0 ? 'Composición por tipo vigente:' : 'Composición por tipo detectado:'} ${composicion}.`);
 
       dibujarTabla(
         doc,
-        ['Columna', 'Tipo detectado'],
+        ['Columna', encabezadoDeColumnaTipo(datos)],
         datos.columnas.map((columna) => [columna.nombre, columna.tipo]),
         [250, 200]
       );
+      tiposCorregidos.forEach((frase, indice) => parrafo(doc, indice === 0 ? frase : `• ${frase}`));
       return;
     }
     default: {
@@ -467,10 +473,10 @@ function dibujarSeccionValoresFaltantes(doc: PDFKit.PDFDocument, contexto: Conte
 
 // ---------------------------------------------------------------------
 // 8. Limpieza realizada — no aplica a CVSS (SIADE no transforma datos de
-// vulnerabilidades). Genérico: SIADE tampoco transforma datos genéricos —
-// solo se reporta el CONTEO de duplicados ya detectado, con la aclaración
-// explícita de que no hay una bitácora de limpieza real (nota ya redactada
-// y confirmada en el mapeo de RF-130).
+// vulnerabilidades). Genérico: sobre qué versión del dataset se calculó el
+// informe y, si es una versión procesada, las operaciones de limpieza que la
+// produjeron (RF-120 a RF-123, RF-136). El contenido lo arma
+// narrarLimpiezaRealizada, compartido con los demás formatos.
 // ---------------------------------------------------------------------
 function dibujarSeccionLimpiezaRealizada(doc: PDFKit.PDFDocument, contexto: ContextoInformeUniversal): void {
   switch (contexto.pipeline) {
@@ -478,19 +484,13 @@ function dibujarSeccionLimpiezaRealizada(doc: PDFKit.PDFDocument, contexto: Cont
       dibujarSeccionNoAplicable(doc, 'SIADE no transforma datos de vulnerabilidades — solo diagnostica lo que se importa tal cual.');
       return;
     case 'generico': {
-      const datos = contexto.datos;
-      parrafo(
-        doc,
-        datos.filasDuplicadas === 0
-          ? 'No se detectó ninguna limpieza necesaria: sin filas duplicadas exactas.'
-          : `Se detectaron ${datos.filasDuplicadas} fila(s) duplicada(s) exacta(s) (ver sección 6) — SIADE no las ` +
-            'elimina ni modifica automáticamente.'
-      );
-      parrafo(
-        doc,
-        'SIADE no transforma datos: esta sección reporta únicamente lo que se detectó, no una bitácora de limpieza ' +
-          'aplicada — el análisis se ejecuta siempre sobre el dataset tal cual fue importado.'
-      );
+      const narrativa = narrarLimpiezaRealizada(contexto.datos);
+      narrativa.parrafos.forEach((texto) => parrafo(doc, texto));
+      if (narrativa.operaciones) {
+        dibujarTabla(doc, narrativa.operaciones.encabezados, narrativa.operaciones.filas, narrativa.operaciones.anchos);
+      }
+      narrativa.notas.forEach((nota) => parrafo(doc, `• ${nota}`));
+      narrativa.advertencias.forEach((advertencia) => parrafo(doc, advertencia));
       return;
     }
     default: {
@@ -778,8 +778,11 @@ function dibujarSeccionVisualizaciones(doc: PDFKit.PDFDocument, contexto: Contex
     case 'cvss': {
       const datos = contexto.datos;
       const definiciones = construirDefinicionesGraficos(datos, REFERENCIAS_DE_SECCION_RF130);
-      definiciones.forEach((definicion) => {
-        doc.addPage();
+      definiciones.forEach((definicion, indice) => {
+        // Cada gráfico en su página, salvo el primero: va debajo del título
+        // de la sección, que acaba de abrir una página nueva (antes esa
+        // página quedaba con el título solo).
+        if (indice > 0) doc.addPage();
         doc.fontSize(12).font('Times-Bold').fillColor('#0f172a').text(`12.${definicion.numero} Gráfico ${definicion.numero}: ${definicion.titulo}`);
         doc.moveDown(0.3);
         dibujarEtiquetaTipoAnalisis(doc, definicion.tipo);
@@ -819,7 +822,9 @@ function dibujarSeccionVisualizaciones(doc: PDFKit.PDFDocument, contexto: Contex
       numericas.forEach((analisis) => {
         numeroFigura += 1;
         const r = analisis.resumenCincoNumeros;
-        doc.addPage();
+        // La primera figura va debajo del título de la sección; las demás,
+        // cada una en su página.
+        if (numeroFigura > 1) doc.addPage();
         doc.fontSize(12).font('Times-Bold').fillColor('#0f172a').text(`12.${numeroFigura} Distribución de "${analisis.nombre}"`);
         doc.moveDown(0.3);
         dibujarEtiquetaTipoAnalisis(doc, 'Descriptivo');
@@ -844,7 +849,7 @@ function dibujarSeccionVisualizaciones(doc: PDFKit.PDFDocument, contexto: Contex
 
       if (datos.matrizCorrelacion.columnas.length > 0) {
         numeroFigura += 1;
-        doc.addPage();
+        if (numeroFigura > 1) doc.addPage();
         doc.fontSize(12).font('Times-Bold').fillColor('#0f172a').text(`12.${numeroFigura} Heatmap de correlación de Pearson`);
         doc.moveDown(0.3);
         dibujarEtiquetaTipoAnalisis(doc, 'Descriptivo');
