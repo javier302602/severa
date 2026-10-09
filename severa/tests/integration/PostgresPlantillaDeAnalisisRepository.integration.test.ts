@@ -70,6 +70,11 @@ describe('PostgresPlantillaDeAnalisisRepository — RF-12 (integración real)', 
     expect(await repository.listarPorAnalista(ANALISTA_A)).toEqual([original]);
   });
 
+  test('también con tildes y eñes: "Análisis Año" y "ANÁLISIS AÑO" son el mismo nombre', async () => {
+    await repository.guardar(plantilla('Análisis Año'));
+    await expect(repository.guardar(plantilla('ANÁLISIS AÑO'))).rejects.toThrow(NombreDePlantillaRepetidoError);
+  });
+
   test('otro analista puede tener una plantilla con el mismo nombre', async () => {
     await repository.guardar(plantilla('Encuesta mensual'));
     await expect(repository.guardar(plantilla('Encuesta mensual', ANALISTA_B))).resolves.toBeUndefined();

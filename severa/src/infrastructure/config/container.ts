@@ -125,6 +125,13 @@ import { ConfigurarUmbralCritico } from '../../application/usecases/module_notif
 import { NotificarPlazosProximosAVencer } from '../../application/usecases/module_notificaciones_alertas/NotificarPlazosProximosAVencer';
 
 const pool = new Pool({ connectionString: config.databaseUrl });
+
+// Cierra las conexiones a la base. Lo usan los tests de integración que
+// levantan la aplicación real, para terminar sin esperar a que el pool las
+// suelte por inactividad.
+export function cerrarConexiones(): Promise<void> {
+  return pool.end();
+}
 const analistaRepository = new PostgresAnalistaRepository(pool);
 const vulnerabilidadRepository = new PostgresVulnerabilidadRepository(pool);
 const filtroFavoritoRepository = new PostgresFiltroFavoritoRepository(pool);
