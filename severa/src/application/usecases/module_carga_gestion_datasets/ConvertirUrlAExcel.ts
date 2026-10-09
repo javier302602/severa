@@ -162,7 +162,13 @@ export class ConvertirUrlAExcel {
     try {
       return await convertirSiHaceFalta(archivo);
     } finally {
-      fs.unlink(archivo.rutaArchivo, () => {});
+      // Se espera a que el temporal esté borrado antes de responder. Antes se
+      // lanzaba el borrado sin esperarlo: funcionaba, pero "ya no queda nada
+      // en disco cuando el caso de uso terminó" dependía de quién ganara la
+      // carrera (el test que lo comprueba fallaba una de cada tantas
+      // corridas). Si el borrado falla no se pierde la conversión, que ya
+      // está hecha: el archivo queda en el directorio temporal del sistema.
+      await fs.promises.unlink(archivo.rutaArchivo).catch(() => undefined);
     }
   }
 }
