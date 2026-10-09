@@ -163,7 +163,11 @@ export function generarTablaAgrupada(
     ).length;
 
     return {
-      intervalo: `[${intervalo.inferior}-${intervalo.superior})`,
+      // El último intervalo es cerrado por los dos lados (incluye su límite
+      // superior: ver el filtro de arriba) y su etiqueta lo dice. Antes todos
+      // se rotulaban "[a-b)", así que un CVSS de 10.0 aparecía contado en un
+      // intervalo "[8-10)" que, leído al pie de la letra, lo excluye.
+      intervalo: `[${intervalo.inferior}-${intervalo.superior}${esUltimoIntervalo ? ']' : ')'}`,
       limiteInferior: intervalo.inferior,
       limiteSuperior: intervalo.superior,
       marcaDeClase: calcularMarcaDeClase(intervalo.inferior, intervalo.superior),

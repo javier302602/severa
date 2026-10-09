@@ -28,6 +28,7 @@ import { SincronizarConApiNvd } from '../../application/usecases/module_carga_ge
 import { ExportarDatasetValidado } from '../../application/usecases/module_carga_gestion_datasets/ExportarDatasetValidado';
 import { CalcularResumenEstadistico } from '../../application/usecases/module_medidas_tendencia_dispersion/CalcularResumenEstadistico';
 import { GenerarDistribucionFrecuencias } from '../../application/usecases/module_distribucion_frecuencias/GenerarDistribucionFrecuencias';
+import { ExportarDistribucionFrecuencias } from '../../application/usecases/module_distribucion_frecuencias/ExportarDistribucionFrecuencias';
 import { LectorExcelDataset } from '../adapters/out/dataset/parsers/LectorExcelDataset';
 import { ImportarDatasetDesdeArchivo } from '../../application/usecases/module_carga_gestion_datasets/ImportarDatasetDesdeArchivo';
 import { DetectarColumnasDataset } from '../../application/usecases/module_deteccion_variables/DetectarColumnasDataset';
@@ -156,6 +157,8 @@ const generarInformeConAuditoria = new GenerarInformeConAuditoria(
   registrarAnalisisRealizadoUseCase
 );
 
+const generarDistribucionFrecuenciasUseCase = new GenerarDistribucionFrecuencias(vulnerabilidadRepository);
+
 export const container = {
   registrarAnalistaUseCase: new RegistrarAnalista(analistaRepository, hasher),
   // RF-94/95: decorado con auditoría — un login exitoso queda registrado sin
@@ -238,7 +241,10 @@ export const container = {
   // RF-24: primera ruta HTTP para exportar el dataset validado (GET /dataset/exportar).
   exportarDatasetValidadoUseCase: new ExportarDatasetValidado(vulnerabilidadRepository),
   calcularResumenEstadisticoUseCase: new CalcularResumenEstadistico(vulnerabilidadRepository),
-  generarDistribucionFrecuenciasUseCase: new GenerarDistribucionFrecuencias(vulnerabilidadRepository),
+  generarDistribucionFrecuenciasUseCase,
+  // RF-38: exporta la tabla de frecuencias a .xlsx pidiéndosela al mismo caso
+  // de uso que alimenta la pantalla.
+  exportarDistribucionFrecuenciasUseCase: new ExportarDistribucionFrecuencias(generarDistribucionFrecuenciasUseCase),
   generarGraficoUseCase: new GenerarGrafico(vulnerabilidadRepository, graficosOutputPort),
   // RF-58 (M-07): separado a propósito de generarGraficoUseCase (CVSS) —
   // reutiliza el mismo sesionAnalisisStore que las demás rutas de Fase 3/4

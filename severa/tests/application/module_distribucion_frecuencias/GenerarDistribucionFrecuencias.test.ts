@@ -57,7 +57,7 @@ describe('GenerarDistribucionFrecuencias', () => {
     const usecase = new GenerarDistribucionFrecuencias(repo);
     const resultado = (await usecase.ejecutar('agrupada', 'analista-1')) as Array<{ intervalo: string }>;
 
-    expect(resultado.map((fila) => fila.intervalo)).toEqual(['[0-2)', '[2-4)', '[4-6)', '[6-8)', '[8-10)']);
+    expect(resultado.map((fila) => fila.intervalo)).toEqual(['[0-2)', '[2-4)', '[4-6)', '[6-8)', '[8-10]']);
   });
 
   test('con numeroDeIntervalos manual, reparte el rango fijo 0-10 en esa cantidad de bandas', async () => {

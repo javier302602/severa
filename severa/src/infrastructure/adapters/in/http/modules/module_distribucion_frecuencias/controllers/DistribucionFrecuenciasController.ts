@@ -33,10 +33,16 @@ function validarVariableSiVieneEnQuery(valor: unknown): VariableNumericaVulnerab
 // GenerarDistribucionFrecuencias.ts). Un valor inválido
 // (NumeroDeIntervalosInvalidoError) cae al error-handler global de app.ts,
 // que responde 400 con mensaje claro, igual que el resto de la API.
+function leerParametros(req: express.Request) {
+  return {
+    tipo: req.query.tipo === 'agrupada' ? ('agrupada' as const) : ('sinAgrupar' as const),
+    numeroDeIntervalos: req.query.numeroDeIntervalos !== undefined ? Number(req.query.numeroDeIntervalos) : undefined,
+    variable: validarVariableSiVieneEnQuery(req.query.variable)
+  };
+}
+
 distribucionFrecuenciasRouter.get('/frecuencias', async (req, res) => {
-  const tipo = req.query.tipo === 'agrupada' ? 'agrupada' : 'sinAgrupar';
-  const numeroDeIntervalos = req.query.numeroDeIntervalos !== undefined ? Number(req.query.numeroDeIntervalos) : undefined;
-  const variable = validarVariableSiVieneEnQuery(req.query.variable);
+  const { tipo, numeroDeIntervalos, variable } = leerParametros(req);
 
   const resultado = await container.generarDistribucionFrecuenciasUseCase.ejecutar(
     tipo,
@@ -46,4 +52,16 @@ distribucionFrecuenciasRouter.get('/frecuencias', async (req, res) => {
     variable
   );
   res.json(resultado);
+});
+
+// RF-38: la misma tabla, como .xlsx. Acepta exactamente los mismos
+// parámetros que la ruta de arriba (y los valida igual) para que lo que se
+// exporta sea la tabla que el analista tiene en pantalla.
+distribucionFrecuenciasRouter.get('/frecuencias/exportar', async (req, res) => {
+  const { tipo, numeroDeIntervalos, variable } = leerParametros(req);
+
+  const buffer = await container.exportarDistribucionFrecuenciasUseCase.ejecutar(tipo, req.analistaAutenticado!.id, numeroDeIntervalos, variable);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="distribucion-de-frecuencias.xlsx"');
+  res.send(buffer);
 });

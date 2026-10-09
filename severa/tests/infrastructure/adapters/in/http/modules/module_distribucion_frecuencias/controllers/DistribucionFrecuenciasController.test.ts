@@ -10,6 +10,9 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => (
         }
         return [{ valor: 9.8, frecuencia: 1 }];
       })
+    },
+    exportarDistribucionFrecuenciasUseCase: {
+      ejecutar: jest.fn().mockResolvedValue(Buffer.from('xlsx-falso'))
     }
   }
 }));
@@ -118,6 +121,48 @@ describe('GET /estadistica/frecuencias — RF-33/RF-34/RF-39', () => {
 
   test('sin autenticar devuelve 401', async () => {
     const res = await conHttps(request(app).get('/estadistica/frecuencias'));
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('GET /estadistica/frecuencias/exportar — RF-38', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test('sirve el .xlsx como descarga, con los mismos parámetros que la tabla en pantalla', async () => {
+    const res = await conToken(
+      conHttps(request(app).get('/estadistica/frecuencias/exportar').query({ tipo: 'agrupada', numeroDeIntervalos: '8', variable: 'diasParaParche' }))
+    )
+      .buffer(true)
+      .parse((respuesta, callback) => {
+        const partes: Buffer[] = [];
+        respuesta.on('data', (parte: Buffer) => partes.push(parte));
+        respuesta.on('end', () => callback(null, Buffer.concat(partes)));
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    expect(res.headers['content-disposition']).toBe('attachment; filename="distribucion-de-frecuencias.xlsx"');
+    expect((res.body as Buffer).toString()).toBe('xlsx-falso');
+    expect(container.exportarDistribucionFrecuenciasUseCase.ejecutar).toHaveBeenCalledWith('agrupada', 'analista-1', 8, 'diasParaParche');
+  });
+
+  test('sin parámetros: la tabla por defecto (sin agrupar, CVSS)', async () => {
+    const res = await conToken(conHttps(request(app).get('/estadistica/frecuencias/exportar')));
+
+    expect(res.status).toBe(200);
+    expect(container.exportarDistribucionFrecuenciasUseCase.ejecutar).toHaveBeenCalledWith('sinAgrupar', 'analista-1', undefined, undefined);
+  });
+
+  test('variable inválida: 400, igual que la ruta de consulta, sin exportar nada', async () => {
+    const res = await conToken(conHttps(request(app).get('/estadistica/frecuencias/exportar').query({ variable: 'software' })));
+
+    expect(res.status).toBe(400);
+    expect(container.exportarDistribucionFrecuenciasUseCase.ejecutar).not.toHaveBeenCalled();
+  });
+
+  test('sin token: 401', async () => {
+    const res = await conHttps(request(app).get('/estadistica/frecuencias/exportar'));
+
     expect(res.status).toBe(401);
   });
 });

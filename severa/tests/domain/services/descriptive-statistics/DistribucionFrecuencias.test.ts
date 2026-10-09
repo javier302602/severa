@@ -22,7 +22,7 @@ describe('DistribucionFrecuencias', () => {
       frecuenciaAcumulada: 2
     });
     expect(tabla[4]).toMatchObject({
-      intervalo: '[8-10)',
+      intervalo: '[8-10]',
       frecuenciaAbsoluta: 3,
       frecuenciaAcumulada: scores.length
     });
@@ -125,5 +125,19 @@ describe('validarNumeroDeIntervalos (RF-39)', () => {
 
   test.each([0, 1, -5, 31, 100, 2.5])('rechaza %s (fuera de [2,30] o no entero)', (numero) => {
     expect(() => validarNumeroDeIntervalos(numero)).toThrow(NumeroDeIntervalosInvalidoError);
+  });
+});
+
+describe('generarTablaAgrupada — notación de los intervalos', () => {
+  test('solo el último intervalo es cerrado a la derecha, y es el único que incluye su límite superior', () => {
+    const tabla = generarTablaAgrupada([0, 2, 4, 10, 10]);
+
+    expect(tabla.map((fila) => fila.intervalo)).toEqual(['[0-2)', '[2-4)', '[4-6)', '[6-8)', '[8-10]']);
+    // El 2 va al intervalo que empieza en 2, no al que termina en 2; los dos 10 al último.
+    expect(tabla.map((fila) => fila.frecuenciaAbsoluta)).toEqual([1, 1, 1, 0, 2]);
+  });
+
+  test('con un único intervalo (todos los valores iguales) la etiqueta es cerrada', () => {
+    expect(generarTablaAgrupada([5, 5, 5], generarIntervalosEquiespaciados(5, 5, 4))[0].intervalo).toBe('[5-5]');
   });
 });
