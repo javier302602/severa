@@ -31,6 +31,7 @@ function servicioDeNotificacionesFalso(): ServicioDeNotificaciones {
     notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
     notificarPlazoProximoAVencer: jest.fn().mockResolvedValue(undefined),
     notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
+    notificarLimpiezaCompletada: jest.fn().mockResolvedValue(undefined),
     notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined),
     notificarInformeListo: jest.fn().mockResolvedValue(undefined),
     notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),

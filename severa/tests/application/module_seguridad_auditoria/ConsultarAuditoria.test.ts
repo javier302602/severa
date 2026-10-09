@@ -15,5 +15,17 @@ describe('ConsultarAuditoria', () => {
 
     expect(resultado).toBe(registros);
     expect(auditoriaRepository.listar).toHaveBeenCalledTimes(1);
+    expect(auditoriaRepository.listar).toHaveBeenCalledWith({});
+  });
+
+  test('RF-138: pasa el filtro por dataset al repositorio tal cual', async () => {
+    const auditoriaRepository: AuditoriaRepository = {
+      registrar: jest.fn().mockResolvedValue(undefined),
+      listar: jest.fn().mockResolvedValue([])
+    };
+
+    await new ConsultarAuditoria(auditoriaRepository).ejecutar({ datasetId: 'dataset-9' });
+
+    expect(auditoriaRepository.listar).toHaveBeenCalledWith({ datasetId: 'dataset-9' });
   });
 });

@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { Vulnerabilidad } from '../../../../domain/entities/Vulnerabilidad';
 import { Notificacion } from '../../../../domain/entities/Notificacion';
-import { ServicioDeNotificaciones } from '../../../../application/ports/out/notificaciones/ServicioDeNotificaciones';
+import { ResumenDeLimpiezaNotificable, ServicioDeNotificaciones } from '../../../../application/ports/out/notificaciones/ServicioDeNotificaciones';
 import { NotificacionRepository } from '../../../../application/ports/out/persistencia/repositorios/NotificacionRepository';
 import { FormatoDeInforme } from '../../../../application/ports/out/reportes/GeneradorDeInformes';
 
@@ -85,6 +85,23 @@ export class ConsolaServicioDeNotificaciones implements ServicioDeNotificaciones
     console.log(`[RF-16] ${mensaje} (analista ${analistaId})`);
     await this.notificacionRepository.guardar(
       new Notificacion(randomUUID(), 'PerfilActualizado', analistaId, false, new Date(), mensaje)
+    );
+  }
+
+  async notificarLimpiezaCompletada(analistaId: string, resumen: ResumenDeLimpiezaNotificable): Promise<void> {
+    const partes = [
+      `Limpieza de "${resumen.nombreArchivo}" completada: se generó la versión ${resumen.version}.`,
+      `Registros: ${resumen.filasEliminadas} fila(s) eliminada(s) de ${resumen.filasAntes}, ${resumen.celdasImputadas} valor(es) imputado(s).`,
+      resumen.columnasEliminadas.length > 0
+        ? `Columnas eliminadas: ${resumen.columnasEliminadas.length} (${resumen.columnasEliminadas.join(', ')}).`
+        : 'Columnas eliminadas: ninguna.',
+      `Método por variable: ${resumen.metodosPorVariable.map((item) => `${item.variable}: ${item.metodo}`).join('; ')}.`,
+      'El detalle completo está en la bitácora del dataset.'
+    ];
+    const mensaje = partes.join(' ');
+    console.log(`[RF-122] ${mensaje} (analista ${analistaId})`);
+    await this.notificacionRepository.guardar(
+      new Notificacion(randomUUID(), 'LimpiezaCompletada', analistaId, false, new Date(), mensaje)
     );
   }
 }

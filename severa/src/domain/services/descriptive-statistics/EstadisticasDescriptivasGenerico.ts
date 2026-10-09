@@ -1,4 +1,4 @@
-import { TipoColumna, esVacio, esNumerico, inferirTipoColumna, aFechaGenerica } from '../variable-detection/DetectorDeTipoDeColumna';
+import { TipoColumna, CorreccionesDeTipo, esVacio, esNumerico, resolverTipoColumna, aFechaGenerica } from '../variable-detection/DetectorDeTipoDeColumna';
 import {
   calcularMedia,
   calcularMediana,
@@ -142,9 +142,10 @@ function resumirColumna(nombre: string, tipo: TipoColumna, valoresCrudos: unknow
   const noVacios = valoresCrudos.filter((valor) => !esVacio(valor));
 
   if (tipo === 'numerica') {
-    // Invariante que garantiza inferirTipoColumna: si el tipo es
-    // 'numerica', al menos el 80% de noVacios pasa esNumerico, así que si
-    // noVacios no está vacío, tampoco lo está este filtro.
+    // Invariante que garantiza resolverTipoColumna: si el tipo es 'numerica'
+    // hay al menos un valor numérico (el 80% si lo decidió la detección, uno
+    // como mínimo si lo fijó el analista — ver motivoDeTipoNoAplicable), así
+    // que si noVacios no está vacío, tampoco lo está este filtro.
     return resumirNumerica(nombre, noVacios.filter(esNumerico).map(aNumero));
   }
   if (tipo === 'fecha') {
@@ -155,11 +156,12 @@ function resumirColumna(nombre: string, tipo: TipoColumna, valoresCrudos: unknow
 
 export function calcularEstadisticasDescriptivas(
   columnas: string[],
-  filas: Array<Record<string, unknown>>
+  filas: Array<Record<string, unknown>>,
+  correcciones?: CorreccionesDeTipo
 ): ResumenColumna[] {
   return columnas.map((nombre) => {
     const valoresCrudos = filas.map((fila) => fila[nombre]);
-    const tipo = inferirTipoColumna(valoresCrudos);
+    const tipo = resolverTipoColumna(nombre, valoresCrudos, correcciones);
     return resumirColumna(nombre, tipo, valoresCrudos);
   });
 }

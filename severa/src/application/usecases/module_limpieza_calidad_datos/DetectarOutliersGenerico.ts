@@ -13,6 +13,6 @@ export class DetectarOutliersGenerico implements DetectarOutliersGenericoUseCase
       throw new SesionAnalisisNoEncontradaError();
     }
 
-    return detectarOutliers(datos.columnas, datos.filas);
+    return detectarOutliers(datos.columnas, datos.filas, datos.tiposCorregidos);
   }
 }

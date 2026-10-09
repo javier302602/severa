@@ -38,7 +38,7 @@ export class AnalizarCalidadDatasetGenerico implements AnalizarCalidadDatasetGen
       }
     });
 
-    const diagnostico = analizarDataset(datos.columnas, datos.filas);
+    const diagnostico = analizarDataset(datos.columnas, datos.filas, datos.tiposCorregidos);
     const filasIncompletas = detectarFilasIncompletas(datos.columnas, datos.filas, umbralFilaIncompleta);
     const duplicados = detectarFilasDuplicadas(columnasClave, datos.filas);
     const validacionRango = this.validarRangoSiCorresponde(opciones, datos.columnas, datos.filas, diagnostico);

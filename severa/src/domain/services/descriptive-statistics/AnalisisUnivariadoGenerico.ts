@@ -1,4 +1,4 @@
-import { TipoColumna, esVacio, esNumerico, inferirTipoColumna, aFechaGenerica } from '../variable-detection/DetectorDeTipoDeColumna';
+import { TipoColumna, CorreccionesDeTipo, esVacio, esNumerico, resolverTipoColumna, aFechaGenerica } from '../variable-detection/DetectorDeTipoDeColumna';
 import {
   calcularModa,
   calcularVarianzaMuestral,
@@ -121,9 +121,9 @@ function analizarNumerica(
   valoresFaltantes: number,
   numeroDeIntervalos?: number
 ): AnalisisUnivariadoNumerico {
-  // Invariante de inferirTipoColumna: tipo 'numerica' implica que al menos
-  // el 80% de noVacios pasa esNumerico, así que con noVacios no vacío este
-  // filtro tampoco lo está.
+  // Invariante de resolverTipoColumna: tipo 'numerica' implica que hay al
+  // menos un valor numérico (el 80% si lo decidió la detección; uno como
+  // mínimo si lo fijó el analista), así que este filtro no queda vacío.
   const numeros = noVacios.filter(esNumerico).map(aNumero);
   const resumen = calcularResumenCincoNumeros(numeros);
   // rango derivado del resumen ya calculado (max-min), en vez de llamar a
@@ -200,7 +200,8 @@ export function analizarColumnaUnivariado(
   nombreColumna: string,
   columnas: string[],
   filas: Array<Record<string, unknown>>,
-  numeroDeIntervalos?: number
+  numeroDeIntervalos?: number,
+  correcciones?: CorreccionesDeTipo
 ): AnalisisUnivariado {
   if (!columnas.includes(nombreColumna)) {
     throw new DatasetInvalidoError(`La columna "${nombreColumna}" no existe en este dataset`);
@@ -208,7 +209,7 @@ export function analizarColumnaUnivariado(
 
   const valoresCrudos = filas.map((fila) => fila[nombreColumna]);
   const noVacios = valoresCrudos.filter((valor) => !esVacio(valor));
-  const tipo: TipoColumna = inferirTipoColumna(valoresCrudos);
+  const tipo: TipoColumna = resolverTipoColumna(nombreColumna, valoresCrudos, correcciones);
   const valoresFaltantes = valoresCrudos.length - noVacios.length;
 
   if (tipo === 'numerica') return analizarNumerica(nombreColumna, noVacios, valoresFaltantes, numeroDeIntervalos);

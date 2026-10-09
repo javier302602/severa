@@ -1,3 +1,5 @@
+import { CorreccionesDeTipo } from '../../../../domain/services/variable-detection/DetectorDeTipoDeColumna';
+
 // Mejora 4 (Análisis de Datos General) — Fase 3. Forma deliberadamente
 // idéntica a ResultadoLecturaGenerica (LectorDatasetGenerico.ts) pero
 // definida acá en vez de importada desde infraestructura: un puerto no debe
@@ -8,6 +10,16 @@
 export interface DatosDataset {
   columnas: string[];
   filas: Array<Record<string, unknown>>;
+  // M-14/M-15, Ronda 2. Id del DatasetGenerico persistido del que salieron
+  // estas filas (el original o una versión procesada): es lo que permite que
+  // una operación hecha sobre la sesión —corregir un tipo, limpiar— quede
+  // guardada y en la bitácora de ese dataset. Opcional porque una sesión
+  // puede existir sin dataset persistido detrás (tests, y cualquier sesión
+  // creada antes de esta ronda mientras el proceso siga vivo).
+  datasetId?: string;
+  // RF-111: tipos de variable fijados a mano por el analista. Todos los
+  // análisis de la sesión los reciben (ver resolverTipoColumna).
+  tiposCorregidos?: CorreccionesDeTipo;
 }
 
 // `crear` nunca recibe ni expone quién es el dueño de la sesión más allá de
@@ -23,4 +35,9 @@ export interface SesionAnalisisStore {
   // los traduce todos al mismo 404 (SesionAnalisisNoEncontradaError), nunca
   // a un 403 que confirmaría que el id existe.
   obtener(analistaId: string, sesionId: string): DatosDataset | undefined;
+  // RF-111: reemplaza los tipos corregidos de la sesión. Devuelve false en
+  // los mismos tres casos en que `obtener` devuelve undefined. Es lo único de
+  // una sesión que se puede cambiar: columnas y filas no tienen forma de
+  // modificarse — limpiar un dataset crea una sesión nueva (RF-137).
+  actualizarTiposCorregidos(analistaId: string, sesionId: string, tiposCorregidos: CorreccionesDeTipo): boolean;
 }

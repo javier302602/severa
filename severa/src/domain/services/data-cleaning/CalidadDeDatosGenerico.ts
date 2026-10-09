@@ -4,8 +4,10 @@ import {
   esVacio,
   esNumerico,
   calzaConTipo,
-  inferirTipoColumna,
   inferirTipoColumnaDetallado,
+  resolverTipoColumnaDetallado,
+  MAPEO_A_TIPO_LEGADO,
+  CorreccionesDeTipo,
   normalizarTexto,
   PATRON_FECHA_ISO,
   PATRON_FECHA_DIA_MES_ANIO
@@ -125,6 +127,10 @@ export interface DiagnosticoColumna {
   nombre: string;
   tipo: TipoColumna;
   tipoDetallado?: TipoColumnaDetallado;
+  // RF-111: lo que dijo la detección automática, y si el tipo vigente
+  // (tipo/tipoDetallado) es distinto porque el analista lo corrigió.
+  tipoDetectado?: TipoColumnaDetallado;
+  tipoCorregidoManualmente?: boolean;
   esIdentificador?: boolean;
   tipoDatoCrudo?: TipoDatoCrudo;
   valoresFaltantes: number;
@@ -365,13 +371,18 @@ function detectarFormatoTextoInconsistente(noFaltantes: unknown[]): FormatoTexto
   return grupos.length > 0 ? { grupos } : undefined;
 }
 
-function analizarColumna(nombre: string, valores: unknown[]): DiagnosticoColumna {
-  // tipo/tipoDetallado se calculan SIEMPRE sobre `valores` crudos, exactamente
+function analizarColumna(nombre: string, valores: unknown[], correcciones?: CorreccionesDeTipo): DiagnosticoColumna {
+  // El tipo detectado se calcula SIEMPRE sobre `valores` crudos, exactamente
   // como antes de RF-113 — esValorFaltante() (más amplio que esVacio) nunca
   // participa acá. Es la garantía de no regresión del plan, no una promesa:
   // ver el test de propiedad en CalidadDeDatosGenerico.test.ts.
-  const tipo = inferirTipoColumna(valores);
-  const tipoDetallado = inferirTipoColumnaDetallado(valores);
+  //
+  // RF-111: el tipo VIGENTE (tipo/tipoDetallado) es el corregido por el
+  // analista si lo hay; tipoDetectado conserva lo que dijo la detección para
+  // que la pantalla pueda mostrar las dos cosas.
+  const tipoDetectado = inferirTipoColumnaDetallado(valores);
+  const tipoDetallado = resolverTipoColumnaDetallado(nombre, valores, correcciones);
+  const tipo = MAPEO_A_TIPO_LEGADO[tipoDetallado];
 
   const noFaltantes = valores.filter((valor) => !esValorFaltante(valor));
   const faltantes = valores.length - noFaltantes.length;
@@ -384,6 +395,8 @@ function analizarColumna(nombre: string, valores: unknown[]): DiagnosticoColumna
     nombre,
     tipo,
     tipoDetallado,
+    tipoDetectado,
+    tipoCorregidoManualmente: tipoDetallado !== tipoDetectado,
     esIdentificador: tipoDetallado === 'identificador',
     tipoDatoCrudo: inferirTipoDatoCrudo(valores),
     valoresFaltantes: faltantes,
@@ -396,8 +409,12 @@ function analizarColumna(nombre: string, valores: unknown[]): DiagnosticoColumna
   };
 }
 
-export function analizarDataset(columnas: string[], filas: Array<Record<string, unknown>>): DiagnosticoDataset {
-  const columnasAnalizadas = columnas.map((nombre) => analizarColumna(nombre, filas.map((fila) => fila[nombre])));
+export function analizarDataset(
+  columnas: string[],
+  filas: Array<Record<string, unknown>>,
+  correcciones?: CorreccionesDeTipo
+): DiagnosticoDataset {
+  const columnasAnalizadas = columnas.map((nombre) => analizarColumna(nombre, filas.map((fila) => fila[nombre]), correcciones));
 
   const totalCeldas = filas.length * columnas.length;
   const totalFaltantes = columnasAnalizadas.reduce((acumulado, columna) => acumulado + columna.valoresFaltantes, 0);

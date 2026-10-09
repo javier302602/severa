@@ -64,9 +64,12 @@ function graficosOutputPortFalso(): GraficosOutputPort {
 function servicioDeNotificacionesFalso(): ServicioDeNotificaciones {
   return {
     notificarPlazoExcedido: async () => {},
+    notificarPlazoProximoAVencer: async () => {},
+    notificarPerfilActualizado: async () => {},
     notificarVulnerabilidadCritica: async () => {},
     notificarInformeListo: async () => {},
     notificarActualizacionDisponible: async () => {},
+    notificarLimpiezaCompletada: async () => {},
     notificarImportacionCompletada: async () => {}
   };
 }

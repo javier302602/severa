@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { DatosDataset, SesionAnalisisStore } from '../../../../application/ports/out/dataset/SesionAnalisisStore';
+import { CorreccionesDeTipo } from '../../../../domain/services/variable-detection/DetectorDeTipoDeColumna';
 
 // Mejora 4 (Análisis de Datos General) — Fase 3. Guarda en memoria del
 // proceso las filas ya parseadas de un archivo subido, para que las Fases
@@ -70,6 +71,19 @@ export class SesionAnalisisStoreEnMemoria implements SesionAnalisisStore {
     // Expiración deslizante: cada acceso válido renueva los 30 minutos.
     entrada.expiraEn = Date.now() + TTL_MS;
     return entrada.datos;
+  }
+
+  actualizarTiposCorregidos(analistaId: string, sesionId: string, tiposCorregidos: CorreccionesDeTipo): boolean {
+    // Pasa por obtener(): mismas reglas de dueño y de expiración, y renueva
+    // el plazo igual que cualquier otro acceso.
+    if (!this.obtener(analistaId, sesionId)) {
+      return false;
+    }
+    const entrada = this.sesiones.get(sesionId) as EntradaSesion;
+    // Objeto nuevo en vez de mutar `datos`: quien haya leído la sesión antes
+    // conserva exactamente lo que leyó.
+    entrada.datos = { ...entrada.datos, tiposCorregidos: { ...tiposCorregidos } };
+    return true;
   }
 
   private purgarExpiradas(): void {

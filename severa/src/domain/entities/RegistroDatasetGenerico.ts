@@ -7,6 +7,9 @@ export class RegistroDatasetGenerico {
     public readonly datasetId: string,
     public readonly analistaId: string,
     public readonly valores: Record<string, unknown>,
-    public readonly fechaCarga: Date = new Date()
+    public readonly fechaCarga: Date = new Date(),
+    // Posición de la fila en el archivo (0 = primera). null en registros
+    // guardados antes de la migración 016, que no la registraban.
+    public readonly posicion: number | null = null
   ) {}
 }

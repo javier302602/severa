@@ -6,6 +6,7 @@ import { ColumnaDeDatasetInvalidaError } from '../../../src/domain/errors/Column
 function storeFalso(datos: ReturnType<SesionAnalisisStore['obtener']>): jest.Mocked<SesionAnalisisStore> {
   return {
     crear: jest.fn(),
+    actualizarTiposCorregidos: jest.fn().mockReturnValue(true),
     obtener: jest.fn().mockReturnValue(datos)
   };
 }

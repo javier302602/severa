@@ -13,6 +13,13 @@ function datasetGenericoRepositoryFalso(): jest.Mocked<DatasetGenericoRepository
     guardarRegistros: jest.fn().mockResolvedValue(undefined),
     buscarPorId: jest.fn(),
     listarRegistros: jest.fn(),
+    actualizarTiposCorregidos: jest.fn().mockResolvedValue(undefined),
+    actualizarVariableObjetivo: jest.fn().mockResolvedValue(undefined),
+    listarTodos: jest.fn().mockResolvedValue([]),
+    listarVersiones: jest.fn().mockResolvedValue([]),
+    crearVersionProcesada: jest.fn(),
+    registrarEnBitacora: jest.fn().mockResolvedValue(undefined),
+    listarBitacora: jest.fn().mockResolvedValue([]),
     actualizarCriterioClasificacion: jest.fn().mockResolvedValue(undefined)
   };
 }
@@ -37,6 +44,7 @@ describe('AnalizarDatasetGenerico — Mejora 4 (Análisis de Datos General) Fase
     };
     const store: jest.Mocked<SesionAnalisisStore> = {
       crear: jest.fn().mockReturnValue('sesion-nueva-123'),
+      actualizarTiposCorregidos: jest.fn().mockReturnValue(true),
       obtener: jest.fn()
     };
     const datasetGenericoRepository = datasetGenericoRepositoryFalso();
@@ -45,7 +53,9 @@ describe('AnalizarDatasetGenerico — Mejora 4 (Análisis de Datos General) Fase
     const resultado = await useCase.ejecutar(rutaArchivo, 'analista-A', 'ventas.xlsx');
 
     expect(lector.leerArchivo).toHaveBeenCalledWith(rutaArchivo);
-    expect(store.crear).toHaveBeenCalledWith('analista-A', datos);
+    // La sesión queda atada al dataset guardado: es lo que permite después
+    // corregir tipos, limpiar y versionar sin volver a subir el archivo.
+    expect(store.crear).toHaveBeenCalledWith('analista-A', { ...datos, datasetId: resultado.datasetId });
     expect(resultado.sesionId).toBe('sesion-nueva-123');
     expect(resultado.diagnostico.totalFilas).toBe(2);
   });
@@ -58,6 +68,7 @@ describe('AnalizarDatasetGenerico — Mejora 4 (Análisis de Datos General) Fase
     };
     const store: jest.Mocked<SesionAnalisisStore> = {
       crear: jest.fn().mockReturnValue('sesion-nueva-123'),
+      actualizarTiposCorregidos: jest.fn().mockReturnValue(true),
       obtener: jest.fn()
     };
     const datasetGenericoRepository = datasetGenericoRepositoryFalso();
@@ -74,13 +85,75 @@ describe('AnalizarDatasetGenerico — Mejora 4 (Análisis de Datos General) Fase
         columnas: ['Producto'],
         fuente: 'archivo',
         preset: null,
-        filasDuplicadas: 0
+        filasDuplicadas: 0,
+        // RF-136: lo que se carga es siempre el original (versión 0) de una
+        // familia nueva; las versiones procesadas nacen de una limpieza.
+        esOriginal: true,
+        version: 0,
+        totalFilas: 2
       })
     );
+    // `posicion` guarda el orden del archivo: sin ella, un dataset reabierto o
+    // exportado salía con las filas en el orden de sus UUID.
     expect(datasetGenericoRepository.guardarRegistros).toHaveBeenCalledWith([
-      expect.objectContaining({ datasetId: resultado.datasetId, analistaId: 'analista-A', valores: { Producto: 'Laptop' } }),
-      expect.objectContaining({ datasetId: resultado.datasetId, analistaId: 'analista-A', valores: { Producto: 'Mouse' } })
+      expect.objectContaining({ datasetId: resultado.datasetId, analistaId: 'analista-A', valores: { Producto: 'Laptop' }, posicion: 0 }),
+      expect.objectContaining({ datasetId: resultado.datasetId, analistaId: 'analista-A', valores: { Producto: 'Mouse' }, posicion: 1 })
     ]);
+  });
+
+  test('la posición sigue la numeración del archivo a través de los lotes, y la sesión se crea recién después de guardar', async () => {
+    const rutaArchivo = crearArchivoTemporal('contenido de prueba');
+    const filas = Array.from({ length: 1001 }, (_, i) => ({ Producto: `Item ${i}` }));
+    const lector: jest.Mocked<Pick<LectorDatasetGenerico, 'leerArchivo'>> = {
+      leerArchivo: jest.fn().mockReturnValue({ columnas: ['Producto'], filas })
+    };
+    const orden: string[] = [];
+    const store: jest.Mocked<SesionAnalisisStore> = {
+      crear: jest.fn().mockImplementation(() => {
+        orden.push('sesion');
+        return 'sesion-1';
+      }),
+      actualizarTiposCorregidos: jest.fn().mockReturnValue(true),
+      obtener: jest.fn()
+    };
+    const datasetGenericoRepository = datasetGenericoRepositoryFalso();
+    datasetGenericoRepository.guardarRegistros.mockImplementation(async () => {
+      orden.push('registros');
+    });
+
+    await new AnalizarDatasetGenerico(lector as unknown as LectorDatasetGenerico, store, datasetGenericoRepository).ejecutar(
+      rutaArchivo,
+      'analista-A',
+      'ventas.xlsx'
+    );
+
+    const segundoLote = datasetGenericoRepository.guardarRegistros.mock.calls[1][0];
+    expect(segundoLote).toHaveLength(1);
+    expect(segundoLote[0].posicion).toBe(1000);
+    expect(orden).toEqual(['registros', 'registros', 'sesion']);
+  });
+
+  test('si guardar falla, no queda una sesión apuntando a un dataset que no existe', async () => {
+    const rutaArchivo = crearArchivoTemporal('contenido de prueba');
+    const lector: jest.Mocked<Pick<LectorDatasetGenerico, 'leerArchivo'>> = {
+      leerArchivo: jest.fn().mockReturnValue({ columnas: ['Producto'], filas: [{ Producto: 'Laptop' }] })
+    };
+    const store: jest.Mocked<SesionAnalisisStore> = {
+      crear: jest.fn(),
+      actualizarTiposCorregidos: jest.fn().mockReturnValue(true),
+      obtener: jest.fn()
+    };
+    const datasetGenericoRepository = datasetGenericoRepositoryFalso();
+    datasetGenericoRepository.guardarRegistros.mockRejectedValue(new Error('base caída'));
+
+    await expect(
+      new AnalizarDatasetGenerico(lector as unknown as LectorDatasetGenerico, store, datasetGenericoRepository).ejecutar(
+        rutaArchivo,
+        'analista-A',
+        'ventas.xlsx'
+      )
+    ).rejects.toThrow('base caída');
+    expect(store.crear).not.toHaveBeenCalled();
   });
 
   test('divide los registros en lotes de 1000', async () => {
@@ -92,6 +165,7 @@ describe('AnalizarDatasetGenerico — Mejora 4 (Análisis de Datos General) Fase
     };
     const store: jest.Mocked<SesionAnalisisStore> = {
       crear: jest.fn().mockReturnValue('sesion-nueva-123'),
+      actualizarTiposCorregidos: jest.fn().mockReturnValue(true),
       obtener: jest.fn()
     };
     const datasetGenericoRepository = datasetGenericoRepositoryFalso();
@@ -115,6 +189,7 @@ describe('AnalizarDatasetGenerico — Mejora 4 (Análisis de Datos General) Fase
     };
     const store: jest.Mocked<SesionAnalisisStore> = {
       crear: jest.fn().mockReturnValue('sesion-nueva-123'),
+      actualizarTiposCorregidos: jest.fn().mockReturnValue(true),
       obtener: jest.fn()
     };
     const datasetGenericoRepository = datasetGenericoRepositoryFalso();
@@ -136,6 +211,7 @@ describe('AnalizarDatasetGenerico — Mejora 4 (Análisis de Datos General) Fase
     };
     const store: jest.Mocked<SesionAnalisisStore> = {
       crear: jest.fn().mockReturnValue('sesion-nueva-123'),
+      actualizarTiposCorregidos: jest.fn().mockReturnValue(true),
       obtener: jest.fn()
     };
     const datasetGenericoRepository = datasetGenericoRepositoryFalso();

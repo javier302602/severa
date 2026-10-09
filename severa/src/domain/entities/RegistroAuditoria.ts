@@ -16,6 +16,11 @@ export class RegistroAuditoria {
     public readonly accion: string,
     public readonly detalle: string,
     public readonly fechaHora: Date = new Date(),
-    public readonly ip: string | null = null
+    public readonly ip: string | null = null,
+    // RF-138: dataset genérico sobre el que se hizo la operación, cuando la
+    // hay — siempre el id del ORIGINAL (identifica a toda la familia de
+    // versiones), para que la auditoría de un dataset reúna lo hecho sobre
+    // cualquiera de ellas. null en las operaciones que no son sobre un dataset.
+    public readonly datasetId: string | null = null
   ) {}
 }

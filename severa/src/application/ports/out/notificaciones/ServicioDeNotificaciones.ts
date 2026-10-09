@@ -50,4 +50,19 @@ export interface ServicioDeNotificaciones {
   // solo dice QUÉ campo cambió ('nombre'/'correo'), nunca el valor viejo ni
   // el nuevo — y nunca incluye la contraseña, que este flujo ni siquiera toca.
   notificarPerfilActualizado(analistaId: string, camposModificados: string[]): Promise<void>;
+  // RF-122 (M-15): UNA notificación por proceso de limpieza, con lo que pide
+  // el requisito —registros afectados, columnas afectadas y método usado por
+  // variable—; el detalle exhaustivo queda en la bitácora (RF-123).
+  notificarLimpiezaCompletada(analistaId: string, resumen: ResumenDeLimpiezaNotificable): Promise<void>;
+}
+
+export interface ResumenDeLimpiezaNotificable {
+  nombreArchivo: string;
+  // La versión que generó la limpieza.
+  version: number;
+  filasAntes: number;
+  filasEliminadas: number;
+  columnasEliminadas: string[];
+  celdasImputadas: number;
+  metodosPorVariable: Array<{ variable: string; metodo: string }>;
 }

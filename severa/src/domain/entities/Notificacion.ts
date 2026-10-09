@@ -5,7 +5,9 @@ export type TipoNotificacion =
   | 'InformeListo'
   | 'ActualizacionNVD'
   | 'ImportacionCompletada'
-  | 'PerfilActualizado';
+  | 'PerfilActualizado'
+  // RF-122 (M-15): resumen único de un proceso de limpieza de un dataset.
+  | 'LimpiezaCompletada';
 
 // RF-99 a RF-104: modela la clase Notificacion del SDS (M-13). El campo
 // `mensaje` es una extensión sobre el modelo mínimo del SDS

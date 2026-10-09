@@ -171,3 +171,56 @@ describe('ConsolaServicioDeNotificaciones — notificarPerfilActualizado (RF-16)
     expect(propias[0].mensaje).toBe('Tu perfil fue actualizado: se modificó nombre y correo.');
   });
 });
+
+// RF-122: "una única notificación de resumen: registros afectados, columnas
+// afectadas y método usado por variable. El detalle queda en la bitácora."
+describe('ConsolaServicioDeNotificaciones — notificarLimpiezaCompletada (RF-122)', () => {
+  const resumen = {
+    nombreArchivo: 'encuesta.csv',
+    version: 2,
+    filasAntes: 120,
+    filasEliminadas: 7,
+    columnasEliminadas: ['notas', 'observaciones'],
+    celdasImputadas: 15,
+    metodosPorVariable: [
+      { variable: 'notas', metodo: 'eliminación de la columna' },
+      { variable: 'edad', metodo: 'mediana' }
+    ]
+  };
+
+  test('guarda UNA notificación del analista con registros, columnas y método por variable', async () => {
+    const notificacionRepository = notificacionRepositoryEnMemoria();
+    const servicio = new ConsolaServicioDeNotificaciones(notificacionRepository);
+
+    await servicio.notificarLimpiezaCompletada('analista-7', resumen);
+
+    expect(notificacionRepository.registros).toHaveLength(1);
+    const [notificacion] = notificacionRepository.registros;
+    expect(notificacion).toMatchObject({ tipo: 'LimpiezaCompletada', destinatario: 'analista-7', leida: false });
+    expect(notificacion.mensaje).toBe(
+      'Limpieza de "encuesta.csv" completada: se generó la versión 2. ' +
+        'Registros: 7 fila(s) eliminada(s) de 120, 15 valor(es) imputado(s). ' +
+        'Columnas eliminadas: 2 (notas, observaciones). ' +
+        'Método por variable: notas: eliminación de la columna; edad: mediana. ' +
+        'El detalle completo está en la bitácora del dataset.'
+    );
+  });
+
+  test('sin columnas eliminadas lo dice, en vez de dejar la lista vacía', async () => {
+    const notificacionRepository = notificacionRepositoryEnMemoria();
+    const servicio = new ConsolaServicioDeNotificaciones(notificacionRepository);
+
+    await servicio.notificarLimpiezaCompletada('analista-7', { ...resumen, columnasEliminadas: [] });
+
+    expect(notificacionRepository.registros[0].mensaje).toContain('Columnas eliminadas: ninguna.');
+  });
+
+  test('no le llega a otro analista', async () => {
+    const notificacionRepository = notificacionRepositoryEnMemoria();
+    const servicio = new ConsolaServicioDeNotificaciones(notificacionRepository);
+
+    await servicio.notificarLimpiezaCompletada('analista-7', resumen);
+
+    expect(await notificacionRepository.listarPorAnalista('analista-8')).toHaveLength(0);
+  });
+});

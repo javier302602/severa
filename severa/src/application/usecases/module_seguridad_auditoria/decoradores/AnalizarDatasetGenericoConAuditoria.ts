@@ -27,7 +27,9 @@ export class AnalizarDatasetGenericoConAuditoria implements AnalizarDatasetGener
     await this.auditoriaRepository.registrar({
       usuario: analistaId,
       accion: 'ImportarDatasetGenerico',
-      detalle
+      detalle,
+      // RF-138: la carga es la primera operación de la auditoría del dataset.
+      datasetId: resultado.datasetId
     });
 
     return resultado;

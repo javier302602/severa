@@ -77,3 +77,51 @@ describe('SesionAnalisisStoreEnMemoria — Mejora 4 (Análisis de Datos General)
     expect(store.obtener('analista-99', sesionIds[99])).toBeDefined();
   });
 });
+
+// RF-111 (M-14, Ronda 2): la corrección de tipo vive en la sesión, para que
+// todos los análisis posteriores de esa sesión la usen.
+describe('SesionAnalisisStoreEnMemoria — actualizarTiposCorregidos (RF-111)', () => {
+  test('guarda las correcciones sin tocar columnas, filas ni el dataset asociado', () => {
+    const store = new SesionAnalisisStoreEnMemoria();
+    const filas = [{ cp: 15001 }, { cp: 15003 }];
+    const sesionId = store.crear('analista-A', { columnas: ['cp'], filas, datasetId: 'dataset-1' });
+
+    expect(store.actualizarTiposCorregidos('analista-A', sesionId, { cp: 'categorica_nominal' })).toBe(true);
+
+    const datos = store.obtener('analista-A', sesionId);
+    expect(datos).toEqual({ columnas: ['cp'], filas, datasetId: 'dataset-1', tiposCorregidos: { cp: 'categorica_nominal' } });
+    // Las filas son las mismas, no una copia: corregir un tipo no duplica el dataset en memoria.
+    expect(datos?.filas).toBe(filas);
+  });
+
+  test('reemplaza el conjunto completo de correcciones (un objeto vacío las quita todas)', () => {
+    const store = new SesionAnalisisStoreEnMemoria();
+    const sesionId = store.crear('analista-A', { columnas: ['a', 'b'], filas: [], tiposCorregidos: { a: 'texto_libre', b: 'identificador' } });
+
+    store.actualizarTiposCorregidos('analista-A', sesionId, { a: 'categorica_nominal' });
+    expect(store.obtener('analista-A', sesionId)?.tiposCorregidos).toEqual({ a: 'categorica_nominal' });
+
+    store.actualizarTiposCorregidos('analista-A', sesionId, {});
+    expect(store.obtener('analista-A', sesionId)?.tiposCorregidos).toEqual({});
+  });
+
+  test('guarda una copia: modificar después el objeto que se le pasó no cambia la sesión', () => {
+    const store = new SesionAnalisisStoreEnMemoria();
+    const sesionId = store.crear('analista-A', { columnas: ['a'], filas: [] });
+    const correcciones: Record<string, 'texto_libre' | 'identificador'> = { a: 'texto_libre' };
+
+    store.actualizarTiposCorregidos('analista-A', sesionId, correcciones);
+    correcciones.a = 'identificador';
+
+    expect(store.obtener('analista-A', sesionId)?.tiposCorregidos).toEqual({ a: 'texto_libre' });
+  });
+
+  test('otro analista no puede modificar la sesión, y una sesión inexistente devuelve false', () => {
+    const store = new SesionAnalisisStoreEnMemoria();
+    const sesionId = store.crear('analista-A', { columnas: ['a'], filas: [] });
+
+    expect(store.actualizarTiposCorregidos('analista-B', sesionId, { a: 'texto_libre' })).toBe(false);
+    expect(store.actualizarTiposCorregidos('analista-A', 'no-existe', { a: 'texto_libre' })).toBe(false);
+    expect(store.obtener('analista-A', sesionId)?.tiposCorregidos).toBeUndefined();
+  });
+});

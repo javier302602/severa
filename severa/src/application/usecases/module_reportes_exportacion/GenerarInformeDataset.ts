@@ -21,7 +21,7 @@ export class GenerarInformeDataset implements GenerarInformeDatasetUseCase {
     }
 
     const generadoPara = await resolverNombreAnalistaParaInforme(this.analistaRepository, analistaId);
-    const datos = recopilarDatosDeInformeDataset(datosSesion.columnas, datosSesion.filas, generadoPara);
+    const datos = recopilarDatosDeInformeDataset(datosSesion.columnas, datosSesion.filas, generadoPara, datosSesion.tiposCorregidos);
 
     return this.geradorDeInformes.generarInformeEnFormato({ pipeline: 'generico', datos }, formato, opciones);
   }

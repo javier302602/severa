@@ -5,6 +5,7 @@ import { SesionAnalisisNoEncontradaError } from '../../../src/domain/errors/Sesi
 function storeFalso(datos: ReturnType<SesionAnalisisStore['obtener']>): jest.Mocked<SesionAnalisisStore> {
   return {
     crear: jest.fn(),
+    actualizarTiposCorregidos: jest.fn().mockReturnValue(true),
     obtener: jest.fn().mockReturnValue(datos)
   };
 }

@@ -10,6 +10,13 @@ function repositorioFalso(dataset: DatasetGenerico | null, registros: RegistroDa
     guardarRegistros: jest.fn().mockResolvedValue(undefined),
     buscarPorId: jest.fn().mockResolvedValue(dataset),
     listarRegistros: jest.fn().mockResolvedValue(registros),
+    actualizarTiposCorregidos: jest.fn().mockResolvedValue(undefined),
+    actualizarVariableObjetivo: jest.fn().mockResolvedValue(undefined),
+    listarTodos: jest.fn().mockResolvedValue([]),
+    listarVersiones: jest.fn().mockResolvedValue([]),
+    crearVersionProcesada: jest.fn(),
+    registrarEnBitacora: jest.fn().mockResolvedValue(undefined),
+    listarBitacora: jest.fn().mockResolvedValue([]),
     actualizarCriterioClasificacion: jest.fn().mockResolvedValue(undefined)
   };
 }
@@ -24,12 +31,14 @@ describe('ExportarDatasetGenerico', () => {
     const repository = repositorioFalso(dataset, registros);
     const usecase = new ExportarDatasetGenerico(repository);
 
-    const buffer = await usecase.ejecutar('d1', 'analista-A');
+    const exportado = await usecase.ejecutar('d1', 'analista-A');
 
     expect(repository.buscarPorId).toHaveBeenCalledWith('d1', 'analista-A');
     expect(repository.listarRegistros).toHaveBeenCalledWith('d1', 'analista-A');
-    expect(Buffer.isBuffer(buffer)).toBe(true);
-    expect(buffer.length).toBeGreaterThan(0);
+    expect(Buffer.isBuffer(exportado.contenido)).toBe(true);
+    expect(exportado.contenido.length).toBeGreaterThan(0);
+    // RF-138: lo que necesita la auditoría para decir QUÉ se exportó.
+    expect(exportado).toMatchObject({ datasetOriginalId: 'd1', nombreArchivo: 'ventas.xlsx', version: 0, totalFilas: 2 });
   });
 
   test('lanza DatasetGenericoNoEncontradoError si el dataset no existe', async () => {

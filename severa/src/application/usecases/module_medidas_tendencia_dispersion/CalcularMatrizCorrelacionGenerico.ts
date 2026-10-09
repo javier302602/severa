@@ -13,6 +13,6 @@ export class CalcularMatrizCorrelacionGenerico implements CalcularMatrizCorrelac
       throw new SesionAnalisisNoEncontradaError();
     }
 
-    return calcularMatrizCorrelacion(datos.columnas, datos.filas);
+    return calcularMatrizCorrelacion(datos.columnas, datos.filas, datos.tiposCorregidos);
   }
 }

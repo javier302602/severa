@@ -28,7 +28,10 @@ describe('AnalizarDatasetGenericoConAuditoria', () => {
       expect.objectContaining({
         usuario: 'analista-A',
         accion: 'ImportarDatasetGenerico',
-        detalle: expect.stringContaining('10 fila(s), 2 columna(s), 2 duplicada(s) (archivo: ventas.xlsx)')
+        detalle: expect.stringContaining('10 fila(s), 2 columna(s), 2 duplicada(s) (archivo: ventas.xlsx)'),
+        // RF-138: la carga queda asociada al dataset, para que el
+        // administrador pueda pedir la auditoría de ese dataset.
+        datasetId: 'dataset-1'
       })
     );
   });

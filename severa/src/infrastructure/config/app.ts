@@ -26,6 +26,9 @@ import { analisisDatasetAnalizarRouter } from '../adapters/in/http/modules/modul
 import { analisisDatasetOutliersRouter } from '../adapters/in/http/modules/module_limpieza_calidad_datos/controllers/AnalisisDatasetOutliersController';
 import { analisisDatasetCalidadRouter } from '../adapters/in/http/modules/module_limpieza_calidad_datos/controllers/AnalisisDatasetCalidadController';
 import { analisisDatasetInformeRouter } from '../adapters/in/http/modules/module_reportes_exportacion/controllers/AnalisisDatasetInformeController';
+import { analisisDatasetVariablesRouter } from '../adapters/in/http/modules/module_deteccion_variables/controllers/AnalisisDatasetVariablesController';
+import { analisisDatasetLimpiezaRouter } from '../adapters/in/http/modules/module_limpieza_calidad_datos/controllers/AnalisisDatasetLimpiezaController';
+import { analisisDatasetVersionesRouter } from '../adapters/in/http/modules/module_carga_gestion_datasets/controllers/AnalisisDatasetVersionesController';
 import { analisisDatasetHistogramaTiempoRouter } from '../adapters/in/http/modules/module_visualizacion_grafica/controllers/AnalisisDatasetHistogramaTiempoController';
 import { exigirHttps } from '../adapters/in/http/middleware/HttpsMiddleware';
 import { autenticacion } from '../adapters/in/http/middleware/AutenticacionMiddleware';
@@ -100,6 +103,11 @@ export function createApp(): express.Express {
   app.use(analisisDatasetCalidadRouter);
   app.use(analisisDatasetInformeRouter);
   app.use(analisisDatasetHistogramaTiempoRouter);
+  // M-14/M-15 Ronda 2 y RF-136: variables (serie de tiempo, variable
+  // objetivo, corrección de tipo), limpieza con bitácora, y versiones.
+  app.use(analisisDatasetVariablesRouter);
+  app.use(analisisDatasetLimpiezaRouter);
+  app.use(analisisDatasetVersionesRouter);
 
   // Red de seguridad global: bug real encontrado en Sprint 15 — varios
   // controllers (EstadisticaController, InformeController, el gráfico

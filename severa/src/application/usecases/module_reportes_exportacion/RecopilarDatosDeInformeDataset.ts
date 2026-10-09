@@ -4,6 +4,7 @@ import { calcularEstadisticasDescriptivas } from '../../../domain/services/descr
 import { analizarColumnaUnivariado } from '../../../domain/services/descriptive-statistics/AnalisisUnivariadoGenerico';
 import { calcularMatrizCorrelacion } from '../../../domain/services/descriptive-statistics/CorrelacionGenerico';
 import { detectarOutliers } from '../../../domain/services/data-cleaning/DeteccionOutliersGenerico';
+import { CorreccionesDeTipo } from '../../../domain/services/variable-detection/DetectorDeTipoDeColumna';
 import { generarInterpretacionDataset } from '../../../domain/services/InterpretadorDeResultadosGenerico';
 
 // Mejora 4 (Análisis de Datos General) — Fase 5. Mismo rol que
@@ -32,16 +33,19 @@ const LIMITE_FILAS_ANEXO = 20;
 export function recopilarDatosDeInformeDataset(
   columnas: string[],
   filas: Array<Record<string, unknown>>,
-  generadoPara: string
+  generadoPara: string,
+  // RF-111: tipos de variable fijados a mano por el analista. El informe se
+  // arma con los mismos tipos que el analista ve en pantalla.
+  correcciones?: CorreccionesDeTipo
 ): DatosInformeDataset {
-  const diagnostico = analizarDataset(columnas, filas);
-  const estadisticasDescriptivas = calcularEstadisticasDescriptivas(columnas, filas);
+  const diagnostico = analizarDataset(columnas, filas, correcciones);
+  const estadisticasDescriptivas = calcularEstadisticasDescriptivas(columnas, filas, correcciones);
 
   const columnasNumericas = diagnostico.columnas.filter((columna) => columna.tipo === 'numerica').map((columna) => columna.nombre);
-  const analisisUnivariado = columnasNumericas.map((nombre) => analizarColumnaUnivariado(nombre, columnas, filas));
+  const analisisUnivariado = columnasNumericas.map((nombre) => analizarColumnaUnivariado(nombre, columnas, filas, undefined, correcciones));
 
-  const matrizCorrelacion = calcularMatrizCorrelacion(columnas, filas);
-  const outliers = detectarOutliers(columnas, filas);
+  const matrizCorrelacion = calcularMatrizCorrelacion(columnas, filas, correcciones);
+  const outliers = detectarOutliers(columnas, filas, correcciones);
   const interpretacion = generarInterpretacionDataset(diagnostico, matrizCorrelacion, outliers);
 
   const columnasMostradas = columnas.slice(0, LIMITE_COLUMNAS_ANEXO);

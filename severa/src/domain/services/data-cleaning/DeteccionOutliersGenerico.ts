@@ -1,4 +1,4 @@
-import { esVacio, esNumerico, inferirTipoColumna } from '../variable-detection/DetectorDeTipoDeColumna';
+import { CorreccionesDeTipo, esVacio, esNumerico, resolverTipoColumna } from '../variable-detection/DetectorDeTipoDeColumna';
 import { calcularCuartiles, calcularMedia, calcularDesviacionEstandarMuestral } from '../descriptive-statistics/EstadisticaDescriptiva';
 
 // Mejora 4 (Análisis de Datos General) — Fase 4. Detección de valores
@@ -119,13 +119,17 @@ function detectarOutliersColumna(nombre: string, filas: Array<Record<string, unk
   };
 }
 
-export function detectarOutliers(columnas: string[], filas: Array<Record<string, unknown>>): ResultadoDeteccionOutliers {
+export function detectarOutliers(
+  columnas: string[],
+  filas: Array<Record<string, unknown>>,
+  correcciones?: CorreccionesDeTipo
+): ResultadoDeteccionOutliers {
   const columnasExcluidas: ColumnaExcluidaDeOutliers[] = [];
   const resultado: OutliersColumna[] = [];
 
   columnas.forEach((nombre) => {
     const valoresCrudos = filas.map((fila) => fila[nombre]);
-    if (inferirTipoColumna(valoresCrudos) !== 'numerica') {
+    if (resolverTipoColumna(nombre, valoresCrudos, correcciones) !== 'numerica') {
       columnasExcluidas.push({ nombre, motivo: 'La columna no es numérica' });
       return;
     }

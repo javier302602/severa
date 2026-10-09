@@ -18,6 +18,6 @@ export class AnalizarColumnaUnivariadoGenerico implements AnalizarColumnaUnivari
       throw new SesionAnalisisNoEncontradaError();
     }
 
-    return analizarColumnaUnivariado(nombreColumna, datos.columnas, datos.filas, numeroDeIntervalos);
+    return analizarColumnaUnivariado(nombreColumna, datos.columnas, datos.filas, numeroDeIntervalos, datos.tiposCorregidos);
   }
 }

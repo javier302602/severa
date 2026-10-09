@@ -11,6 +11,13 @@ function repositorioFalso(dataset: DatasetGenerico | null, registros: RegistroDa
     guardarRegistros: jest.fn().mockResolvedValue(undefined),
     buscarPorId: jest.fn().mockResolvedValue(dataset),
     listarRegistros: jest.fn().mockResolvedValue(registros),
+    actualizarTiposCorregidos: jest.fn().mockResolvedValue(undefined),
+    actualizarVariableObjetivo: jest.fn().mockResolvedValue(undefined),
+    listarTodos: jest.fn().mockResolvedValue([]),
+    listarVersiones: jest.fn().mockResolvedValue([]),
+    crearVersionProcesada: jest.fn(),
+    registrarEnBitacora: jest.fn().mockResolvedValue(undefined),
+    listarBitacora: jest.fn().mockResolvedValue([]),
     actualizarCriterioClasificacion: jest.fn().mockResolvedValue(undefined)
   };
 }

@@ -9,9 +9,9 @@ import { interpretarHistogramaTiempo } from '../../../domain/services/graphs/Int
 // RF-58: histograma de una columna de tipo fecha/tiempo de un dataset
 // genérico. Separado a propósito de GenerarGrafico.ts (CVSS) — ver
 // auditoría SDS M-07. La columna es seleccionada por el analista por
-// nombre (igual que /univariado/:nombreColumna); el tipo se infiere en el
-// momento de la consulta (inferirTipoColumna, vía analizarColumnaUnivariado),
-// no se persiste ningún "tipo" por columna en datasets_genericos.
+// nombre (igual que /univariado/:nombreColumna); el tipo es el vigente en el
+// momento de la consulta: el detectado, o el que el analista haya fijado a
+// mano (RF-111, ver resolverTipoColumna).
 export class GenerarHistogramaDeTiempoGenerico implements GenerarHistogramaDeTiempoGenericoUseCase {
   constructor(private readonly sesionAnalisisStore: SesionAnalisisStore) {}
 
@@ -26,7 +26,7 @@ export class GenerarHistogramaDeTiempoGenerico implements GenerarHistogramaDeTie
       throw new SesionAnalisisNoEncontradaError();
     }
 
-    const analisis = analizarColumnaUnivariado(nombreColumna, datos.columnas, datos.filas);
+    const analisis = analizarColumnaUnivariado(nombreColumna, datos.columnas, datos.filas, undefined, datos.tiposCorregidos);
     if (analisis.tipo !== 'fecha') {
       throw new DatasetInvalidoError(`La columna "${nombreColumna}" no es de tipo fecha/tiempo`);
     }

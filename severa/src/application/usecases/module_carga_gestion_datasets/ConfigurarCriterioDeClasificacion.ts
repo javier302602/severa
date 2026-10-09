@@ -7,7 +7,7 @@ import { DatasetGenerico } from '../../../domain/entities/DatasetGenerico';
 import { DatasetGenericoNoEncontradoError } from '../../../domain/errors/DatasetGenericoNoEncontradoError';
 import { ColumnaDeDatasetInvalidaError } from '../../../domain/errors/ColumnaDeDatasetInvalidaError';
 import { CriterioDeClasificacionValue } from '../../../domain/shared/value-objects/CriterioDeClasificacion';
-import { inferirTipoColumna } from '../../../domain/services/variable-detection/DetectorDeTipoDeColumna';
+import { resolverTipoColumna } from '../../../domain/services/variable-detection/DetectorDeTipoDeColumna';
 
 // RF-139: pieza habilitadora. NO genera ranking ni filtra nada — solo valida
 // y persiste la elección del analista, consumida más adelante por
@@ -30,7 +30,8 @@ export class ConfigurarCriterioDeClasificacion implements ConfigurarCriterioDeCl
 
     const registros = await this.datasetGenericoRepository.listarRegistros(datasetId, analistaId);
     const valoresDeLaColumna = registros.map((registro) => registro.valores[input.nombreColumna]);
-    const tipoDetectado = inferirTipoColumna(valoresDeLaColumna);
+    // El tipo vigente: el detectado, o el que el analista fijó a mano (RF-111).
+    const tipoDetectado = resolverTipoColumna(input.nombreColumna, valoresDeLaColumna, dataset.tiposCorregidos);
 
     if (tipoDetectado === 'texto' || tipoDetectado === 'fecha') {
       throw new ColumnaDeDatasetInvalidaError(
@@ -43,18 +44,7 @@ export class ConfigurarCriterioDeClasificacion implements ConfigurarCriterioDeCl
 
     await this.datasetGenericoRepository.actualizarCriterioClasificacion(datasetId, analistaId, criterio, columnaClave);
 
-    return new DatasetGenerico(
-      dataset.id,
-      dataset.analistaId,
-      dataset.nombreArchivo,
-      dataset.columnas,
-      dataset.fuente,
-      dataset.preset,
-      dataset.filasDuplicadas,
-      dataset.fechaCarga,
-      criterio,
-      columnaClave
-    );
+    return dataset.conConfiguracion({ criterioClasificacion: criterio, columnaClave });
   }
 
   private construirCriterio(

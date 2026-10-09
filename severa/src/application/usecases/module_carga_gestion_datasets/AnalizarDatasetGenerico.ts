@@ -5,7 +5,7 @@ import { analizarDataset } from '../../../domain/services/data-cleaning/CalidadD
 import { calcularEstadisticasDescriptivas } from '../../../domain/services/descriptive-statistics/EstadisticasDescriptivasGenerico';
 import { SesionAnalisisStore } from '../../ports/out/dataset/SesionAnalisisStore';
 import { DatasetGenericoRepository } from '../../ports/out/persistencia/repositorios/DatasetGenericoRepository';
-import { DatasetGenerico } from '../../../domain/entities/DatasetGenerico';
+import { DatasetGenerico, LINAJE_DE_ORIGINAL, VARIABLE_OBJETIVO_PENDIENTE } from '../../../domain/entities/DatasetGenerico';
 import { RegistroDatasetGenerico } from '../../../domain/entities/RegistroDatasetGenerico';
 import { calcularHashSha256Archivo } from '../../utils/CalcularHashSha256Archivo';
 
@@ -39,22 +39,29 @@ export class AnalizarDatasetGenerico implements AnalizarDatasetGenericoUseCase {
     // se hace con las mismas columnas/filas ya en memoria (sin releer nada)
     // para consolidarlo en la respuesta de /analizar.
     const perfilVariables = calcularEstadisticasDescriptivas(columnas, filas);
-    const sesionId = this.sesionAnalisisStore.crear(analistaId, { columnas, filas });
 
     const datasetId = randomUUID();
     await this.datasetGenericoRepository.guardar(
       new DatasetGenerico(
         datasetId, analistaId, nombreArchivoOriginal, columnas, 'archivo', null, diagnostico.filasDuplicadas,
-        new Date(), null, null, hashOriginalSha256
+        new Date(), null, null, hashOriginalSha256, LINAJE_DE_ORIGINAL, {}, VARIABLE_OBJETIVO_PENDIENTE, filas.length
       )
     );
 
+    // `posicion` conserva el orden del archivo: es el orden en que el dataset
+    // se exporta y se vuelve a abrir (antes salía ordenado por un id al azar).
     for (let inicio = 0; inicio < filas.length; inicio += TAMANO_DE_LOTE) {
       const lote = filas
         .slice(inicio, inicio + TAMANO_DE_LOTE)
-        .map((valores) => new RegistroDatasetGenerico(randomUUID(), datasetId, analistaId, valores));
+        .map((valores, indice) => new RegistroDatasetGenerico(randomUUID(), datasetId, analistaId, valores, new Date(), inicio + indice));
       await this.datasetGenericoRepository.guardarRegistros(lote);
     }
+
+    // La sesión se crea al final y sabe a qué dataset persistido corresponde:
+    // es lo que permite que corregir un tipo o limpiar los datos desde la
+    // sesión quede guardado y en la bitácora de ese dataset (M-14/M-15,
+    // Ronda 2).
+    const sesionId = this.sesionAnalisisStore.crear(analistaId, { columnas, filas, datasetId });
 
     return { diagnostico, perfilVariables, sesionId, datasetId };
   }

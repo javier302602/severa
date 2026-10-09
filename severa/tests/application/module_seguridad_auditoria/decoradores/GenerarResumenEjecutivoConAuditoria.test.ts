@@ -18,6 +18,7 @@ function servicioDeNotificacionesFalso(): ServicioDeNotificaciones {
     notificarInformeListo: jest.fn().mockResolvedValue(undefined),
     notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
     notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
+  notificarLimpiezaCompletada: jest.fn().mockResolvedValue(undefined),
   notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
   };
 }

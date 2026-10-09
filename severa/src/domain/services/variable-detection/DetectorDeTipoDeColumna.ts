@@ -79,7 +79,15 @@ const MINIMO_MUESTRA_IDENTIFICADOR = 5;
 // clasificar POR QUÉ formato calza cada valor de fecha (detección de
 // formatos mezclados) reutilizando los mismos patrones, en vez de duplicar
 // las regex — ningún comportamiento de este archivo cambia por exportarlos.
-export const PATRON_FECHA_ISO = /^(\d{4})-(\d{1,2})-(\d{1,2})([T ]\d{1,2}:\d{2}(:\d{2})?)?$/;
+//
+// El patrón ISO acepta también fracción de segundo y zona horaria
+// ("2024-01-15T10:30:00.000Z", "2024-01-15T10:30:00-05:00"): es como exporta
+// una marca de tiempo cualquier API o base de datos, y sin esto una columna
+// así se detectaba como texto (o como identificador, por tener casi todos los
+// valores distintos). Grupos: 1 año, 2 mes, 3 día, 4 la parte horaria
+// completa (si hay), 5 hora, 6 minuto, 7 segundo, 8 zona.
+export const PATRON_FECHA_ISO =
+  /^(\d{4})-(\d{1,2})-(\d{1,2})([T ](\d{1,2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
 export const PATRON_FECHA_DIA_MES_ANIO = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/;
 
 // RF-107 (categórica ordinal): heurística de diccionario, deliberadamente NO
@@ -131,20 +139,16 @@ export function esFecha(valor: unknown): boolean {
   if (valor instanceof Date) return !Number.isNaN(valor.getTime());
   if (typeof valor !== 'string') return false;
 
+  // Una sola definición: un texto es una fecha si aFechaGenerica (abajo) lo
+  // puede convertir. Antes este chequeo era más laxo que la conversión — el
+  // formato ISO se validaba con Date.parse, que en Node acepta "2024-02-31" y
+  // lo corre al 2 de marzo, y en día/mes/año solo se miraba dia <= 31 — así
+  // que un 31 de febrero contaba como fecha al detectar el tipo y después se
+  // descartaba en silencio al calcular. Ahora es un valor que no calza con
+  // el tipo, y el diagnóstico de calidad lo informa como inconsistente.
   const texto = valor.trim();
-
-  if (PATRON_FECHA_ISO.test(texto)) {
-    return !Number.isNaN(Date.parse(texto));
-  }
-
-  const coincidencia = PATRON_FECHA_DIA_MES_ANIO.exec(texto);
-  if (coincidencia) {
-    const dia = Number(coincidencia[1]);
-    const mes = Number(coincidencia[2]);
-    return dia >= 1 && dia <= 31 && mes >= 1 && mes <= 12;
-  }
-
-  return false;
+  if (!PATRON_FECHA_ISO.test(texto) && !PATRON_FECHA_DIA_MES_ANIO.test(texto)) return false;
+  return !Number.isNaN(aFechaGenerica(texto).getTime());
 }
 
 // Conversión única de un valor crudo a Date para TODO el pipeline genérico.
@@ -183,6 +187,14 @@ function expandirAnio(texto: string): number {
   return anio <= 68 ? 2000 + anio : 1900 + anio;
 }
 
+// "+05:30" -> 330, "-0500" -> -300, "Z" o sin zona -> 0.
+function minutosDeDesfase(zona: string | undefined): number {
+  if (zona === undefined || zona === 'Z') return 0;
+  const signo = zona[0] === '-' ? -1 : 1;
+  const digitos = zona.slice(1).replace(':', '');
+  return signo * (Number(digitos.slice(0, 2)) * 60 + Number(digitos.slice(2, 4)));
+}
+
 export function aFechaGenerica(valor: unknown): Date {
   if (valor instanceof Date) return valor;
 
@@ -190,8 +202,18 @@ export function aFechaGenerica(valor: unknown): Date {
 
   const iso = PATRON_FECHA_ISO.exec(texto);
   if (iso) {
-    const [hora = 0, minuto = 0, segundo = 0] = iso[4] ? iso[4].slice(1).split(':').map(Number) : [];
-    return fechaUtcEstricta(Number(iso[1]), Number(iso[2]), Number(iso[3]), hora, minuto, segundo);
+    const fecha = fechaUtcEstricta(
+      Number(iso[1]),
+      Number(iso[2]),
+      Number(iso[3]),
+      Number(iso[5] ?? 0),
+      Number(iso[6] ?? 0),
+      Number(iso[7] ?? 0)
+    );
+    // Con zona explícita el texto nombra un instante: se lleva a UTC. Sin
+    // zona es una fecha/hora "de calendario" y se deja tal cual (ver arriba).
+    const desfase = minutosDeDesfase(iso[8]);
+    return desfase === 0 || Number.isNaN(fecha.getTime()) ? fecha : new Date(fecha.getTime() - desfase * 60_000);
   }
 
   const diaMesAnio = PATRON_FECHA_DIA_MES_ANIO.exec(texto);
@@ -306,4 +328,108 @@ export function inferirTipoColumna(valores: unknown[]): TipoColumna {
 // de inferirTipoColumna no necesitan saber que esto existe.
 export function esIdentificador(valores: unknown[]): boolean {
   return inferirTipoColumnaDetallado(valores) === 'identificador';
+}
+
+// RF-111 (M-14, Ronda 2): corrección manual del tipo detectado.
+//
+// La detección de arriba es una heurística (umbrales de mayoría y de
+// cardinalidad): puede equivocarse — un código postal es un número para el
+// detector y una categoría para quien conoce los datos. El analista puede
+// fijar el tipo de cualquier columna; esa decisión viaja como un mapa
+// nombre-de-columna -> tipo y TODOS los análisis del pipeline genérico lo
+// consultan a través de resolverTipoColumna / resolverTipoColumnaDetallado en
+// vez de llamar a inferirTipoColumna directamente. Así "recalcular los
+// análisis dependientes" no es un paso aparte que pueda olvidarse: cada
+// análisis se calcula siempre con el tipo vigente.
+export const TIPOS_DE_COLUMNA_DETALLADOS: readonly TipoColumnaDetallado[] = [
+  'numerica_continua',
+  'numerica_discreta',
+  'categorica_nominal',
+  'categorica_ordinal',
+  'binaria',
+  'fecha',
+  'fecha_hora',
+  'texto_libre',
+  'identificador'
+];
+
+// Cómo se le nombra cada tipo a una persona (mensajes de error, bitácora,
+// recomendaciones). Un solo lugar, para que todo el sistema los llame igual.
+export const ETIQUETA_DE_TIPO_DETALLADO: Record<TipoColumnaDetallado, string> = {
+  numerica_continua: 'numérica continua',
+  numerica_discreta: 'numérica discreta',
+  categorica_nominal: 'categórica nominal',
+  categorica_ordinal: 'categórica ordinal',
+  binaria: 'binaria',
+  fecha: 'fecha',
+  fecha_hora: 'fecha y hora',
+  texto_libre: 'texto libre',
+  identificador: 'identificador'
+};
+
+export function esTipoColumnaDetallado(valor: unknown): valor is TipoColumnaDetallado {
+  return typeof valor === 'string' && (TIPOS_DE_COLUMNA_DETALLADOS as readonly string[]).includes(valor);
+}
+
+export type CorreccionesDeTipo = Readonly<Record<string, TipoColumnaDetallado>>;
+
+// Por qué un tipo NO se puede aplicar a una columna, o null si se puede.
+// Las reglas son las mínimas para que ningún cálculo posterior se quede sin
+// datos: tratar como numérica una columna sin un solo número dejaría la media
+// sin nada que promediar. No se exige la mayoría del 80% de la detección
+// automática — justamente para eso existe la corrección manual.
+export function motivoDeTipoNoAplicable(tipo: TipoColumnaDetallado, valores: unknown[]): string | null {
+  const noVacios = valores.filter((valor) => !esVacio(valor));
+  if (noVacios.length === 0) {
+    return 'la columna no tiene ningún valor';
+  }
+
+  switch (tipo) {
+    case 'numerica_continua':
+    case 'numerica_discreta': {
+      const numeros = noVacios.filter(esNumerico).map(aNumeroSeguro);
+      if (numeros.length === 0) return 'ninguno de sus valores es un número';
+      if (tipo === 'numerica_discreta' && !numeros.every((numero) => Number.isInteger(numero))) {
+        return 'tiene valores con decimales';
+      }
+      return null;
+    }
+    case 'fecha':
+    case 'fecha_hora':
+      return noVacios.some(esFecha) ? null : 'ninguno de sus valores es una fecha reconocible (AAAA-MM-DD o DD/MM/AAAA)';
+    case 'binaria': {
+      const distintos = new Set(noVacios.map((valor) => normalizarTexto(String(valor)))).size;
+      return distintos === 2 ? null : `tiene ${distintos} valor(es) distinto(s), y una variable binaria tiene exactamente 2`;
+    }
+    case 'categorica_nominal':
+    case 'categorica_ordinal':
+    case 'texto_libre':
+    case 'identificador':
+      return null;
+    default: {
+      const exhaustivo: never = tipo;
+      throw new Error(`Tipo de columna no manejado: ${String(exhaustivo)}`);
+    }
+  }
+}
+
+// El tipo vigente de una columna: el que fijó el analista si lo hay y sigue
+// siendo aplicable; si no, el detectado. "Sigue siendo aplicable" importa
+// porque los datos pueden cambiar debajo de una corrección ya guardada (una
+// versión limpia del dataset puede haber perdido las filas que la hacían
+// válida): en ese caso se vuelve a la detección automática en vez de fallar.
+export function resolverTipoColumnaDetallado(
+  nombre: string,
+  valores: unknown[],
+  correcciones?: CorreccionesDeTipo
+): TipoColumnaDetallado {
+  const corregido = correcciones && Object.prototype.hasOwnProperty.call(correcciones, nombre) ? correcciones[nombre] : undefined;
+  if (corregido !== undefined && motivoDeTipoNoAplicable(corregido, valores) === null) {
+    return corregido;
+  }
+  return inferirTipoColumnaDetallado(valores);
+}
+
+export function resolverTipoColumna(nombre: string, valores: unknown[], correcciones?: CorreccionesDeTipo): TipoColumna {
+  return MAPEO_A_TIPO_LEGADO[resolverTipoColumnaDetallado(nombre, valores, correcciones)];
 }

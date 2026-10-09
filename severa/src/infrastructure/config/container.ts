@@ -91,6 +91,22 @@ import { ExportarDatasetGenerico } from '../../application/usecases/module_carga
 import { AnalizarDatasetGenericoConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/AnalizarDatasetGenericoConAuditoria';
 import { ConfigurarCriterioDeClasificacion } from '../../application/usecases/module_carga_gestion_datasets/ConfigurarCriterioDeClasificacion';
 import { VerificarIntegridadDataset } from '../../application/usecases/module_carga_gestion_datasets/VerificarIntegridadDataset';
+import { EvaluarSerieDeTiempoGenerico } from '../../application/usecases/module_deteccion_variables/EvaluarSerieDeTiempoGenerico';
+import { SugerirVariableObjetivo } from '../../application/usecases/module_deteccion_variables/SugerirVariableObjetivo';
+import { DefinirVariableObjetivo } from '../../application/usecases/module_deteccion_variables/DefinirVariableObjetivo';
+import { CorregirTipoDeVariable } from '../../application/usecases/module_deteccion_variables/CorregirTipoDeVariable';
+import { ProponerTratamientoDeFaltantes } from '../../application/usecases/module_limpieza_calidad_datos/ProponerTratamientoDeFaltantes';
+import { AplicarLimpiezaDeDataset } from '../../application/usecases/module_limpieza_calidad_datos/AplicarLimpiezaDeDataset';
+import { ConsultarBitacoraDeDataset } from '../../application/usecases/module_limpieza_calidad_datos/ConsultarBitacoraDeDataset';
+import { ListarDatasetsGenericos } from '../../application/usecases/module_carga_gestion_datasets/ListarDatasetsGenericos';
+import { ListarVersionesDeDataset } from '../../application/usecases/module_carga_gestion_datasets/ListarVersionesDeDataset';
+import { AbrirDatasetGenerico } from '../../application/usecases/module_carga_gestion_datasets/AbrirDatasetGenerico';
+import {
+  AplicarLimpiezaDeDatasetConAuditoria,
+  CorregirTipoDeVariableConAuditoria,
+  DefinirVariableObjetivoConAuditoria,
+  ExportarDatasetGenericoConAuditoria
+} from '../../application/usecases/module_seguridad_auditoria/decoradores/OperacionesDeDatasetGenericoConAuditoria';
 import { ConfigurarUmbralCritico } from '../../application/usecases/module_notificaciones_alertas/ConfigurarUmbralCritico';
 import { NotificarPlazosProximosAVencer } from '../../application/usecases/module_notificaciones_alertas/NotificarPlazosProximosAVencer';
 
@@ -303,14 +319,43 @@ export const container = {
   ),
   // RF-24 generalizado: exporta el dataset genérico persistido tal cual, sin
   // agrupar por severidad (eso sigue siendo exclusivo de exportarDatasetValidadoUseCase).
-  exportarDatasetGenericoUseCase: new ExportarDatasetGenerico(datasetGenericoRepository),
-  // RF-139 (M-09, pieza habilitadora): sin decorador de auditoría — mismo
-  // criterio que exportarDatasetGenericoUseCase (lectura/configuración, no
-  // una acción que el SDS pida auditar como sí pide RF-94 para escritura de
-  // vulnerabilidades).
+  // RF-138: la exportación es una de las operaciones sobre datasets que el
+  // requisito pide dejar en la auditoría central.
+  exportarDatasetGenericoUseCase: new ExportarDatasetGenericoConAuditoria(
+    new ExportarDatasetGenerico(datasetGenericoRepository),
+    auditoriaRepository
+  ),
+  // M-14, Ronda 2 (RF-108/110/111). Las dos que escriben (variable objetivo
+  // y corrección de tipo) van con auditoría; las dos de lectura, no.
+  evaluarSerieDeTiempoGenericoUseCase: new EvaluarSerieDeTiempoGenerico(sesionAnalisisStore),
+  sugerirVariableObjetivoUseCase: new SugerirVariableObjetivo(sesionAnalisisStore, datasetGenericoRepository),
+  definirVariableObjetivoUseCase: new DefinirVariableObjetivoConAuditoria(
+    new DefinirVariableObjetivo(sesionAnalisisStore, datasetGenericoRepository),
+    auditoriaRepository
+  ),
+  corregirTipoDeVariableUseCase: new CorregirTipoDeVariableConAuditoria(
+    new CorregirTipoDeVariable(sesionAnalisisStore, datasetGenericoRepository),
+    auditoriaRepository
+  ),
+  // M-15, Ronda 2 (RF-120 a RF-123). El decorador de la limpieza audita
+  // (RF-138) y emite la única notificación de resumen del proceso (RF-122).
+  proponerTratamientoDeFaltantesUseCase: new ProponerTratamientoDeFaltantes(sesionAnalisisStore),
+  aplicarLimpiezaDeDatasetUseCase: new AplicarLimpiezaDeDatasetConAuditoria(
+    new AplicarLimpiezaDeDataset(sesionAnalisisStore, datasetGenericoRepository),
+    auditoriaRepository,
+    servicioDeNotificaciones
+  ),
+  consultarBitacoraDeDatasetUseCase: new ConsultarBitacoraDeDataset(datasetGenericoRepository),
+  // RF-136 (M-12): consultar y recuperar versiones de un dataset.
+  listarDatasetsGenericosUseCase: new ListarDatasetsGenericos(datasetGenericoRepository),
+  listarVersionesDeDatasetUseCase: new ListarVersionesDeDataset(datasetGenericoRepository),
+  abrirDatasetGenericoUseCase: new AbrirDatasetGenerico(datasetGenericoRepository, sesionAnalisisStore),
+  // RF-139 (M-09, pieza habilitadora): sin decorador de auditoría — es
+  // configuración de cómo se lee el dataset, no una de las operaciones que
+  // enumera RF-138, y no es una escritura de vulnerabilidades (RF-94).
   configurarCriterioDeClasificacionUseCase: new ConfigurarCriterioDeClasificacion(datasetGenericoRepository),
   // RF-135 (M-12): sin decorador de auditoría — es una consulta de
-  // verificación, no una escritura (mismo criterio que exportarDatasetGenericoUseCase).
+  // verificación, no una escritura ni una de las operaciones de RF-138.
   verificarIntegridadDatasetUseCase: new VerificarIntegridadDataset(datasetGenericoRepository),
   // Fase 3: reciben sesionId en vez de un archivo — leen del mismo
   // sesionAnalisisStore que acaba de poblar analizarDatasetGenericoUseCase.

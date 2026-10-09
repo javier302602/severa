@@ -125,9 +125,11 @@ analisisDatasetAnalizarRouter.get('/analisis-datos/:datasetId/exportar', async (
   const analistaId = req.analistaAutenticado!.id;
 
   try {
-    const buffer = await container.exportarDatasetGenericoUseCase.ejecutar(req.params.datasetId, analistaId);
+    const exportado = await container.exportarDatasetGenericoUseCase.ejecutar(req.params.datasetId, analistaId);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.send(buffer);
+    // Nombre fijo y ASCII (no el del archivo del usuario): dice qué versión es.
+    res.setHeader('Content-Disposition', `attachment; filename="dataset-version-${exportado.version}.xlsx"`);
+    res.send(exportado.contenido);
   } catch (error) {
     if (error instanceof DatasetGenericoNoEncontradoError) {
       res.status(404).json({ error: error.message });

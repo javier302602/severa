@@ -174,14 +174,31 @@ describe('GET /analisis-datos/:datasetId/exportar — RF-24 generalizado', () =>
   const token = tokenPara('analista-A');
 
   test('exporta con éxito y responde con un .xlsx', async () => {
-    (container.exportarDatasetGenericoUseCase.ejecutar as jest.Mock).mockResolvedValueOnce(Buffer.from('PK-xlsx-fake'));
+    (container.exportarDatasetGenericoUseCase.ejecutar as jest.Mock).mockResolvedValueOnce({
+      contenido: Buffer.from('PK-xlsx-fake'),
+      datasetOriginalId: 'dataset-1',
+      nombreArchivo: 'ventas.xlsx',
+      version: 2,
+      totalFilas: 10
+    });
 
     const res = await conHttps(
-      request(app).get('/analisis-datos/dataset-1/exportar').set('Authorization', `Bearer ${token}`)
+      request(app)
+        .get('/analisis-datos/dataset-1/exportar')
+        .set('Authorization', `Bearer ${token}`)
+        .buffer(true)
+        .parse((respuesta, callback) => {
+          const partes: Buffer[] = [];
+          respuesta.on('data', (parte: Buffer) => partes.push(parte));
+          respuesta.on('end', () => callback(null, Buffer.concat(partes)));
+        })
     );
 
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    // RF-136: el nombre del archivo descargado dice qué versión es.
+    expect(res.headers['content-disposition']).toBe('attachment; filename="dataset-version-2.xlsx"');
+    expect((res.body as Buffer).toString()).toBe('PK-xlsx-fake');
     expect(container.exportarDatasetGenericoUseCase.ejecutar).toHaveBeenCalledWith('dataset-1', 'analista-A');
   });
 
