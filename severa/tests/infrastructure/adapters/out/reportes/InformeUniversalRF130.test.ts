@@ -8,6 +8,7 @@ import { IdentificadorCVE } from '../../../../../src/domain/shared/value-objects
 import { CvssScore } from '../../../../../src/domain/shared/value-objects/CvssScore';
 import { TipoAccesoValue } from '../../../../../src/domain/shared/value-objects/TipoAcceso';
 import { MAPEO_PLANTILLA_UNIVERSAL_RF130 } from '../../../../../src/domain/services/reportes/MapeoPlantillaUniversalRF130';
+import { interpretarOutliers } from '../../../../../src/domain/services/InterpretadorDeResultadosGenerico';
 
 // M-10 Ronda 2, Pasada 2-A (RF-130): InformeUniversalRF130.ts NO está
 // conectado al puerto público GeneradorDeInformes todavía — este archivo es
@@ -407,5 +408,66 @@ describe('InformeUniversalRF130 — Pasada 2-C (RF-130): secciones 2/17/18 (cont
 
     expect(texto).toContain('Limitaciones conocidas');
     datos.limitacionesConocidas.forEach((limitacion) => expect(texto).toContain(limitacion));
+  });
+});
+
+// Regresión detectada en la Pasada 2-D Paso 2: el cutover del pipeline
+// genérico (v3.11) retiró la sección "Valores atípicos (outliers)" del informe
+// viejo sin reubicarla — datos.outliers se calculaba y nadie lo dibujaba. Los
+// smoke tests de arriba no podían verlo (un PDF sin esa tabla sigue siendo un
+// PDF válido). Estos tests fijan que la tabla vive en §6 (Calidad de datos).
+describe('InformeUniversalRF130 — §6 genérico: tabla de valores atípicos (regresión del cutover v3.11)', () => {
+  let spyTexto: jest.SpyInstance;
+
+  beforeEach(() => {
+    (LayoutInformePdf.nuevaSeccion as jest.Mock).mockClear();
+    spyTexto = jest.spyOn(PDFDocument.prototype, 'text');
+  });
+
+  afterEach(() => {
+    spyTexto.mockRestore();
+  });
+
+  test('con un atípico real: §6 trae la subsección, la fila de la columna y el mismo cierre que interpretarOutliers', async () => {
+    const filas = [10, 11, 12, 11, 10, 12, 11, 10, 12, 11, 500].map((precio, indice) => ({ Producto: `P${indice}`, Precio: precio }));
+    const datos = recopilarDatosDeInformeDataset(['Producto', 'Precio'], filas, 'Analista de Prueba');
+    const columnaPrecio = datos.outliers.columnas.find((columna) => columna.columna === 'Precio');
+    expect(columnaPrecio?.cantidadValoresAtipicos).toBeGreaterThan(0);
+
+    await renderizarInformeUniversal({ pipeline: 'generico', datos });
+    const textos6 = textosPorSeccion(LayoutInformePdf.nuevaSeccion as jest.Mock, spyTexto)(6);
+
+    expect(textos6).toContain('Valores atípicos (outliers)');
+    expect(textos6).toContain('Cant. atípicos');
+    expect(textos6).toContain(columnaPrecio!.limiteSuperior.toFixed(2));
+    expect(textos6).toContain(String(columnaPrecio!.cantidadValoresAtipicos));
+    expect(textos6.some((texto) => texto.includes(interpretarOutliers(datos.outliers)))).toBe(true);
+  });
+
+  test('sin columnas numéricas: §6 lo dice en vez de dibujar una tabla vacía', async () => {
+    const datos = recopilarDatosDeInformeDataset(
+      ['Nombre', 'Ciudad'],
+      [
+        { Nombre: 'Ana', Ciudad: 'Lima' },
+        { Nombre: 'Luis', Ciudad: 'Cusco' },
+        { Nombre: 'Rosa', Ciudad: 'Lima' }
+      ],
+      'Analista de Prueba'
+    );
+    expect(datos.outliers.columnas).toHaveLength(0);
+
+    await renderizarInformeUniversal({ pipeline: 'generico', datos });
+    const textos6 = textosPorSeccion(LayoutInformePdf.nuevaSeccion as jest.Mock, spyTexto)(6);
+
+    expect(textos6).toContain('Valores atípicos (outliers)');
+    expect(textos6).toContain('No hay columnas numéricas para evaluar.');
+    expect(textos6).not.toContain('Cant. atípicos');
+  });
+
+  test('pipeline CVSS: §6 no gana una subsección de atípicos (esquema fijo, sin diagnóstico por columna)', async () => {
+    await renderizarInformeUniversal(await contextoCvss());
+    const textos6 = textosPorSeccion(LayoutInformePdf.nuevaSeccion as jest.Mock, spyTexto)(6);
+
+    expect(textos6).not.toContain('Valores atípicos (outliers)');
   });
 });

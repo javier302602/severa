@@ -66,7 +66,8 @@ export const MAPEO_PLANTILLA_UNIVERSAL_RF130: MapeoSeccionRF130[] = [
     numero: 6,
     nombreRF130: 'Calidad de datos',
     estado: 'cubierta',
-    cubiertaPor: ['% faltante = (valores faltantes de la columna / total de filas) × 100', 'Origen y calidad de los datos']
+    cubiertaPor: ['% faltante = (valores faltantes de la columna / total de filas) × 100', 'Origen y calidad de los datos', 'Valores atípicos (outliers)'],
+    nota: 'La tabla de valores atípicos por columna (informe genérico) vive acá como subsección: RF-130 no le da número propio y es un diagnóstico de calidad del dato, igual que faltantes y duplicados.'
   },
   {
     numero: 7,

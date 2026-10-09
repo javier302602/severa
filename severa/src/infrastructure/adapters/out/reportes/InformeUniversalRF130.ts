@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { DatosInforme, DatosInformeDataset } from '../../../../application/ports/out/reportes/GeneradorDeInformes';
 import { MAPEO_PLANTILLA_UNIVERSAL_RF130 } from '../../../../domain/services/reportes/MapeoPlantillaUniversalRF130';
-import { interpretarComposicionDataset, interpretarCorrelacionMasFuerte } from '../../../../domain/services/InterpretadorDeResultadosGenerico';
+import { interpretarComposicionDataset, interpretarCorrelacionMasFuerte, interpretarOutliers } from '../../../../domain/services/InterpretadorDeResultadosGenerico';
 import { detectarVocabularioDataset } from '../../../../domain/services/reportes/VocabularioDeDominioGenerico';
 import { interpretarDispersionCvssDias } from '../../../../domain/services/graphs/InterpretacionDeGraficos';
 import { formatearEstadistico } from '../../../../domain/services/inferential-statistics/ComparadorDeCategorias';
@@ -326,6 +326,17 @@ function dibujarSeccionTiposDeVariables(doc: PDFKit.PDFDocument, contexto: Conte
 // un esquema fijo). Genérico: cuerpo trasladado de dibujarCalidadDatosDataset
 // completo, sin recortar (ver nota sobre superposición con §7/§8 en el
 // resumen de la implementación).
+//
+// Regresión corregida (Pasada 2-D Paso 2): el cutover del pipeline genérico
+// (v3.11) retiró dibujarOutliersDataset ("8. Valores atípicos (outliers)" del
+// informe viejo de 10 secciones) sin darle un lugar entre las 20 de RF-130 —
+// datos.outliers se seguía calculando pero ningún renderer lo consumía; del
+// tema solo sobrevivía una oración suelta en §17. La tabla por columna
+// vuelve acá como subsección: los atípicos son un diagnóstico de calidad del
+// dato (mismo módulo M-15 que faltantes y duplicados), no una sección propia
+// de RF-130. La fórmula ahora nombra los dos criterios (RF-119: el conteo es
+// la unión de IQR y 3 desviaciones estándar), y el cierre reusa
+// interpretarOutliers en vez de la oración vieja, que solo hablaba de IQR.
 // ---------------------------------------------------------------------
 function dibujarSeccionCalidadDeDatos(doc: PDFKit.PDFDocument, contexto: ContextoInformeUniversal): void {
   switch (contexto.pipeline) {
@@ -378,6 +389,38 @@ function dibujarSeccionCalidadDeDatos(doc: PDFKit.PDFDocument, contexto: Context
               .map((columna) => `"${columna.nombre}" (${columna.valoresInconsistentes})`)
               .join(', ')}.`
       );
+
+      subseccion(doc, 'Valores atípicos (outliers)');
+      // Guion ASCII, no el signo menos U+2212: las fuentes estándar de pdfkit
+      // (WinAnsiEncoding) no lo tienen. "×" sí es WinAnsi-seguro.
+      formula(
+        doc,
+        'Atípico si valor < Q1 - 1.5×IQR o valor > Q3 + 1.5×IQR (IQR = Q3 - Q1), o si |valor - media| > 3×desviación estándar'
+      );
+      if (datos.outliers.columnasExcluidas.length > 0) {
+        parrafo(
+          doc,
+          `Columnas no evaluadas: ${datos.outliers.columnasExcluidas.map((columna) => `"${columna.nombre}" (${columna.motivo})`).join(', ')}.`
+        );
+      }
+      if (datos.outliers.columnas.length === 0) {
+        parrafo(doc, 'No hay columnas numéricas para evaluar.');
+        return;
+      }
+      dibujarTabla(
+        doc,
+        ['Columna', 'Q1', 'Q3', 'Límite inf. (IQR)', 'Límite sup. (IQR)', 'Cant. atípicos'],
+        datos.outliers.columnas.map((columna) => [
+          columna.columna,
+          columna.q1.toFixed(2),
+          columna.q3.toFixed(2),
+          columna.limiteInferior.toFixed(2),
+          columna.limiteSuperior.toFixed(2),
+          String(columna.cantidadValoresAtipicos)
+        ]),
+        [108, 60, 60, 85, 85, 70]
+      );
+      parrafo(doc, interpretarOutliers(datos.outliers));
       return;
     }
     default: {
