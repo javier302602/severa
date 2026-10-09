@@ -1,4 +1,5 @@
 import { SvgGraficosAdapter } from '../../../../../src/infrastructure/adapters/out/graphics/SvgGraficosAdapter';
+import sharp from 'sharp';
 
 // Bug real encontrado en vivo (auditoría de cierre de Mejora 4): GET
 // /graficos/:tipo devolvía SIEMPRE el mismo SVG placeholder — un rectángulo
@@ -135,64 +136,57 @@ describe('SvgGraficosAdapter — dibuja de verdad, no un placeholder fijo', () =
     expect(resultado).toEqual({ tipo: 'barras', datos });
   });
 
-  test('formato png/pdf sigue devolviendo el aviso de exportación pendiente (comportamiento preexistente, no debe romperse)', async () => {
-    const datosHistograma = { bins: [], media: 0, mediana: 0 };
-    const svgPng = (await adapter.renderizarHistograma(datosHistograma, 'png')) as string;
-    const svgPdf = (await adapter.renderizarHistograma(datosHistograma, 'pdf')) as string;
+  // RF-61: png y pdf son archivos reales. Antes los 6 métodos devolvían un
+  // SVG con el texto "Exportación pendiente" (y estos tests fijaban ese
+  // aviso); se reemplazan por la verificación de los archivos de verdad.
+  const FIRMA_PNG = '89504e470d0a1a0a';
+  const datosPorMetodo: Array<[string, (formato: 'png' | 'pdf' | 'svg') => Promise<unknown>]> = [
+    ['renderizarHistograma', (formato) => adapter.renderizarHistograma({ bins: [{ intervalo: '0-2', frecuencia: 3 }, { intervalo: '2-4', frecuencia: 5 }], media: 2.5, mediana: 2 }, formato, 'Histograma de CVSS', 'CVSS Score')],
+    ['renderizarBarras', (formato) => adapter.renderizarBarras([{ etiqueta: 'Crítica', valor: 5 }, { etiqueta: 'Alta', valor: 2 }], formato)],
+    ['renderizarPastel', (formato) => adapter.renderizarPastel([{ etiqueta: 'Crítica', valor: 5 }, { etiqueta: 'Baja', valor: 1 }], formato)],
+    ['renderizarBoxplot', (formato) => adapter.renderizarBoxplot({ minimo: 0, q1: 2, mediana: 5, q3: 8, maximo: 10, media: 5 }, formato)],
+    ['renderizarDispersion', (formato) => adapter.renderizarDispersion({ puntos: [{ x: 1, y: 2 }, { x: 3, y: 9 }, { x: 5, y: 4 }], correlacion: 0.5 }, formato)],
+    ['renderizarBarrasHorizontales', (formato) => adapter.renderizarBarrasHorizontales([{ etiqueta: 'Apache Log4j', valor: 12 }, { etiqueta: 'OpenSSL', valor: 7 }], formato)]
+  ];
 
-    expect(svgPng).toContain('PNG');
-    expect(svgPdf).toContain('PDF');
-    expect(svgPng).toContain('pendiente');
+  test.each(datosPorMetodo)('%s: formato png devuelve un PNG real a 300 dpi, del mismo gráfico que el SVG', async (_metodo, renderizar) => {
+    const png = (await renderizar('png')) as Buffer;
+
+    expect(Buffer.isBuffer(png)).toBe(true);
+    expect(png.subarray(0, 8).toString('hex')).toBe(FIRMA_PNG);
+    const metadatos = await sharp(png).metadata();
+    expect(metadatos.density).toBe(300);
+    // El SVG mide 460 unidades de ancho a 72 por pulgada: a 300 dpi son 1917 px.
+    expect(metadatos.width).toBe(Math.round((460 * 300) / 72));
+    // No es una imagen en blanco: tiene más de un color.
+    const { channels } = await sharp(png).stats();
+    expect(channels.some((canal) => canal.stdev > 1)).toBe(true);
   });
 
-  // RF-61 (diferido, ver nota en SvgGraficosAdapter.ts): el placeholder de
-  // formato png/pdf antes solo estaba probado para renderizarHistograma —
-  // se ejercitan acá los otros 5 métodos, uno por uno, para no dejar
-  // ninguno sin cubrir.
-  test('renderizarBarras: formato png/pdf devuelve el aviso pendiente', async () => {
-    const datos = [{ etiqueta: 'Crítica', valor: 5 }];
-    const svgPng = (await adapter.renderizarBarras(datos, 'png')) as string;
-    const svgPdf = (await adapter.renderizarBarras(datos, 'pdf')) as string;
+  test.each(datosPorMetodo)('%s: formato pdf devuelve un PDF real de una sola página', async (_metodo, renderizar) => {
+    const pdf = (await renderizar('pdf')) as Buffer;
 
-    expect(svgPng).toContain('PNG');
-    expect(svgPdf).toContain('PDF');
-    expect(svgPng).toContain('pendiente');
+    expect(Buffer.isBuffer(pdf)).toBe(true);
+    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+    expect((pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length).toBe(1);
   });
 
-  test('renderizarPastel: formato png/pdf devuelve el aviso pendiente', async () => {
-    const datos = [{ etiqueta: 'Crítica', valor: 5 }];
-    const svgPng = (await adapter.renderizarPastel(datos, 'png')) as string;
-    const svgPdf = (await adapter.renderizarPastel(datos, 'pdf')) as string;
-
-    expect(svgPng).toContain('PNG');
-    expect(svgPdf).toContain('PDF');
+  test('png y pdf ya no son el aviso de "exportación pendiente"', async () => {
+    for (const [, renderizar] of datosPorMetodo) {
+      const png = (await renderizar('png')) as Buffer;
+      const pdf = (await renderizar('pdf')) as Buffer;
+      expect(png.toString('latin1')).not.toContain('pendiente');
+      expect(pdf.toString('latin1')).not.toContain('pendiente');
+    }
   });
 
-  test('renderizarBoxplot: formato png/pdf devuelve el aviso pendiente', async () => {
-    const resumen = { minimo: 0, q1: 2, mediana: 5, q3: 8, maximo: 10, media: 5 };
-    const svgPng = (await adapter.renderizarBoxplot(resumen, 'png')) as string;
-    const svgPdf = (await adapter.renderizarBoxplot(resumen, 'pdf')) as string;
+  test('el PDF de un Top 10 es más alto que el de un boxplot: la página se ajusta al gráfico', async () => {
+    const altoDePagina = (pdf: Buffer) => Number(/\/MediaBox\s*\[\s*0\s+0\s+[\d.]+\s+([\d.]+)\s*\]/.exec(pdf.toString('latin1'))?.[1]);
+    const top = (await adapter.renderizarBarrasHorizontales(Array.from({ length: 10 }, (_, i) => ({ etiqueta: `Software ${i}`, valor: 10 - i })), 'pdf')) as Buffer;
+    const boxplot = (await adapter.renderizarBoxplot({ minimo: 0, q1: 2, mediana: 5, q3: 8, maximo: 10, media: 5 }, 'pdf')) as Buffer;
 
-    expect(svgPng).toContain('PNG');
-    expect(svgPdf).toContain('PDF');
-  });
-
-  test('renderizarDispersion: formato png/pdf devuelve el aviso pendiente', async () => {
-    const datos = { puntos: [{ x: 1, y: 2 }], correlacion: 0.5 };
-    const svgPng = (await adapter.renderizarDispersion(datos, 'png')) as string;
-    const svgPdf = (await adapter.renderizarDispersion(datos, 'pdf')) as string;
-
-    expect(svgPng).toContain('PNG');
-    expect(svgPdf).toContain('PDF');
-  });
-
-  test('renderizarBarrasHorizontales: formato png/pdf devuelve el aviso pendiente', async () => {
-    const datos = [{ etiqueta: 'Apache Log4j', valor: 12 }];
-    const svgPng = (await adapter.renderizarBarrasHorizontales(datos, 'png')) as string;
-    const svgPdf = (await adapter.renderizarBarrasHorizontales(datos, 'pdf')) as string;
-
-    expect(svgPng).toContain('PNG');
-    expect(svgPdf).toContain('PDF');
+    expect(altoDePagina(top)).toBeGreaterThan(altoDePagina(boxplot));
+    expect(altoDePagina(boxplot)).toBeLessThan(400);
   });
 
   test('formato json de los 5 métodos restantes sigue siendo el passthrough {tipo, datos} tal cual (comportamiento preexistente)', async () => {

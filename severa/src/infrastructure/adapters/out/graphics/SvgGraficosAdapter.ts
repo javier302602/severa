@@ -1,6 +1,15 @@
 import { GraficosOutputPort } from '../../../../application/ports/out/graphics/GraficosOutputPort';
 import { DatoBarra, ResumenCincoNumeros, PuntoDispersion } from '../../../../domain/services/graphs/GeometriaDeGraficos';
 import { dibujarBarras, dibujarBarrasHorizontales, dibujarBoxplot, dibujarDispersion, dibujarHistograma, dibujarPastel } from './SvgDibujoDeGraficos';
+import {
+  dibujarBarras as dibujarBarrasPdf,
+  dibujarBarrasHorizontales as dibujarBarrasHorizontalesPdf,
+  dibujarBoxplot as dibujarBoxplotPdf,
+  dibujarDispersion as dibujarDispersionPdf,
+  dibujarHistograma as dibujarHistogramaPdf,
+  dibujarPastel as dibujarPastelPdf
+} from '../reportes/DibujoDeGraficosPdf';
+import { exportarGraficoComoPng, exportarGraficoComoPdf, DibujoEnPdf } from './ExportadorDeGraficos';
 
 interface DatosHistograma {
   bins: Array<{ intervalo: string; frecuencia: number }>;
@@ -43,11 +52,13 @@ export class SvgGraficosAdapter implements GraficosOutputPort {
     etiquetaEjeX?: string
   ): Promise<unknown> {
     if (formato === 'json') return { tipo: 'histograma', datos };
-    if (formato === 'png' || formato === 'pdf') {
-      return this.generarSvgPendiente(formato, titulo);
-    }
     const { bins, media, mediana } = datos as DatosHistograma;
-    return dibujarHistograma(bins, media, mediana, { titulo, etiquetaEjeX, etiquetaEjeY: 'Frecuencia' });
+    const opciones = { titulo, etiquetaEjeX, etiquetaEjeY: 'Frecuencia' };
+    return this.entregar(
+      formato,
+      () => dibujarHistograma(bins, media, mediana, opciones),
+      (doc) => dibujarHistogramaPdf(doc, bins, media, mediana, opciones)
+    );
   }
 
   // Bug real #3 (reportado con capturas junto a los ticks numéricos
@@ -64,35 +75,42 @@ export class SvgGraficosAdapter implements GraficosOutputPort {
     etiquetaEjeX?: string
   ): Promise<unknown> {
     if (formato === 'json') return { tipo: 'barras', datos };
-    if (formato === 'png' || formato === 'pdf') {
-      return this.generarSvgPendiente(formato, titulo);
-    }
-    return dibujarBarras(datos as DatoBarra[], { titulo, etiquetaEjeX, etiquetaEjeY });
+    const opciones = { titulo, etiquetaEjeX, etiquetaEjeY };
+    return this.entregar(
+      formato,
+      () => dibujarBarras(datos as DatoBarra[], opciones),
+      (doc) => dibujarBarrasPdf(doc, datos as DatoBarra[], opciones)
+    );
   }
 
   async renderizarPastel(datos: unknown, formato: 'svg' | 'json' | 'png' | 'pdf', titulo = 'Pastel'): Promise<unknown> {
     if (formato === 'json') return { tipo: 'pastel', datos };
-    if (formato === 'png' || formato === 'pdf') {
-      return this.generarSvgPendiente(formato, titulo);
-    }
-    return dibujarPastel(datos as DatoBarra[], { titulo });
+    return this.entregar(
+      formato,
+      () => dibujarPastel(datos as DatoBarra[], { titulo }),
+      (doc) => dibujarPastelPdf(doc, datos as DatoBarra[], { titulo })
+    );
   }
 
   async renderizarBoxplot(datos: unknown, formato: 'svg' | 'json' | 'png' | 'pdf', titulo = 'Boxplot'): Promise<unknown> {
     if (formato === 'json') return { tipo: 'boxplot', datos };
-    if (formato === 'png' || formato === 'pdf') {
-      return this.generarSvgPendiente(formato, titulo);
-    }
-    return dibujarBoxplot(datos as ResumenCincoNumeros, { titulo, etiquetaEjeY: 'CVSS Score' });
+    const opciones = { titulo, etiquetaEjeY: 'CVSS Score' };
+    return this.entregar(
+      formato,
+      () => dibujarBoxplot(datos as ResumenCincoNumeros, opciones),
+      (doc) => dibujarBoxplotPdf(doc, datos as ResumenCincoNumeros, opciones)
+    );
   }
 
   async renderizarDispersion(datos: unknown, formato: 'svg' | 'json' | 'png' | 'pdf', titulo = 'Dispersión'): Promise<unknown> {
     if (formato === 'json') return { tipo: 'dispersion', datos };
-    if (formato === 'png' || formato === 'pdf') {
-      return this.generarSvgPendiente(formato, titulo);
-    }
     const { puntos, correlacion } = datos as DatosDispersion;
-    return dibujarDispersion(puntos, correlacion, { titulo, etiquetaEjeX: 'CVSS Score', etiquetaEjeY: 'Días para parche' });
+    const opciones = { titulo, etiquetaEjeX: 'CVSS Score', etiquetaEjeY: 'Días para parche' };
+    return this.entregar(
+      formato,
+      () => dibujarDispersion(puntos, correlacion, opciones),
+      (doc) => dibujarDispersionPdf(doc, puntos, correlacion, opciones)
+    );
   }
 
   async renderizarBarrasHorizontales(
@@ -102,18 +120,27 @@ export class SvgGraficosAdapter implements GraficosOutputPort {
     etiquetaEjeX = 'Cantidad'
   ): Promise<unknown> {
     if (formato === 'json') return { tipo: 'barrasHorizontales', datos };
-    if (formato === 'png' || formato === 'pdf') {
-      return this.generarSvgPendiente(formato, titulo);
-    }
-    return dibujarBarrasHorizontales(datos as DatoBarra[], { titulo, etiquetaEjeX });
+    const opciones = { titulo, etiquetaEjeX };
+    return this.entregar(
+      formato,
+      () => dibujarBarrasHorizontales(datos as DatoBarra[], opciones),
+      (doc) => dibujarBarrasHorizontalesPdf(doc, datos as DatoBarra[], opciones)
+    );
   }
 
-  // RF-61: la conversión real a PNG/PDF sigue sin implementar (decisión
-  // confirmada: no se agrega una librería de rasterizado SVG→PNG/PDF solo
-  // para esto) — el modo SVG en pantalla, que es el que de verdad usa
-  // GraficosPage.tsx, es el que se arregla acá.
-  // Diferido — decisión de arquitectura, ver auditoría SDS M-07.
-  private generarSvgPendiente(formato: 'png' | 'pdf', titulo: string): string {
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200"><rect width="400" height="200" fill="#fff"/><text x="20" y="30">${titulo}</text><text x="20" y="60">Exportación ${formato.toUpperCase()} pendiente de decidir librería de conversión SVG→${formato.toUpperCase()}.</text></svg>`;
+  // RF-61: un mismo gráfico en los tres formatos de salida. SVG es el de la
+  // pantalla; PNG y PDF son las descargas "para usar en presentaciones":
+  //   - PNG: el mismo SVG rasterizado a 300 dpi;
+  //   - PDF: vectorial, dibujado con las funciones que ya usa el informe
+  //     (DibujoDeGraficosPdf.ts) sobre la misma geometría — no una imagen
+  //     pegada en una página.
+  // Durante mucho tiempo png/pdf devolvieron un SVG con el texto "Exportación
+  // pendiente": la decisión era no agregar una librería de rasterizado solo
+  // para esto. Esa librería (sharp) entró después por el informe Word, así
+  // que el motivo dejó de existir.
+  private async entregar(formato: 'svg' | 'png' | 'pdf', dibujarSvg: () => string, dibujarEnPdf: DibujoEnPdf): Promise<string | Buffer> {
+    if (formato === 'png') return exportarGraficoComoPng(dibujarSvg());
+    if (formato === 'pdf') return exportarGraficoComoPdf(dibujarEnPdf);
+    return dibujarSvg();
   }
 }

@@ -66,14 +66,16 @@ describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () =
     expect(resultado).toEqual({ tipo: 'barras', datos: [] });
   });
 
-  test('formato png: sigue devolviendo el string del adapter sin envolver (comportamiento preexistente)', async () => {
+  test.each(['png', 'pdf'] as const)('formato %s (RF-61): devuelve el archivo del adapter tal cual, sin envolverlo con la interpretación', async (formato) => {
+    const archivo = Buffer.from('archivo-binario');
     const port = graficosOutputPortFalso();
-    port.renderizarBarras.mockResolvedValue('<svg>pendiente PNG</svg>');
+    port.renderizarBarras.mockResolvedValue(archivo);
     const useCase = new GenerarGrafico(repoFalso(dataset), port);
 
-    const resultado = await useCase.ejecutar('barrasSeveridad', 'analista-1', { formato: 'png' });
+    const resultado = await useCase.ejecutar('barrasSeveridad', 'analista-1', { formato });
 
-    expect(resultado).toBe('<svg>pendiente PNG</svg>');
+    expect(resultado).toBe(archivo);
+    expect(port.renderizarBarras).toHaveBeenCalledWith(expect.anything(), formato, expect.any(String), expect.any(String), expect.any(String));
   });
 
   test('boxplotCvss: la interpretación usa el resumen de cinco números real, no un valor fijo', async () => {

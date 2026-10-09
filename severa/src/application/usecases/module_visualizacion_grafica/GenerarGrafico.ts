@@ -221,12 +221,11 @@ export class GenerarGrafico implements GenerarGraficoUseCase {
   }
 
   // Mejora "interpretación en prosa en la página de Gráficos": solo el
-  // formato 'svg' (el único que de verdad usa GraficosPage.tsx — ver
-  // graficoService.ts) se envuelve con el texto de análisis, así que el
-  // body pasa de ser el string SVG a ser {svg, interpretacion}. Los
-  // formatos 'json'/'png'/'pdf' quedan exactamente como estaban (json seguía
-  // siendo un passthrough {tipo, datos}; png/pdf el aviso de exportación
-  // pendiente) — no hay motivo para tocar esos formatos hoy.
+  // formato 'svg' (el que muestra GraficosPage.tsx — ver graficoService.ts)
+  // se envuelve con el texto de análisis, así que el body pasa de ser el
+  // string SVG a ser {svg, interpretacion}. 'json' es un passthrough
+  // {tipo, datos}; 'png'/'pdf' (RF-61) son el archivo binario tal cual lo
+  // entrega el adaptador, sin envolver.
   private envolver(formato: string, resultado: unknown, interpretar: () => string): unknown {
     if (formato !== 'svg') {
       return resultado;

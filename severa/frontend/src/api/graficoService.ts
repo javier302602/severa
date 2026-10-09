@@ -25,10 +25,18 @@ export interface GraficoConInterpretacion {
   interpretacion: string;
 }
 
+// RF-61: formatos de descarga de un gráfico suelto. El SVG no pasa por acá:
+// la pantalla ya lo tiene (es lo que muestra) y se guarda tal cual.
+export type FormatoDescargaGrafico = 'png' | 'pdf';
+
 export const graficoService = {
-  // Sin `formato`: el backend por defecto devuelve SVG. PNG/PDF existen como
-  // query param pero no están realmente implementados del lado del backend
-  // (X-Formato-Real: svg, ver GraficoController.ts) — no se ofrecen acá.
+  // Sin `formato`: el backend devuelve el SVG envuelto en JSON, que es lo
+  // que muestra la pantalla.
   obtener: (tipo: TipoGrafico, limite?: number, signal?: AbortSignal): Promise<GraficoConInterpretacion> =>
-    httpClient.get(`/graficos/${tipo}`, { limite }, signal)
+    httpClient.get(`/graficos/${tipo}`, { limite }, signal),
+  // Contrato verificado contra GraficoController.ts: con formato=png|pdf el
+  // cuerpo es el archivo binario (image/png a 300 dpi, o application/pdf
+  // vectorial) — httpClient lo entrega como Blob.
+  descargar: (tipo: TipoGrafico, formato: FormatoDescargaGrafico, limite?: number): Promise<Blob> =>
+    httpClient.get(`/graficos/${tipo}`, { formato, limite })
 };

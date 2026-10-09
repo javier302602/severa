@@ -10,9 +10,12 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => (
       // { svg, interpretacion } desde GenerarGrafico.ts — mismo mock que la
       // forma real, no la vieja (string crudo), para que este test siga
       // probando el contrato verdadero.
-      ejecutar: jest.fn(async (_tipo: string, opciones: { formato?: string }) => {
+      // Misma firma que el caso de uso real: (tipo, analistaId, opciones). El
+      // mock anterior leía `formato` del segundo argumento (el id del
+      // analista), así que siempre respondía como si se hubiera pedido svg.
+      ejecutar: jest.fn(async (_tipo: string, _analistaId: string, opciones: { formato?: string }) => {
         if (opciones.formato === 'json') return { tipo: 'histograma', datos: [] };
-        if (opciones.formato === 'png' || opciones.formato === 'pdf') return '<svg xmlns="http://www.w3.org/2000/svg"></svg>';
+        if (opciones.formato === 'png' || opciones.formato === 'pdf') return Buffer.from(`archivo-${opciones.formato}`);
         return { svg: '<svg xmlns="http://www.w3.org/2000/svg"></svg>', interpretacion: 'Texto de análisis de prueba.' };
       })
     }
@@ -32,34 +35,28 @@ function conHttps(req: request.Test): request.Test {
   return req.set('x-forwarded-proto', 'https');
 }
 
-describe('GraficoController — header X-Formato-Real (RF-61)', () => {
+describe('GraficoController — formatos de salida (RF-61)', () => {
   const token = tokenPara('analista-A');
 
-  test.each(['png', 'pdf'])('?formato=%s trae X-Formato-Real: svg porque la conversión no está implementada', async (formato) => {
+  test.each([
+    ['png', 'image/png'],
+    ['pdf', 'application/pdf']
+  ])('?formato=%s: sirve el archivo binario con su tipo real y como descarga con nombre', async (formato, tipoMime) => {
     const res = await conHttps(
       request(app).get(`/graficos/histogramaCvss?formato=${formato}`).set('Authorization', `Bearer ${token}`)
-    );
+    )
+      .buffer(true)
+      .parse((respuesta, callback) => {
+        const partes: Buffer[] = [];
+        respuesta.on('data', (parte: Buffer) => partes.push(parte));
+        respuesta.on('end', () => callback(null, Buffer.concat(partes)));
+      });
 
     expect(res.status).toBe(200);
-    expect(res.headers['x-formato-real']).toBe('svg');
-    expect(res.headers['content-type']).toContain('image/svg+xml');
-  });
-
-  test('sin query param "formato" (svg por defecto) NO trae X-Formato-Real: lo pedido y lo entregado ya coinciden', async () => {
-    const res = await conHttps(
-      request(app).get('/graficos/histogramaCvss').set('Authorization', `Bearer ${token}`)
-    );
-
-    expect(res.status).toBe(200);
-    expect(res.headers['x-formato-real']).toBeUndefined();
-  });
-
-  test('?formato=svg explícito tampoco trae X-Formato-Real', async () => {
-    const res = await conHttps(
-      request(app).get('/graficos/histogramaCvss?formato=svg').set('Authorization', `Bearer ${token}`)
-    );
-
-    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toBe(tipoMime);
+    expect(res.headers['content-disposition']).toBe(`attachment; filename="histogramaCvss.${formato}"`);
+    expect((res.body as Buffer).toString()).toBe(`archivo-${formato}`);
+    // El aviso de "se pidió png pero se entregó svg" ya no existe: se entrega lo pedido.
     expect(res.headers['x-formato-real']).toBeUndefined();
   });
 
@@ -74,13 +71,14 @@ describe('GraficoController — header X-Formato-Real (RF-61)', () => {
     expect(res.body.interpretacion).toBe('Texto de análisis de prueba.');
   });
 
-  test('?formato=json tampoco trae X-Formato-Real (json sí se entrega tal cual se pide)', async () => {
+  test('?formato=json devuelve JSON', async () => {
     const res = await conHttps(
       request(app).get('/graficos/histogramaCvss?formato=json').set('Authorization', `Bearer ${token}`)
     );
 
     expect(res.status).toBe(200);
-    expect(res.headers['x-formato-real']).toBeUndefined();
+    expect(res.headers['content-type']).toContain('application/json');
+    expect(res.body).toEqual({ tipo: 'histograma', datos: [] });
   });
 });
 

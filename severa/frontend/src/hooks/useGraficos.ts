@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { graficoService, type TipoGrafico } from '../api/graficoService';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { graficoService, type FormatoDescargaGrafico, type TipoGrafico } from '../api/graficoService';
 
 // Bug real reportado: un gráfico que fallaba solo mostraba "Failed to fetch"
 // genérico, y uno que no respondía se quedaba cargando indefinidamente.
@@ -27,5 +27,12 @@ export function useGrafico(tipo: TipoGrafico, limite?: number) {
         throw error;
       }
     }
+  });
+}
+
+// RF-61: descarga del gráfico en PNG (300 dpi) o PDF (vectorial).
+export function useDescargarGrafico(tipo: TipoGrafico, limite?: number) {
+  return useMutation({
+    mutationFn: (formato: FormatoDescargaGrafico) => graficoService.descargar(tipo, formato, limite)
   });
 }

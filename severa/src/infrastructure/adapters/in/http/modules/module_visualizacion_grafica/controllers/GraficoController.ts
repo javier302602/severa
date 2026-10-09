@@ -36,22 +36,20 @@ graficoRouter.get('/:tipo', async (req, res) => {
       variableValor
     });
 
-    // RF-61: la conversión real a PNG/PDF no está implementada (ver
-    // SvgGraficosAdapter.generarSvgPendiente) — el Content-Type SIEMPRE
-    // refleja lo que de verdad se envía (svg), nunca lo que se pidió, para no
-    // prometer un formato que no se entrega. Cuando el cliente pidió png/pdf,
-    // se avisa explícitamente por header en vez de dejar que lo descubra
-    // comparando el Content-Type con su propio query param.
+    // RF-61: png y pdf son descargas — el cuerpo es el archivo binario, con
+    // su tipo real y un nombre de archivo (el tipo de gráfico ya pasó por el
+    // switch del caso de uso, así que acá es una de las 10 claves fijas).
     if (formato === 'png' || formato === 'pdf') {
-      res.set('X-Formato-Real', 'svg');
+      res.setHeader('Content-Type', formato === 'png' ? 'image/png' : 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${tipo}.${formato}"`);
+      res.send(resultado);
+      return;
     }
     // Mejora "interpretación en prosa en Gráficos": formato 'svg' (el que
-    // de verdad usa la página web) ya no manda el SVG crudo como body —
-    // GenerarGrafico.ts lo envuelve en { svg, interpretacion }, así que el
-    // body pasa a ser JSON. 'json' ya era un objeto (passthrough
-    // {tipo, datos}); png/pdf siguen siendo el SVG de aviso tal cual.
-    res.type(formato === 'png' || formato === 'pdf' ? 'image/svg+xml' : 'application/json');
-    res.send(resultado);
+    // usa la página web) no manda el SVG crudo como body — GenerarGrafico.ts
+    // lo envuelve en { svg, interpretacion }, así que el body es JSON. 'json'
+    // ya era un objeto (passthrough {tipo, datos}).
+    res.json(resultado);
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : 'Error desconocido' });
   }

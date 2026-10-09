@@ -4,6 +4,8 @@ import { TarjetaGrafico } from '../../../src/components/graficos/TarjetaGrafico'
 import { graficoService } from '../../../src/api/graficoService';
 import { HttpError } from '../../../src/api/httpClient';
 import { EnvoltorioQuery } from '../../testUtils';
+import userEvent from '@testing-library/user-event';
+import { descargarArchivo } from '../../../src/utils/descargarArchivo';
 
 // Componente más directamente relacionado con el bug real encontrado en
 // vivo (SvgGraficosAdapter.ts devolvía siempre el mismo placeholder): este
@@ -13,8 +15,10 @@ import { EnvoltorioQuery } from '../../testUtils';
 // devuelve el SVG crudo como string, sino { svg, interpretacion } (Mejora
 // "interpretación en prosa en Gráficos").
 vi.mock('../../../src/api/graficoService', () => ({
-  graficoService: { obtener: vi.fn() }
+  graficoService: { obtener: vi.fn(), descargar: vi.fn() }
 }));
+
+vi.mock('../../../src/utils/descargarArchivo', () => ({ descargarArchivo: vi.fn() }));
 
 describe('TarjetaGrafico', () => {
   afterEach(() => {
@@ -78,5 +82,52 @@ describe('TarjetaGrafico', () => {
 
     expect(screen.getByText('Top 10 software')).toBeInTheDocument();
     await waitFor(() => expect(graficoService.obtener).toHaveBeenCalledWith('topSoftware', 10, expect.any(AbortSignal)));
+  });
+
+  // RF-61: descarga del gráfico suelto.
+  describe('descarga (RF-61)', () => {
+    const SVG = '<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10" /></svg>';
+
+    test.each(['png', 'pdf'] as const)('%s: pide ese formato al backend y guarda el archivo con el nombre del gráfico', async (formato) => {
+      const blob = new Blob(['archivo']);
+      vi.mocked(graficoService.obtener).mockResolvedValue({ svg: SVG, interpretacion: 'x' });
+      vi.mocked(graficoService.descargar).mockResolvedValue(blob);
+
+      render(<TarjetaGrafico tipo="topSoftware" titulo="Top 10 software" limite={10} />, { wrapper: EnvoltorioQuery });
+      await userEvent.click(await screen.findByRole('button', { name: formato.toUpperCase() }));
+
+      await waitFor(() => expect(descargarArchivo).toHaveBeenCalledWith(blob, `topSoftware.${formato}`));
+      expect(graficoService.descargar).toHaveBeenCalledWith('topSoftware', formato, 10);
+    });
+
+    test('svg: guarda el mismo SVG que está en pantalla, sin volver a pedirlo', async () => {
+      vi.mocked(graficoService.obtener).mockResolvedValue({ svg: SVG, interpretacion: 'x' });
+
+      render(<TarjetaGrafico tipo="boxplotCvss" titulo="Boxplot" />, { wrapper: EnvoltorioQuery });
+      await userEvent.click(await screen.findByRole('button', { name: 'SVG' }));
+
+      expect(descargarArchivo).toHaveBeenCalledWith(SVG, 'boxplotCvss.svg', 'image/svg+xml');
+      expect(graficoService.descargar).not.toHaveBeenCalled();
+    });
+
+    test('si la descarga falla, lo dice en la tarjeta y el gráfico sigue visible', async () => {
+      vi.mocked(graficoService.obtener).mockResolvedValue({ svg: SVG, interpretacion: 'Análisis.' });
+      vi.mocked(graficoService.descargar).mockRejectedValue(new HttpError(500, 'Error interno'));
+
+      render(<TarjetaGrafico tipo="boxplotCvss" titulo="Boxplot" />, { wrapper: EnvoltorioQuery });
+      await userEvent.click(await screen.findByRole('button', { name: 'PDF' }));
+
+      expect(await screen.findByText(/No se pudo descargar/)).toBeInTheDocument();
+      expect(screen.getByText('Análisis.')).toBeInTheDocument();
+      expect(descargarArchivo).not.toHaveBeenCalled();
+    });
+
+    test('sin gráfico (cargando o con error) no se ofrecen descargas', () => {
+      vi.mocked(graficoService.obtener).mockReturnValue(new Promise(() => {}));
+
+      render(<TarjetaGrafico tipo="boxplotCvss" titulo="Boxplot" />, { wrapper: EnvoltorioQuery });
+
+      expect(screen.queryByRole('button', { name: 'PNG' })).toBeNull();
+    });
   });
 });
