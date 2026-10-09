@@ -387,8 +387,8 @@ export interface GeometriaHeatmap {
 
 // Grilla cuadrada N×N: cada celda es un cuadrado de lado `tamanoCelda`, sin
 // escala de valor (a diferencia de barras/boxplot, acá el valor se codifica
-// en el COLOR de la celda, no en su tamaño — ver colorDivergente en
-// DibujoDeGraficosPdf.ts). `valor: null` (par de columnas sin datos
+// en el COLOR de la celda, no en su tamaño — ver colorDivergenteCorrelacion
+// más abajo). `valor: null` (par de columnas sin datos
 // suficientes en común, ver CorrelacionGenerico.ts) se posiciona igual que
 // cualquier otra celda; es el renderer quien decide cómo pintarla.
 export function calcularGeometriaHeatmap(valores: Array<Array<number | null>>, lienzo: Lienzo): GeometriaHeatmap {
@@ -412,6 +412,32 @@ export function calcularGeometriaHeatmap(valores: Array<Array<number | null>>, l
   }
 
   return { celdas, area, tamanoCelda };
+}
+
+// Escala divergente del heatmap de correlación: azul (-1) — blanco (0) —
+// rojo (+1). Vivía privada en DibujoDeGraficosPdf.ts (Fase 5 de Mejora 4);
+// se movió acá, sin cambiar un solo valor, en la Pasada 2-D Paso 2 de M-10
+// (RF-130), cuando el informe Word genérico pasó a incrustar el heatmap como
+// imagen (SvgDibujoDeGraficos.dibujarHeatmap): es una función pura de
+// "valor -> color", igual de independiente del renderer que el resto de este
+// archivo, y dos renderers con dos copias de la misma escala terminan
+// divergiendo. Hex directo (no "rgb(r,g,b)"): es el formato que ya usan tanto
+// pdfkit como el marcado SVG de este proyecto.
+function aComponenteHex(valor: number): string {
+  return Math.max(0, Math.min(255, Math.round(valor))).toString(16).padStart(2, '0');
+}
+
+export function colorDivergenteCorrelacion(valor: number): string {
+  const t = Math.max(-1, Math.min(1, valor));
+  const interpolar = (de: number, a: number, f: number) => de + (a - de) * f;
+
+  // t>=0: blanco -> rojo. t<0: blanco -> azul.
+  const [rDestino, gDestino, bDestino] = t >= 0 ? [220, 38, 38] : [30, 64, 175];
+  const f = Math.abs(t);
+  const r = interpolar(255, rDestino, f);
+  const g = interpolar(255, gDestino, f);
+  const b = interpolar(255, bDestino, f);
+  return `#${aComponenteHex(r)}${aComponenteHex(g)}${aComponenteHex(b)}`;
 }
 
 // Convierte un ángulo (grados, 0 = arriba, sentido horario) a un punto sobre

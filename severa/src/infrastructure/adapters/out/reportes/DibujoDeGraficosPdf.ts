@@ -5,6 +5,7 @@ import {
   calcularGeometriaDispersion,
   calcularGeometriaPastel,
   calcularGeometriaHeatmap,
+  colorDivergenteCorrelacion,
   puntoEnCirculo,
   type DatoBarra,
   type ResumenCincoNumeros,
@@ -390,26 +391,9 @@ export function dibujarDispersion(
 
 // Mejora 4 (Análisis de Datos General) — Fase 5. Heatmap de la matriz de
 // correlación: escala divergente azul (-1) — blanco (0) — rojo (+1), mismo
-// criterio de "color con significado" que COLORES_SEVERIDAD más abajo.
-// Hex directo (no "rgb(r,g,b)"): es el formato que pdfkit ya usa en todo
-// este archivo, sin depender de que soporte otra sintaxis de color.
-function aComponenteHex(valor: number): string {
-  return Math.max(0, Math.min(255, Math.round(valor))).toString(16).padStart(2, '0');
-}
-
-function colorDivergente(valor: number): string {
-  const t = Math.max(-1, Math.min(1, valor));
-  const interpolar = (de: number, a: number, f: number) => de + (a - de) * f;
-
-  // t>=0: blanco -> rojo. t<0: blanco -> azul.
-  const [rDestino, gDestino, bDestino] = t >= 0 ? [220, 38, 38] : [30, 64, 175];
-  const f = Math.abs(t);
-  const r = interpolar(255, rDestino, f);
-  const g = interpolar(255, gDestino, f);
-  const b = interpolar(255, bDestino, f);
-  return `#${aComponenteHex(r)}${aComponenteHex(g)}${aComponenteHex(b)}`;
-}
-
+// criterio de "color con significado" que COLORES_SEVERIDAD más abajo. La
+// escala en sí (colorDivergenteCorrelacion) vive en GeometriaDeGraficos.ts
+// desde que el renderer SVG también la necesita (informe Word genérico).
 const ANCHO_ETIQUETAS_HEATMAP = 75;
 const LARGO_MAXIMO_ETIQUETA_HEATMAP = 11;
 
@@ -434,7 +418,7 @@ export function dibujarHeatmap(doc: PDFKit.PDFDocument, matriz: MatrizCorrelacio
   geometria.celdas.forEach((celda) => {
     const x = offsetX + celda.x;
     const y = offsetY + celda.y;
-    const color = celda.valor === null ? '#e2e8f0' : colorDivergente(celda.valor);
+    const color = celda.valor === null ? '#e2e8f0' : colorDivergenteCorrelacion(celda.valor);
     doc.rect(x, y, celda.ancho, celda.alto).fillAndStroke(color, '#ffffff');
     doc
       .fontSize(Math.max(5, Math.min(7, celda.ancho / 5)))

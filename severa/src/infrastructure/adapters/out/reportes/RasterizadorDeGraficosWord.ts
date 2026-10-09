@@ -1,12 +1,14 @@
 import sharp from 'sharp';
-import { DatosInforme } from '../../../../application/ports/out/reportes/GeneradorDeInformes';
+import { DatosInforme, DatosInformeDataset } from '../../../../application/ports/out/reportes/GeneradorDeInformes';
+import type { AnalisisUnivariadoNumerico } from '../../../../domain/services/descriptive-statistics/AnalisisUnivariadoGenerico';
 import {
   dibujarBarras,
   dibujarBarrasHorizontales,
   dibujarHistograma,
   dibujarBoxplot,
   dibujarDispersion,
-  dibujarPastel
+  dibujarPastel,
+  dibujarHeatmap
 } from '../graphics/SvgDibujoDeGraficos';
 
 // Bug real reportado: el .docx solo tenía encabezados y tablas de datos, sin
@@ -19,8 +21,16 @@ import {
 export const ANCHO_IMAGEN_GRAFICO = 460;
 export const ALTO_IMAGEN_GRAFICO = 240;
 
+// Los SVG de SvgDibujoDeGraficos.ts solo declaran viewBox (460 de ancho), y
+// librsvg los rasteriza a 72 dpi salvo que se le pida otra cosa: 460 píxeles
+// para una figura que en la página ocupa casi 5 pulgadas, texto borroso en
+// pantalla y peor impreso. Se rasteriza al triple; el tamaño con el que la
+// figura se coloca en el documento (ANCHO/ALTO_IMAGEN_GRAFICO) no cambia.
+const ESCALA_RASTERIZADO = 3;
+const DENSIDAD_RASTERIZADO = 72 * ESCALA_RASTERIZADO;
+
 async function svgAPng(svg: string): Promise<Buffer> {
-  return sharp(Buffer.from(svg)).png().toBuffer();
+  return sharp(Buffer.from(svg), { density: DENSIDAD_RASTERIZADO }).png().toBuffer();
 }
 
 // Orden y contenido idénticos a construirDefinicionesGraficosWord() en
@@ -72,4 +82,50 @@ export async function generarImagenesDeGraficosInforme(datos: DatosInforme): Pro
   ];
 
   return Promise.all(svgs.map(svgAPng));
+}
+
+// M-10 Ronda 2, Pasada 2-D Paso 2 (RF-130): figuras del informe Word del
+// pipeline genérico — un histograma por columna numérica y, si hay columnas
+// elegibles, el heatmap de correlación. Mismo orden que la galería de §12 del
+// PDF (dibujarSeccionVisualizaciones, caso 'generico') y que el índice de
+// figuras del Anexo B, así los tres numeran igual. A diferencia de las 10
+// figuras fijas de CVSS, acá cada imagen informa su propio tamaño: el heatmap
+// crece con la cantidad de columnas (ver SvgDibujoDeGraficos.dibujarHeatmap).
+export interface FiguraInformeDataset {
+  titulo: string;
+  imagen: Buffer;
+  ancho: number;
+  alto: number;
+}
+
+// ancho/alto son el tamaño de colocación en el documento (las unidades del
+// viewBox del SVG), no los píxeles del PNG, que es ESCALA_RASTERIZADO veces
+// más grande.
+async function figuraDesdeSvg(titulo: string, svg: string): Promise<FiguraInformeDataset> {
+  const { data, info } = await sharp(Buffer.from(svg), { density: DENSIDAD_RASTERIZADO }).png().toBuffer({ resolveWithObject: true });
+  return { titulo, imagen: data, ancho: Math.round(info.width / ESCALA_RASTERIZADO), alto: Math.round(info.height / ESCALA_RASTERIZADO) };
+}
+
+export async function generarFigurasDeInformeDataset(datos: DatosInformeDataset): Promise<FiguraInformeDataset[]> {
+  const numericas = datos.analisisUnivariado.filter((analisis): analisis is AnalisisUnivariadoNumerico => analisis.tipo === 'numerica');
+
+  const pendientes = numericas.map((analisis) => {
+    const titulo = `Distribución de "${analisis.nombre}"`;
+    return figuraDesdeSvg(
+      titulo,
+      dibujarHistograma(
+        analisis.distribucion.map((bin) => ({ intervalo: bin.intervalo, frecuencia: bin.frecuenciaAbsoluta })),
+        analisis.resumenCincoNumeros.media,
+        analisis.resumenCincoNumeros.mediana,
+        { titulo, etiquetaEjeX: analisis.nombre, etiquetaEjeY: 'Frecuencia' }
+      )
+    );
+  });
+
+  if (datos.matrizCorrelacion.columnas.length > 0) {
+    const titulo = 'Heatmap de correlación de Pearson';
+    pendientes.push(figuraDesdeSvg(titulo, dibujarHeatmap(datos.matrizCorrelacion, { titulo })));
+  }
+
+  return Promise.all(pendientes);
 }

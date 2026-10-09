@@ -4,6 +4,8 @@ import {
   calcularGeometriaBoxplot,
   calcularGeometriaDispersion,
   calcularGeometriaPastel,
+  calcularGeometriaHeatmap,
+  colorDivergenteCorrelacion,
   puntoEnCirculo,
   type DatoBarra,
   type ResumenCincoNumeros,
@@ -12,6 +14,7 @@ import {
   type MarcasDeEje,
   type AreaDeTrazado
 } from '../../../../domain/services/graphs/GeometriaDeGraficos';
+import type { MatrizCorrelacion } from '../../../../domain/services/descriptive-statistics/CorrelacionGenerico';
 
 // Bug real (auditoría de cierre de Mejora 4, confirmado en vivo contra
 // GET /graficos/:tipo): SvgGraficosAdapter.ts nunca dibujaba nada — siempre
@@ -403,4 +406,73 @@ export function dibujarPastel(datos: DatoBarra[], opciones: OpcionesGraficoSvg):
     .join('');
 
   return envolverSvg(titulo(opciones.titulo) + porciones + leyenda);
+}
+
+// M-10 Ronda 2, Pasada 2-D Paso 2 (RF-130): equivalente SVG de
+// DibujoDeGraficosPdf.dibujarHeatmap — misma geometría
+// (calcularGeometriaHeatmap) y misma escala de color
+// (colorDivergenteCorrelacion), solo cambia el renderer. Nace para el informe
+// Word del pipeline genérico, que hasta esta pasada decía "Heatmap disponible
+// en la versión PDF de este informe" porque no había forma de dibujarlo fuera
+// de pdfkit. El alto del lienzo depende de la cantidad de columnas (mismo
+// criterio que el PDF: 32 unidades por celda, acotado), por eso no usa ALTO.
+const MARGEN_HEATMAP = { arriba: 44, abajo: 12, izquierda: 84, derecha: 16 };
+const LARGO_MAXIMO_ETIQUETA_HEATMAP = 12;
+
+export function dibujarHeatmap(matriz: MatrizCorrelacion, opciones: OpcionesGraficoSvg): string {
+  const n = matriz.columnas.length;
+
+  if (n === 0) {
+    return envolverSvg(
+      titulo(opciones.titulo) +
+        texto(8, 40, 'No hay columnas numéricas elegibles para el heatmap.', { tamano: 8, color: COLOR_TEXTO_SECUNDARIO }),
+      60
+    );
+  }
+
+  const ladoMaximo = ANCHO - MARGEN_HEATMAP.izquierda - MARGEN_HEATMAP.derecha;
+  const lado = Math.min(ladoMaximo, Math.max(150, n * 32));
+  const lienzo: Lienzo = { ancho: ANCHO, alto: MARGEN_HEATMAP.arriba + lado + MARGEN_HEATMAP.abajo, margen: MARGEN_HEATMAP };
+
+  const valores = matriz.filas.map((fila) => fila.correlaciones.map((celda) => celda.valor));
+  const geometria = calcularGeometriaHeatmap(valores, lienzo);
+  const tamanoFuenteCelda = Math.max(5, Math.min(8, geometria.tamanoCelda / 5));
+
+  const celdas = geometria.celdas
+    .map((celda) => {
+      const color = celda.valor === null ? '#e2e8f0' : colorDivergenteCorrelacion(celda.valor);
+      const colorTexto = celda.valor !== null && Math.abs(celda.valor) > 0.6 ? '#ffffff' : COLOR_TEXTO;
+      return (
+        `<rect x="${celda.x.toFixed(1)}" y="${celda.y.toFixed(1)}" width="${celda.ancho.toFixed(1)}" height="${celda.alto.toFixed(1)}" fill="${color}" stroke="#ffffff" />` +
+        texto(celda.x + celda.ancho / 2, celda.y + celda.alto / 2 + tamanoFuenteCelda / 3, celda.valor === null ? 'N/D' : celda.valor.toFixed(2), {
+          tamano: tamanoFuenteCelda,
+          color: colorTexto,
+          ancla: 'middle'
+        })
+      );
+    })
+    .join('');
+
+  // Etiquetas de columna (arriba) y de fila (a la izquierda), en horizontal y
+  // truncadas por ancho disponible — mismo criterio que el heatmap del PDF.
+  const etiquetas = matriz.columnas
+    .map((nombre, indice) => {
+      const recortado = nombre.slice(0, LARGO_MAXIMO_ETIQUETA_HEATMAP);
+      return (
+        texto(
+          geometria.area.x + indice * geometria.tamanoCelda + geometria.tamanoCelda / 2,
+          geometria.area.y - 5,
+          truncarTexto(recortado, geometria.tamanoCelda - 2, 6),
+          { tamano: 6, color: COLOR_TEXTO_SECUNDARIO, ancla: 'middle' }
+        ) +
+        texto(geometria.area.x - 5, geometria.area.y + indice * geometria.tamanoCelda + geometria.tamanoCelda / 2 + 2, recortado, {
+          tamano: 6,
+          color: COLOR_TEXTO_SECUNDARIO,
+          ancla: 'end'
+        })
+      );
+    })
+    .join('');
+
+  return envolverSvg(titulo(opciones.titulo) + celdas + etiquetas, lienzo.alto);
 }

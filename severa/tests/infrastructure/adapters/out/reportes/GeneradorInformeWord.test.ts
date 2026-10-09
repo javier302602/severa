@@ -2,6 +2,8 @@ import JSZip from 'jszip';
 import { HeadingLevel } from 'docx';
 import { GeneradorInformeWord } from '../../../../../src/infrastructure/adapters/out/reportes/GeneradorInformeWord';
 import { recopilarDatosDeInforme } from '../../../../../src/application/usecases/module_reportes_exportacion/RecopilarDatosDeInforme';
+import { recopilarDatosDeInformeDataset } from '../../../../../src/application/usecases/module_reportes_exportacion/RecopilarDatosDeInformeDataset';
+import { interpretarOutliers } from '../../../../../src/domain/services/InterpretadorDeResultadosGenerico';
 import { VulnerabilidadRepository } from '../../../../../src/application/ports/out/persistencia/repositorios/VulnerabilidadRepository';
 import { AuditoriaRepository } from '../../../../../src/application/ports/out/persistencia/repositorios/AuditoriaRepository';
 import { Vulnerabilidad } from '../../../../../src/domain/entities/Vulnerabilidad';
@@ -173,5 +175,167 @@ describe('GeneradorInformeWord — Pasada 2-D, Paso 1 (RF-130, CVSS)', () => {
     const buffer = await new GeneradorInformeWord().generar(datos);
 
     expect(buffer.subarray(0, 2).toString()).toBe('PK');
+  });
+});
+
+// M-10 Ronda 2, Pasada 2-D (RF-130), Paso 2: generarDataset() (pipeline
+// genérico) entra al mismo orquestador de 20 secciones. Antes de este paso el
+// informe Word genérico no tenía NINGÚN test (ya era así antes de la pasada):
+// estos cubren el orden de secciones, que las figuras quedaron incrustadas de
+// verdad (el Word viejo remitía al PDF) y que el contenido que el informe
+// viejo tenía como sección propia (valores atípicos) no se perdió al
+// reubicarse.
+const COLUMNAS_VENTAS = ['Producto', 'Categoria', 'Precio', 'Unidades'];
+const FILAS_VENTAS = [
+  ['Laptop', 'Electrónica', 1200, 3],
+  ['Mouse', 'Accesorios', 25, 40],
+  ['Teclado', 'Accesorios', 45, 22],
+  ['Monitor', 'Electrónica', 310, 9],
+  ['Webcam', 'Accesorios', 60, 18],
+  ['Auriculares', 'Accesorios', 80, 25],
+  ['Tablet', 'Electrónica', 420, 7],
+  ['Cable HDMI', 'Accesorios', 12, 55],
+  ['Parlante', 'Accesorios', 35, 30],
+  ['Hub USB', 'Accesorios', 28, 33],
+  ['Servidor', 'Electrónica', 9800, 1]
+].map(([Producto, Categoria, Precio, Unidades]) => ({ Producto, Categoria, Precio, Unidades }));
+
+async function imagenesPngDe(buffer: Buffer): Promise<string[]> {
+  const zip = await JSZip.loadAsync(buffer);
+  return Object.keys(zip.files).filter((ruta) => ruta.startsWith('word/media/') && ruta.endsWith('.png'));
+}
+
+describe('GeneradorInformeWord — Pasada 2-D, Paso 2 (RF-130, genérico)', () => {
+  beforeEach(() => {
+    (LayoutInformeWord.heading as jest.Mock).mockClear();
+  });
+
+  test('genérico: cada heading() de nivel 1 se llama en el mismo orden y con el mismo título que el mapeo (2-20, sin contar Portada)', async () => {
+    const datos = recopilarDatosDeInformeDataset(COLUMNAS_VENTAS, FILAS_VENTAS, 'Analista de Prueba');
+
+    const buffer = await new GeneradorInformeWord().generarDataset(datos);
+
+    expect(buffer.subarray(0, 2).toString()).toBe('PK');
+    const llamadasNivel1 = (LayoutInformeWord.heading as jest.Mock).mock.calls
+      .filter(([, nivel]) => nivel === HeadingLevel.HEADING_1)
+      .map(([texto]) => texto);
+    const esperado = MAPEO_PLANTILLA_UNIVERSAL_RF130.filter((entrada) => entrada.numero !== 1).map((entrada) => `${entrada.numero}. ${entrada.nombreRF130}`);
+
+    expect(llamadasNivel1).toEqual(esperado);
+  });
+
+  test('genérico §12: un histograma por columna numérica más el heatmap quedan incrustados como PNG reales, y el texto ya no remite al PDF', async () => {
+    const datos = recopilarDatosDeInformeDataset(COLUMNAS_VENTAS, FILAS_VENTAS, 'Analista de Prueba');
+    const columnasNumericas = datos.analisisUnivariado.filter((analisis) => analisis.tipo === 'numerica').length;
+    expect(columnasNumericas).toBe(2);
+    expect(datos.matrizCorrelacion.columnas.length).toBeGreaterThan(0);
+
+    const buffer = await new GeneradorInformeWord().generarDataset(datos);
+
+    const imagenes = await imagenesPngDe(buffer);
+    expect(imagenes).toHaveLength(columnasNumericas + 1);
+    const zip = await JSZip.loadAsync(buffer);
+    for (const ruta of imagenes) {
+      const contenido = await zip.files[ruta].async('nodebuffer');
+      expect(contenido.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+      expect(contenido.length).toBeGreaterThan(100);
+    }
+
+    const texto = (await textosDeDocx(buffer)).join(' | ');
+    expect(texto).not.toContain('disponible en la versión PDF');
+    expect(texto).toContain('Figura 1: Distribución de "Precio"');
+    expect(texto).toContain('Figura 2: Distribución de "Unidades"');
+    expect(texto).toContain('Figura 3: Heatmap de correlación de Pearson');
+  });
+
+  test('genérico §6: la tabla de valores atípicos (sección propia en el Word viejo) sigue en el documento, con el mismo cierre que interpretarOutliers', async () => {
+    const datos = recopilarDatosDeInformeDataset(COLUMNAS_VENTAS, FILAS_VENTAS, 'Analista de Prueba');
+    const precio = datos.outliers.columnas.find((columna) => columna.columna === 'Precio');
+    expect(precio?.cantidadValoresAtipicos).toBeGreaterThan(0);
+
+    const textos = await textosDeDocx(await new GeneradorInformeWord().generarDataset(datos));
+
+    expect(textos).toContain('Valores atípicos (outliers)');
+    expect(textos).toContain('Cant. atípicos');
+    expect(textos).toContain(precio!.limiteSuperior.toFixed(2));
+    expect(textos).toContain(interpretarOutliers(datos.outliers));
+  });
+
+  test('genérico: hallazgos (§17), limitaciones (§18), "No aplicable" y "Pendiente" llegan al documento', async () => {
+    const datos = recopilarDatosDeInformeDataset(COLUMNAS_VENTAS, FILAS_VENTAS, 'Analista de Prueba');
+
+    const textos = await textosDeDocx(await new GeneradorInformeWord().generarDataset(datos));
+
+    expect(datos.interpretacion.length).toBeGreaterThan(0);
+    datos.interpretacion.forEach((hallazgo) => expect(textos).toContain(hallazgo));
+    datos.limitacionesConocidas.forEach((limitacion) => expect(textos).toContain(limitacion));
+    // §19 Recomendaciones y la subsección Referencias de §20.
+    expect(textos.filter((texto) => texto === 'No aplicable')).toHaveLength(2);
+    // §14, §15 y §16.
+    expect(textos.filter((texto) => texto === 'Pendiente')).toHaveLength(3);
+    // Contenido propio de CVSS que no debe filtrarse al genérico.
+    expect(textos.join(' | ')).not.toContain('Ranking de urgencia de remediación');
+  });
+
+  test('genérico sin columnas numéricas: no explota, no incrusta imágenes y lo dice en cada sección afectada', async () => {
+    const datos = recopilarDatosDeInformeDataset(
+      ['Nombre', 'Ciudad'],
+      [
+        { Nombre: 'Ana', Ciudad: 'Lima' },
+        { Nombre: 'Luis', Ciudad: 'Cusco' },
+        { Nombre: 'Rosa', Ciudad: 'Lima' }
+      ],
+      'Analista de Prueba'
+    );
+
+    const buffer = await new GeneradorInformeWord().generarDataset(datos);
+
+    expect(await imagenesPngDe(buffer)).toHaveLength(0);
+    const textos = await textosDeDocx(buffer);
+    expect(textos).toContain('Este dataset no tiene columnas numéricas para analizar individualmente.');
+    expect(textos).toContain('Este dataset no tiene columnas numéricas para calcular distribuciones.');
+    expect(textos).toContain('No hay columnas numéricas para evaluar.');
+    expect(textos).toContain('No hay columnas numéricas elegibles para calcular correlaciones.');
+    expect(textos.filter((texto) => texto === 'Este dataset no generó ninguna figura (sin columnas numéricas).')).toHaveLength(2);
+  });
+
+  test('genérico con dataset vacío (solo encabezados): no explota', async () => {
+    const datos = recopilarDatosDeInformeDataset(['A', 'B'], [], 'Analista de Prueba');
+
+    const buffer = await new GeneradorInformeWord().generarDataset(datos);
+
+    expect(buffer.subarray(0, 2).toString()).toBe('PK');
+    expect(await textosDeDocx(buffer)).toContain('El dataset no tiene filas.');
+  });
+});
+
+// Bug real (Pasada 2-D Paso 2): el interlineado por defecto se emitía sin
+// w:lineRule. Word lo interpreta como múltiple, LibreOffice como alto de
+// renglón fijo — y recortaba cada gráfico al alto de un renglón. Los tests de
+// "hay N imágenes PNG en word/media" no lo veían: la imagen está en el
+// archivo, lo que falla es cómo se compone la página.
+describe('GeneradorInformeWord — interlineado compatible con LibreOffice (bug real)', () => {
+  async function espaciadoPorDefecto(buffer: Buffer): Promise<string> {
+    const zip = await JSZip.loadAsync(buffer);
+    const estilos = await zip.files['word/styles.xml'].async('string');
+    const porDefecto = /<w:pPrDefault>.*?<\/w:pPrDefault>/s.exec(estilos)?.[0] ?? '';
+    return /<w:spacing[^>]*>/.exec(porDefecto)?.[0] ?? '';
+  }
+
+  test('informe CVSS: el interlineado por defecto declara lineRule="auto"', async () => {
+    const datos = await recopilarDatosDeInforme(repositorioFalso(DATASET_CVSS_TIPICO), auditoriaFalsa(), 'Analista de Prueba', 'analista-1');
+
+    const espaciado = await espaciadoPorDefecto(await new GeneradorInformeWord().generar(datos));
+
+    expect(espaciado).toContain('w:line="360"');
+    expect(espaciado).toContain('w:lineRule="auto"');
+  });
+
+  test('informe genérico: ídem', async () => {
+    const datos = recopilarDatosDeInformeDataset(COLUMNAS_VENTAS, FILAS_VENTAS, 'Analista de Prueba');
+
+    const espaciado = await espaciadoPorDefecto(await new GeneradorInformeWord().generarDataset(datos));
+
+    expect(espaciado).toContain('w:lineRule="auto"');
   });
 });

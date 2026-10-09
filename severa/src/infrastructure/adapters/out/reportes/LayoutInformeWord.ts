@@ -1,4 +1,4 @@
-import { Paragraph, Table, TableRow, TableCell, TextRun, WidthType, TableOfContents, HeadingLevel, AlignmentType } from 'docx';
+import { Paragraph, Table, TableRow, TableCell, TextRun, WidthType, TableOfContents, HeadingLevel, AlignmentType, LineRuleType } from 'docx';
 
 // M-10 Ronda 2, Pasada 2-D (RF-130), Paso 1: extracción PURA desde
 // GeneradorInformeWord.ts — mismo código, mismo comportamiento, sin ningún
@@ -23,11 +23,19 @@ export type ElementoDocumento = Paragraph | Table | TableOfContents;
 // (line: 360 = 1.5 × 240, donde 240 es "un renglón" en docx) y un espacio
 // después de cada párrafo. Los márgenes de 1 pulgada van en `sections.properties.page.margin`
 // de cada Document (1440 twips = 1 pulgada), no acá.
+//
+// lineRule explícito (bug real, Pasada 2-D Paso 2): sin él, docx emite
+// <w:spacing w:line="360"/> a secas. Word lo lee como interlineado múltiple
+// (el valor por defecto de la norma), pero LibreOffice lo toma como alto de
+// renglón fijo y recorta cada imagen en línea al alto de un renglón — los 10
+// gráficos del informe se veían como una franja con solo las etiquetas del
+// eje. Nadie lo había visto porque el .docx se revisaba leyendo su XML, no
+// abriéndolo. Con "auto" los dos programas hacen lo mismo.
 export const ESTILOS_APA7 = {
   default: {
     document: {
       run: { font: 'Times New Roman', size: 24 },
-      paragraph: { spacing: { line: 360, after: 200 } }
+      paragraph: { spacing: { line: 360, lineRule: LineRuleType.AUTO, after: 200 } }
     }
   }
 };
