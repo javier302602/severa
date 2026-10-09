@@ -121,6 +121,16 @@ import { GuardarPlantillaDeAnalisis } from '../../application/usecases/module_pe
 import { ListarPlantillasDeAnalisis } from '../../application/usecases/module_perfil_analista/ListarPlantillasDeAnalisis';
 import { EliminarPlantillaDeAnalisis } from '../../application/usecases/module_perfil_analista/EliminarPlantillaDeAnalisis';
 import { AplicarPlantillaDeAnalisis } from '../../application/usecases/module_perfil_analista/AplicarPlantillaDeAnalisis';
+import { PostgresEscalaDeClasificacionRepository } from '../adapters/out/persistencia/repositorios/PostgresEscalaDeClasificacionRepository';
+import {
+  GuardarEscalaDeClasificacion,
+  ObtenerEscalaDeClasificacion,
+  RestablecerEscalaDeClasificacion
+} from '../../application/usecases/module_priorizacion_clasificacion/EscalaDeClasificacion';
+import {
+  GuardarEscalaDeClasificacionConAuditoria,
+  RestablecerEscalaDeClasificacionConAuditoria
+} from '../../application/usecases/module_seguridad_auditoria/decoradores/EscalaDeClasificacionConAuditoria';
 import { ConfigurarUmbralCritico } from '../../application/usecases/module_notificaciones_alertas/ConfigurarUmbralCritico';
 import { NotificarPlazosProximosAVencer } from '../../application/usecases/module_notificaciones_alertas/NotificarPlazosProximosAVencer';
 
@@ -141,6 +151,7 @@ const tokenRecuperacionRepository = new PostgresTokenRecuperacionRepository(pool
 const historialAnalisisRepository = new PostgresHistorialAnalisisRepository(pool);
 const datasetGenericoRepository = new PostgresDatasetGenericoRepository(pool);
 const plantillaDeAnalisisRepository = new PostgresPlantillaDeAnalisisRepository(pool);
+const escalaDeClasificacionRepository = new PostgresEscalaDeClasificacionRepository(pool);
 const hasher = new BcryptHasher();
 // RF-03: adaptador simulado (consola), mismo criterio que
 // ConsolaServicioDeNotificaciones — no hay infraestructura SMTP real.
@@ -399,6 +410,17 @@ export const container = {
   // existía pero no había forma de invocarlo.
   programarInformePeriodicoUseCase: new ProgramarInformePeriodico(programadorDeTareas, generarInformeConAuditoria),
   buscarConFiltrosUseCase: new BuscarConFiltros(vulnerabilidadRepository),
+  // RF-28 / RF-69 (Modo B): escala de clasificación del catálogo, por
+  // analista. Cambiarla se audita.
+  obtenerEscalaDeClasificacionUseCase: new ObtenerEscalaDeClasificacion(escalaDeClasificacionRepository),
+  guardarEscalaDeClasificacionUseCase: new GuardarEscalaDeClasificacionConAuditoria(
+    new GuardarEscalaDeClasificacion(escalaDeClasificacionRepository),
+    auditoriaRepository
+  ),
+  restablecerEscalaDeClasificacionUseCase: new RestablecerEscalaDeClasificacionConAuditoria(
+    new RestablecerEscalaDeClasificacion(escalaDeClasificacionRepository),
+    auditoriaRepository
+  ),
   guardarFiltroFavoritoUseCase: new GuardarFiltroFavorito(filtroFavoritoRepository),
   listarFiltrosFavoritosUseCase: new ListarFiltrosFavoritos(filtroFavoritoRepository),
   eliminarFiltroFavoritoUseCase: new EliminarFiltroFavorito(filtroFavoritoRepository),

@@ -17,6 +17,14 @@ lo dice.
   (umbral de filas incompletas, duplicados por columnas clave, rango válido,
   formatos inconsistentes) pero el frontend no lo llama.
 
+- **RF-99 (umbral de alerta "crítica") no tiene pantalla.** Es configurable
+  por analista en el backend (migración 015, `ConfigurarUmbralCritico`) pero
+  el frontend no lo ofrece. En el Paso 2 la alerta pasa a usar el corte de
+  Crítico de la escala cuando el analista no fijó un umbral propio.
+- **`ExportarBusquedaFiltrada` (aplicación) importa un adaptador de
+  infraestructura** (`ExportadorExcelAgrupado`). `lint:deps` no lo detecta:
+  sus reglas solo vigilan el dominio.
+
 ## Paso 5 — RNF
 
 - **`POST /auth/login` sin cuerpo devuelve el mensaje crudo de la base.**

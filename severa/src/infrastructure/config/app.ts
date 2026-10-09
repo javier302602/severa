@@ -26,6 +26,7 @@ import { analisisDatasetAnalizarRouter } from '../adapters/in/http/modules/modul
 import { analisisDatasetOutliersRouter } from '../adapters/in/http/modules/module_limpieza_calidad_datos/controllers/AnalisisDatasetOutliersController';
 import { analisisDatasetCalidadRouter } from '../adapters/in/http/modules/module_limpieza_calidad_datos/controllers/AnalisisDatasetCalidadController';
 import { analisisDatasetInformeRouter } from '../adapters/in/http/modules/module_reportes_exportacion/controllers/AnalisisDatasetInformeController';
+import { escalaDeClasificacionRouter } from '../adapters/in/http/modules/module_priorizacion_clasificacion/controllers/EscalaDeClasificacionController';
 import { plantillasDeAnalisisRouter } from '../adapters/in/http/modules/module_perfil_analista/controllers/PlantillasDeAnalisisController';
 import { analisisDatasetVariablesRouter } from '../adapters/in/http/modules/module_deteccion_variables/controllers/AnalisisDatasetVariablesController';
 import { analisisDatasetLimpiezaRouter } from '../adapters/in/http/modules/module_limpieza_calidad_datos/controllers/AnalisisDatasetLimpiezaController';
@@ -89,6 +90,8 @@ export function createApp(): express.Express {
   app.use('/graficos', graficoRouter);
   app.use('/comparacion', comparacionRouter);
   app.use(priorizacionRouter);
+  // RF-28 / RF-69 (Modo B): escala de clasificación del analista.
+  app.use(escalaDeClasificacionRouter);
   app.use(informeRouter);
   app.use(auditoriaRouter);
   app.use(notificacionRouter);

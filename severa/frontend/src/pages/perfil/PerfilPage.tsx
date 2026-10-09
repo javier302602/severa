@@ -8,6 +8,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { MensajeError } from '../../components/ui/MensajeError';
 import { mensajeDeError } from '../../utils/mensajeDeError';
 import { RUTAS } from '../../routes/paths';
+import { EscalaDeClasificacionSeccion } from './EscalaDeClasificacionSeccion';
 
 const ETIQUETA_ROL: Record<string, string> = {
   analista: 'Analista',
@@ -54,7 +55,7 @@ export function PerfilPage() {
   };
 
   return (
-    <div className="max-w-md space-y-6">
+    <div className="max-w-xl space-y-6">
       <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Mi perfil</h1>
 
       {isLoading && <Spinner etiqueta="Cargando perfil…" />}
@@ -102,6 +103,9 @@ export function PerfilPage() {
           </button>
         </form>
       )}
+
+      {/* RF-28 / RF-69: los rótulos "Escala: …" de las pantallas llevan acá. */}
+      <EscalaDeClasificacionSeccion />
 
       <p className="text-sm text-slate-600 dark:text-slate-400">
         Los análisis que hiciste, con su fecha y su dataset, están en tu{' '}

@@ -20,3 +20,8 @@ export const RUTAS = {
   notificaciones: '/notificaciones',
   comoFunciona: '/como-funciona'
 } as const;
+
+// RF-28 / RF-69: ancla de la sección de Perfil donde se configura la escala
+// de niveles de riesgo. Cada rótulo "Escala: …" de las pantallas lleva acá.
+export const ANCLA_ESCALA = 'escala-de-clasificacion';
+export const RUTA_CONFIGURAR_ESCALA = `${RUTAS.perfil}#${ANCLA_ESCALA}`;
