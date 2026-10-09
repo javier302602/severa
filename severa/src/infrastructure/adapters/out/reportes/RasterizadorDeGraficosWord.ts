@@ -18,23 +18,34 @@ import {
 // el usuario, agregando "sharp". Se reusan EXACTAMENTE las mismas funciones
 // de dibujo SVG que ya sirven /graficos/:tipo en pantalla (SvgDibujoDeGraficos.ts)
 // en vez de duplicar lógica de dibujo para Word.
-export const ANCHO_IMAGEN_GRAFICO = 460;
-export const ALTO_IMAGEN_GRAFICO = 240;
 
 // Los SVG de SvgDibujoDeGraficos.ts solo declaran viewBox (460 de ancho), y
 // librsvg los rasteriza a 72 dpi salvo que se le pida otra cosa: 460 píxeles
 // para una figura que en la página ocupa casi 5 pulgadas, texto borroso en
 // pantalla y peor impreso. Se rasteriza al triple; el tamaño con el que la
-// figura se coloca en el documento (ANCHO/ALTO_IMAGEN_GRAFICO) no cambia.
+// figura se coloca en el documento no cambia.
 const ESCALA_RASTERIZADO = 3;
 const DENSIDAD_RASTERIZADO = 72 * ESCALA_RASTERIZADO;
 
-async function svgAPng(svg: string): Promise<Buffer> {
-  return sharp(Buffer.from(svg), { density: DENSIDAD_RASTERIZADO }).png().toBuffer();
+// Una figura del informe en los dos formatos que los renderers usan (ver
+// BloquesDeInforme.ts): el SVG tal cual se dibujó y su versión PNG.
+// ancho/alto son el tamaño de colocación en el documento (las unidades del
+// viewBox del SVG), no los píxeles del PNG, que es ESCALA_RASTERIZADO veces
+// más grande.
+export interface FiguraRasterizada {
+  svg: string;
+  png: Buffer;
+  ancho: number;
+  alto: number;
 }
 
-// Orden y contenido idénticos a construirDefinicionesGraficosWord() en
-// GeneradorInformeWord.ts (10 gráficos, mismo índice base 0). El Gráfico 6
+async function rasterizar(svg: string): Promise<FiguraRasterizada> {
+  const { data, info } = await sharp(Buffer.from(svg), { density: DENSIDAD_RASTERIZADO }).png().toBuffer({ resolveWithObject: true });
+  return { svg, png: data, ancho: Math.round(info.width / ESCALA_RASTERIZADO), alto: Math.round(info.height / ESCALA_RASTERIZADO) };
+}
+
+// Orden y contenido idénticos a construirDefinicionesGraficos() en
+// ContenidoInformeUniversalRF130.ts (10 gráficos, mismo índice base 0). El Gráfico 6
 // (comparación de acceso) usa un gráfico de barras de las medias en vez del
 // boxplot doble del PDF — SvgDibujoDeGraficos.ts no tiene una versión SVG de
 // boxplot doble (esa geometría solo existe hoy en DibujoDeGraficosPdf.ts,
@@ -42,7 +53,7 @@ async function svgAPng(svg: string): Promise<Buffer> {
 // escribir una segunda implementación de dibujo solo para esto; el gráfico
 // de barras usa los mismos promedios que ya muestra el análisis de esta
 // sección.
-export async function generarImagenesDeGraficosInforme(datos: DatosInforme): Promise<Buffer[]> {
+export async function generarFigurasDeInformeCvss(datos: DatosInforme): Promise<FiguraRasterizada[]> {
   const g = datos.graficos;
   const remotoVsLocal = datos.comparacionAccesoRemotoLocal;
 
@@ -81,7 +92,7 @@ export async function generarImagenesDeGraficosInforme(datos: DatosInforme): Pro
     dibujarBarrasHorizontales(g.topSoftware, { titulo: 'Software más afectado', etiquetaEjeX: 'Cantidad' })
   ];
 
-  return Promise.all(svgs.map(svgAPng));
+  return Promise.all(svgs.map(rasterizar));
 }
 
 // M-10 Ronda 2, Pasada 2-D Paso 2 (RF-130): figuras del informe Word del
@@ -91,19 +102,12 @@ export async function generarImagenesDeGraficosInforme(datos: DatosInforme): Pro
 // figuras del Anexo B, así los tres numeran igual. A diferencia de las 10
 // figuras fijas de CVSS, acá cada imagen informa su propio tamaño: el heatmap
 // crece con la cantidad de columnas (ver SvgDibujoDeGraficos.dibujarHeatmap).
-export interface FiguraInformeDataset {
+export interface FiguraInformeDataset extends FiguraRasterizada {
   titulo: string;
-  imagen: Buffer;
-  ancho: number;
-  alto: number;
 }
 
-// ancho/alto son el tamaño de colocación en el documento (las unidades del
-// viewBox del SVG), no los píxeles del PNG, que es ESCALA_RASTERIZADO veces
-// más grande.
 async function figuraDesdeSvg(titulo: string, svg: string): Promise<FiguraInformeDataset> {
-  const { data, info } = await sharp(Buffer.from(svg), { density: DENSIDAD_RASTERIZADO }).png().toBuffer({ resolveWithObject: true });
-  return { titulo, imagen: data, ancho: Math.round(info.width / ESCALA_RASTERIZADO), alto: Math.round(info.height / ESCALA_RASTERIZADO) };
+  return { titulo, ...(await rasterizar(svg)) };
 }
 
 export async function generarFigurasDeInformeDataset(datos: DatosInformeDataset): Promise<FiguraInformeDataset[]> {
