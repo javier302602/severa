@@ -1,6 +1,19 @@
-import { AnalisisRealizado } from '../../../../domain/entities/AnalisisRealizado';
-import { Paginacion } from '../../out/persistencia/repositorios/VulnerabilidadRepository';
+import { AnalisisRealizadoPresentado } from '../../../../domain/services/historial/HistorialDeAnalisis';
+
+export interface PaginaDeHistorialSolicitada {
+  limite?: number;
+  desplazamiento?: number;
+}
+
+export interface PaginaDeHistorialDeAnalisis {
+  // Del más reciente al más antiguo.
+  eventos: AnalisisRealizadoPresentado[];
+  // Total de eventos del analista, no de la página.
+  total: number;
+  limite: number;
+  desplazamiento: number;
+}
 
 export interface ObtenerHistorialAnalisisUseCase {
-  ejecutar(analistaId: string, paginacion?: Paginacion): Promise<AnalisisRealizado[]>;
+  ejecutar(analistaId: string, pagina?: PaginaDeHistorialSolicitada): Promise<PaginaDeHistorialDeAnalisis>;
 }

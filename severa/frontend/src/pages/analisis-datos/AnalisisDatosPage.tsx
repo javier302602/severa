@@ -1,4 +1,5 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAbrirDataset, useAnalizarDataset, useDescargarInformeDataset } from '../../hooks/useAnalisisDatos';
 import { Spinner } from '../../components/ui/Spinner';
 import { MensajeError } from '../../components/ui/MensajeError';
@@ -21,8 +22,9 @@ import { nombreDeArchivoDeInforme, type OpcionesDescargaDeInforme } from '../../
 import { DescargaDeInforme } from '../../components/ui/DescargaDeInforme';
 import { nombreDeVersion } from '../../constants/tiposDeVariable';
 import { CLASE_AVISO_DE_EXITO, CLASE_TARJETA } from './estilos';
+import { leerSolicitudDeReapertura, type PestanaDeAnalisis } from './reaperturaDesdeHistorial';
 
-type Pestana = 'descriptivas' | 'univariado' | 'correlacion' | 'outliers' | 'serie' | 'objetivo' | 'limpieza' | 'versiones';
+type Pestana = PestanaDeAnalisis;
 
 // `requiereDataset`: pestañas que guardan o leen algo del dataset guardado
 // (decisiones, versiones, bitácora). No se ofrecen si la sesión no tiene uno.
@@ -135,6 +137,28 @@ export function AnalisisDatosPage() {
       }
     });
   };
+
+  // RF-11: reabrir un análisis desde el historial. La solicitud llega como
+  // estado de navegación; se atiende una sola vez y se borra del historial
+  // del navegador, para que recargar o volver atrás no reabra otra vez.
+  //
+  // Se atiende en el turno siguiente (y se cancela si el efecto se limpia
+  // antes): en desarrollo React monta, desmonta y vuelve a montar cada
+  // componente, y una mutación disparada en la primera pasada queda huérfana
+  // —termina, pero la pantalla ya no la escucha.
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const solicitud = leerSolicitudDeReapertura(location.state);
+    if (!solicitud) return;
+    const turno = setTimeout(() => {
+      navigate(location.pathname, { replace: true, state: null });
+      abrirDataset(solicitud.datasetId, solicitud.pestana);
+    }, 0);
+    return () => clearTimeout(turno);
+    // abrirDataset cambia en cada render; lo que dispara esto es la solicitud.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   const onVersionGenerada = (resultado: ResultadoDeLimpiezaAplicada) => {
     mutacionInforme.reset();

@@ -11,7 +11,9 @@ interface ItemNavegacion {
 
 // Un ítem por módulo del SDS con pantalla propia. M-01/M-02 (registro/perfil)
 // no están acá: registro es previo al login y perfil se accede desde el
-// Header, no como "módulo" de análisis. M-12 Auditoría se oculta del lado del
+// Header, no como "módulo" de análisis. La excepción de M-02 es el historial
+// (RF-11): es por donde se retoma un análisis anterior, así que está a un
+// clic como el resto. M-12 Auditoría se oculta del lado del
 // cliente para analistas sin rol administrador — es solo conveniencia de UI,
 // la protección real es el middleware de rol del backend (RolMiddleware.ts).
 const ITEMS_NAVEGACION: ItemNavegacion[] = [
@@ -24,6 +26,7 @@ const ITEMS_NAVEGACION: ItemNavegacion[] = [
   { etiqueta: 'Priorización', ruta: RUTAS.priorizacion },
   { etiqueta: 'Informes', ruta: RUTAS.informes },
   { etiqueta: 'Búsqueda avanzada', ruta: RUTAS.busqueda },
+  { etiqueta: 'Historial', ruta: RUTAS.historial },
   { etiqueta: 'Auditoría', ruta: RUTAS.auditoria, soloAdministrador: true },
   { etiqueta: 'Notificaciones', ruta: RUTAS.notificaciones },
   { etiqueta: 'Cómo funciona SIADE', ruta: RUTAS.comoFunciona }

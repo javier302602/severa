@@ -1,5 +1,6 @@
 import express from 'express';
 import { container } from '../../../../../../config/container';
+import { leerEnteroNoNegativo } from '../../../shared/leerEnteroNoNegativo';
 import { LIMITE_MAXIMO_DE_NOTIFICACIONES } from '../../../../../../../application/ports/in/module_notificaciones_alertas/ObtenerNotificacionesUseCase';
 
 // RF-99 a RF-104: centro de notificaciones del analista autenticado. Montado
@@ -8,14 +9,6 @@ import { LIMITE_MAXIMO_DE_NOTIFICACIONES } from '../../../../../../../applicatio
 // (JWT verificado), nunca de query/body — misma regla de M-11/M-12: es
 // imposible leer o marcar como leída una notificación de otro analista.
 export const notificacionRouter = express.Router();
-
-// Un parámetro de paginado: ausente (se usa el valor por defecto) o un entero
-// no negativo escrito solo con dígitos. Devuelve null si vino otra cosa.
-function leerEnteroNoNegativo(valor: unknown): number | undefined | null {
-  if (valor === undefined) return undefined;
-  if (typeof valor !== 'string' || !/^\d{1,9}$/.test(valor)) return null;
-  return Number(valor);
-}
 
 // RF-103. Devuelve UNA página (?limite=, por defecto 50 y como máximo 200;
 // ?desplazamiento=, por defecto 0) junto con el total y la cantidad de no

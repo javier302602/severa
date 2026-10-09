@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import { createApp } from '../../../../../../../../src/infrastructure/config/app';
 import { config } from '../../../../../../../../src/infrastructure/config/env';
 import { container } from '../../../../../../../../src/infrastructure/config/container';
+import { aislarAnalisisDeDatosDeLaBase } from '../../../../../../../dobles/aislarAnalisisDeDatosDeLaBase';
 
 // Mejora 4 (Análisis de Datos General) — Fase 3/4/5. A diferencia de
 // AnalisisDatasetController.test.ts (que mockea todo el container para
@@ -19,50 +20,13 @@ import { container } from '../../../../../../../../src/infrastructure/config/con
 // uso. El resto de estas rutas sigue sin tocar la base de datos (Pool de pg
 // es perezoso, no conecta hasta la primera query).
 //
-// Generalización de M-03 (RF-17/21/23): AnalizarDatasetGenerico ahora
-// TAMBIÉN persiste en datasets_genericos/registros_datasets_genericos (ver
-// PostgresDatasetGenericoRepository), y su decorador de auditoría
-// (AnalizarDatasetGenericoConAuditoria) escribe en registros_auditoria —
-// ambas cosas requerirían una base de datos real. Se reemplazan SOLO esas
-// dos dependencias por fakes en memoria (`as any` porque son campos
-// privados a nivel de TypeScript, no en runtime), dejando intacta la cadena
-// real que este archivo necesita probar (mismo sesionAnalisisStore
-// compartido con las demás rutas de Fase 3/4/5).
 const app = createApp();
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-(container.analizarDatasetGenericoUseCase as any).usecase.datasetGenericoRepository = {
-  guardar: jest.fn().mockResolvedValue(undefined),
-  guardarRegistros: jest.fn().mockResolvedValue(undefined),
-  buscarPorId: jest.fn().mockResolvedValue(null),
-  listarRegistros: jest.fn().mockResolvedValue([])
-};
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-(container.analizarDatasetGenericoUseCase as any).auditoriaRepository = {
-  registrar: jest.fn().mockResolvedValue(undefined),
-  listar: jest.fn().mockResolvedValue([])
-};
-// Bug real encontrado auditando M-10 (no era "una limitación de LibreOffice/
-// soffice" como se venía asumiendo — esa explicación era incorrecta: no hay
-// ninguna dependencia de soffice en todo el proyecto). La causa real: los dos
-// tests de "Fase 5 (informe por sesionId)" de más abajo pasan por
-// GenerarInformeDataset.ejecutar -> resolverNombreAnalistaParaInforme ->
-// PostgresAnalistaRepository.buscarPorId real — el único de los tres
-// repositorios de esa cadena que este archivo NO reemplazaba por un fake en
-// memoria (a diferencia de datasetGenericoRepository/auditoriaRepository de
-// arriba), así que sin una Postgres real corriendo fallaban con
-// ECONNREFUSED, envuelto en un 400 genérico ("Error desconocido") por el
-// catch-all de AnalisisDatasetInformeController.ts. Mismo criterio que los
-// otros dos: buscarPorId resuelve null a propósito (el nombre del analista
-// en la portada del PDF/Word no es lo que estos tests verifican) para que
-// resolverNombreAnalistaParaInforme caiga a su fallback ('Analista SIADE')
-// sin tocar la base de datos.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-(container.generarInformeDatasetUseCase as any).analistaRepository = {
-  guardar: jest.fn().mockResolvedValue(undefined),
-  buscarPorCorreo: jest.fn().mockResolvedValue(null),
-  buscarPorId: jest.fn().mockResolvedValue(null),
-  eliminar: jest.fn().mockResolvedValue(undefined)
-};
+// El dataset guardado, la auditoría, el historial y el nombre del analista
+// para la portada del informe irían a la base: se reemplazan por dobles en
+// memoria (ver aislarAnalisisDeDatosDeLaBase). Antes este archivo reemplazaba
+// solo una parte, a mano, y el resto pasaba únicamente si había una Postgres
+// levantada en la máquina que corría los tests.
+aislarAnalisisDeDatosDeLaBase(container);
 
 function tokenPara(id: string): string {
   return jwt.sign({ sub: id, rol: 'analista' }, config.jwtSecret, { expiresIn: '1h' });

@@ -7,25 +7,15 @@ import * as XLSX from 'xlsx';
 import { createApp } from '../../../../../../../../src/infrastructure/config/app';
 import { config } from '../../../../../../../../src/infrastructure/config/env';
 import { container } from '../../../../../../../../src/infrastructure/config/container';
+import { aislarAnalisisDeDatosDeLaBase } from '../../../../../../../dobles/aislarAnalisisDeDatosDeLaBase';
 
 // RF-58 (M-07) — mismo criterio que AnalisisDatasetFase3.test.ts: flujo real,
 // sin mockear el container, para probar el mismo sesionAnalisisStore/IDOR de
 // punta a punta. Generalización de M-03: AnalizarDatasetGenerico también
-// persiste en datasets_genericos/registros_datasets_genericos y audita —
-// ambas cosas requerirían una base de datos real, así que se reemplazan por
-// fakes en memoria (lección de la regresión encontrada en esa misma ronda).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-(container.analizarDatasetGenericoUseCase as any).usecase.datasetGenericoRepository = {
-  guardar: jest.fn().mockResolvedValue(undefined),
-  guardarRegistros: jest.fn().mockResolvedValue(undefined),
-  buscarPorId: jest.fn().mockResolvedValue(null),
-  listarRegistros: jest.fn().mockResolvedValue([])
-};
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-(container.analizarDatasetGenericoUseCase as any).auditoriaRepository = {
-  registrar: jest.fn().mockResolvedValue(undefined),
-  listar: jest.fn().mockResolvedValue([])
-};
+// persiste en datasets_genericos/registros_datasets_genericos, audita y anota
+// en el historial — todo eso requeriría una base de datos real, así que se
+// reemplaza por dobles en memoria (ver aislarAnalisisDeDatosDeLaBase).
+aislarAnalisisDeDatosDeLaBase(container);
 
 const app = createApp();
 

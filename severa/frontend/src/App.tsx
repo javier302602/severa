@@ -6,6 +6,7 @@ import { AppLayout } from './components/layout/AppLayout';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegistroPage } from './pages/auth/RegistroPage';
 import { PerfilPage } from './pages/perfil/PerfilPage';
+import { HistorialPage } from './pages/perfil/HistorialPage';
 import { ImportarDatasetPage } from './pages/dataset/ImportarDatasetPage';
 import { AnalisisDatosPage } from './pages/analisis-datos/AnalisisDatosPage';
 import { CatalogoPage } from './pages/catalogo/CatalogoPage';
@@ -34,6 +35,7 @@ export default function App() {
             <Route element={<AppLayout />}>
               <Route index element={<Navigate to={RUTAS.catalogo} replace />} />
               <Route path={RUTAS.perfil} element={<PerfilPage />} />
+              <Route path={RUTAS.historial} element={<HistorialPage />} />
               <Route path={RUTAS.dataset} element={<ImportarDatasetPage />} />
               <Route path={RUTAS.analisisDatos} element={<AnalisisDatosPage />} />
               <Route path={RUTAS.catalogo} element={<CatalogoPage />} />

@@ -13,6 +13,7 @@ import { ServicioDeNotificaciones } from '../../../../src/application/ports/out/
 import { SesionAnalisisStoreEnMemoria } from '../../../../src/infrastructure/adapters/out/dataset/SesionAnalisisStoreEnMemoria';
 import { DatasetGenericoNoEncontradoError } from '../../../../src/domain/errors/DatasetGenericoNoEncontradoError';
 import { DatasetGenericoRepositoryEnMemoria, cargarDatasetDePrueba } from '../../../dobles/DatasetGenericoRepositoryEnMemoria';
+import { historialFalso } from '../../../dobles/HistorialAnalisisRepositoryEnMemoria';
 
 // RF-138 (M-12): "centralizar en el módulo de seguridad y auditoría un
 // registro de todas las operaciones relevantes sobre datasets (carga,
@@ -42,16 +43,19 @@ async function preparar() {
   const cargado = await cargarDatasetDePrueba(repositorio, store, { columnas: COLUMNAS });
   const auditoria = auditoriaFalsa();
   const notificaciones = notificacionesFalsas();
+  const historial = historialFalso();
   return {
     repositorio,
     store,
     auditoria,
     notificaciones,
+    historial,
     ...cargado,
     limpiar: new AplicarLimpiezaDeDatasetConAuditoria(
       new AplicarLimpiezaDeDataset(store, repositorio),
       auditoria,
-      notificaciones as unknown as ServicioDeNotificaciones
+      notificaciones as unknown as ServicioDeNotificaciones,
+      historial
     )
   };
 }
@@ -105,23 +109,41 @@ describe('RF-138 — limpieza e imputación', () => {
   });
 
   test('una limpieza rechazada (sin confirmar, o inválida) no se audita ni se notifica', async () => {
-    const { auditoria, notificaciones, limpiar, sesionId } = await preparar();
+    const { auditoria, notificaciones, historial, limpiar, sesionId } = await preparar();
 
     await expect(limpiar.ejecutar('analista-A', sesionId, [{ columna: 'edad', estrategia: 'imputar', metodo: 'media' }], false)).rejects.toThrow();
     await expect(limpiar.ejecutar('analista-A', sesionId, [{ columna: 'edad', estrategia: 'imputar', metodo: 'moda' }], true)).rejects.toThrow();
 
     expect(auditoria.registrar).not.toHaveBeenCalled();
     expect(notificaciones.notificarLimpiezaCompletada).not.toHaveBeenCalled();
+    expect(historial.deSesion).not.toHaveBeenCalled();
+  });
+
+  test('RF-11: una limpieza aplicada queda en el historial del analista, contra la versión que generó', async () => {
+    const { historial, limpiar, sesionId } = await preparar();
+
+    const resultado = await limpiar.ejecutar('analista-A', sesionId, [
+      { columna: 'edad', estrategia: 'imputar', metodo: 'media' },
+      { columna: 'notas', estrategia: 'eliminar_columna' }
+    ], true);
+
+    expect(historial.deSesion).toHaveBeenCalledTimes(1);
+    expect(historial.deSesion).toHaveBeenCalledWith('analista-A', resultado.sesionId, 'LimpiezaDeDatos', {
+      cadaVez: true,
+      detalle: 'Generó la versión 1: 0 fila(s) eliminada(s), 1 variable(s) eliminada(s), 2 valor(es) imputado(s)'
+    });
+    expect(resultado.sesionId).not.toBe(sesionId);
   });
 
   test('la vista previa no guarda nada: no se audita ni se notifica', async () => {
-    const { auditoria, notificaciones, limpiar, sesionId } = await preparar();
+    const { auditoria, notificaciones, historial, limpiar, sesionId } = await preparar();
 
     const resumen = await limpiar.previsualizar('analista-A', sesionId, [{ columna: 'edad', estrategia: 'imputar', metodo: 'media' }]);
 
     expect(resumen.celdasImputadas).toBe(2);
     expect(auditoria.registrar).not.toHaveBeenCalled();
     expect(notificaciones.notificarLimpiezaCompletada).not.toHaveBeenCalled();
+    expect(historial.deSesion).not.toHaveBeenCalled();
   });
 });
 

@@ -17,7 +17,10 @@ import { RestablecerContrasena } from '../../application/usecases/module_gestion
 import { EditarPerfil } from '../../application/usecases/module_perfil_analista/EditarPerfil';
 import { VerPerfil } from '../../application/usecases/module_perfil_analista/VerPerfil';
 import { ObtenerHistorialAnalisis } from '../../application/usecases/module_perfil_analista/ObtenerHistorialAnalisis';
-import { RegistrarAnalisisRealizado } from '../../application/usecases/module_perfil_analista/RegistrarAnalisisRealizado';
+import { RegistrarEnHistorialDeAnalisis } from '../../application/usecases/module_perfil_analista/RegistrarEnHistorialDeAnalisis';
+import { ExportarHistorialAnalisis } from '../../application/usecases/module_perfil_analista/ExportarHistorialAnalisis';
+import { conHistorialDeSesion, conHistorialDelCatalogo } from '../../application/usecases/module_perfil_analista/decoradores/ConHistorialDeAnalisis';
+import { ExportadorDeTablaExcelJs } from '../adapters/out/exportacion/ExportadorDeTablaExcelJs';
 import { EliminarCuenta } from '../../application/usecases/module_gestion_usuarios/EliminarCuenta';
 import { AsignarRol } from '../../application/usecases/module_gestion_usuarios/AsignarRol';
 import { ConsultarVulnerabilidadPorCVE } from '../../application/usecases/module_priorizacion_clasificacion/ConsultarVulnerabilidadPorCVE';
@@ -78,6 +81,7 @@ import { EditarPerfilConAuditoriaYNotificacion } from '../../application/usecase
 import { MarcarComoRemediadaConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/MarcarComoRemediadaConAuditoria';
 import { GenerarInformeConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/GenerarInformeConAuditoria';
 import { GenerarResumenEjecutivoConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/GenerarResumenEjecutivoConAuditoria';
+import { GenerarInformeDatasetConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/GenerarInformeDatasetConAuditoria';
 import { LectorDatasetGenerico } from '../adapters/out/dataset/parsers/LectorDatasetGenerico';
 import { SesionAnalisisStoreEnMemoria } from '../adapters/out/dataset/SesionAnalisisStoreEnMemoria';
 import { AnalizarDatasetGenerico } from '../../application/usecases/module_carga_gestion_datasets/AnalizarDatasetGenerico';
@@ -165,10 +169,11 @@ const sincronizarConApiNvdUseCase = new SincronizarConApiNvd(
   servicioDeNotificaciones
 );
 const descargadorDeArchivos = new DescargadorDeArchivosHttp();
-// RF-11 (M-02): hoisteado para poder pasarlo a generarInformeConAuditoria de
-// abajo (M-12, RF-95) — es el primer productor real conectado a este puerto,
-// que hasta ahora quedaba dado de alta sin nadie que lo invocara.
-const registrarAnalisisRealizadoUseCase = new RegistrarAnalisisRealizado(historialAnalisisRepository);
+// RF-11 (M-02): único productor del historial de análisis del analista. Los
+// casos de uso de análisis se envuelven más abajo con conHistorialDeSesion /
+// conHistorialDelCatalogo, así que ninguno de ellos (ni sus controladores)
+// sabe que el historial existe.
+const historialDeAnalisis = new RegistrarEnHistorialDeAnalisis(historialAnalisisRepository, sesionAnalisisStore, datasetGenericoRepository);
 // Compartido entre `generarInformeUseCase` y `programarInformePeriodicoUseCase`
 // para que un informe generado automáticamente por el cron quede auditado
 // (RF-95) y notificado (RF-101) igual que uno pedido a mano.
@@ -176,10 +181,15 @@ const generarInformeConAuditoria = new GenerarInformeConAuditoria(
   new GenerarInforme(vulnerabilidadRepository, geradorDeInformes, auditoriaRepository, analistaRepository),
   auditoriaRepository,
   servicioDeNotificaciones,
-  registrarAnalisisRealizadoUseCase
+  historialDeAnalisis
 );
 
-const generarDistribucionFrecuenciasUseCase = new GenerarDistribucionFrecuencias(vulnerabilidadRepository);
+const generarDistribucionFrecuenciasUseCase = conHistorialDelCatalogo(
+  new GenerarDistribucionFrecuencias(vulnerabilidadRepository),
+  historialDeAnalisis,
+  'DistribucionDeFrecuencias',
+  ([, analistaId]) => analistaId
+);
 
 export const container = {
   registrarAnalistaUseCase: new RegistrarAnalista(analistaRepository, hasher),
@@ -219,13 +229,16 @@ export const container = {
     analistaRepository,
     auditoriaRepository
   ),
-  // RF-11: infraestructura de consulta/escritura del historial de análisis.
-  // registrarAnalisisRealizadoUseCase (instanciado arriba, hoisteado para
-  // generarInformeConAuditoria) tiene su primer productor real desde M-12
-  // (RF-95, informes generados) — otros módulos pueden seguir conectándose
-  // más adelante.
+  // RF-11: historial de análisis del analista (lo escribe historialDeAnalisis,
+  // ver arriba). RF-14: el mismo historial, exportado a .xlsx.
   obtenerHistorialAnalisisUseCase: new ObtenerHistorialAnalisis(historialAnalisisRepository),
-  registrarAnalisisRealizadoUseCase,
+  registrarEnHistorialDeAnalisisUseCase: historialDeAnalisis,
+  exportarHistorialAnalisisUseCase: new ExportarHistorialAnalisis(
+    historialAnalisisRepository,
+    new ExportadorDeTablaExcelJs(),
+    // Las fechas del archivo van con el mismo reloj que las de los informes.
+    config.zonaHorariaInformes
+  ),
   // RF-04/RNF-33: decorado con auditoría — queda registrado quién asignó qué
   // rol a quién y cuál era el rol anterior.
   asignarRolUseCase: new AsignarRolConAuditoria(
@@ -262,27 +275,72 @@ export const container = {
   ),
   // RF-24: primera ruta HTTP para exportar el dataset validado (GET /dataset/exportar).
   exportarDatasetValidadoUseCase: new ExportarDatasetValidado(vulnerabilidadRepository),
-  calcularResumenEstadisticoUseCase: new CalcularResumenEstadistico(vulnerabilidadRepository),
+  calcularResumenEstadisticoUseCase: conHistorialDelCatalogo(
+    new CalcularResumenEstadistico(vulnerabilidadRepository),
+    historialDeAnalisis,
+    'ResumenEstadistico',
+    ([analistaId]) => analistaId
+  ),
   generarDistribucionFrecuenciasUseCase,
   // RF-38: exporta la tabla de frecuencias a .xlsx pidiéndosela al mismo caso
   // de uso que alimenta la pantalla.
   exportarDistribucionFrecuenciasUseCase: new ExportarDistribucionFrecuencias(generarDistribucionFrecuenciasUseCase),
-  generarGraficoUseCase: new GenerarGrafico(vulnerabilidadRepository, graficosOutputPort),
+  generarGraficoUseCase: conHistorialDelCatalogo(
+    new GenerarGrafico(vulnerabilidadRepository, graficosOutputPort),
+    historialDeAnalisis,
+    'Graficos',
+    ([, analistaId]) => analistaId
+  ),
   // RF-58 (M-07): separado a propósito de generarGraficoUseCase (CVSS) —
   // reutiliza el mismo sesionAnalisisStore que las demás rutas de Fase 3/4
   // genéricas de M-05/M-06, no vulnerabilidadRepository. Ver auditoría SDS M-07.
-  generarHistogramaDeTiempoGenericoUseCase: new GenerarHistogramaDeTiempoGenerico(sesionAnalisisStore),
-  compararPorTipoAccesoUseCase: new CompararPorTipoAcceso(vulnerabilidadRepository),
-  compararPorTipoDeVulnerabilidadUseCase: new CompararPorTipoDeVulnerabilidad(vulnerabilidadRepository),
-  compararPorSoftwareUseCase: new CompararPorSoftware(vulnerabilidadRepository),
+  generarHistogramaDeTiempoGenericoUseCase: conHistorialDeSesion(
+    new GenerarHistogramaDeTiempoGenerico(sesionAnalisisStore),
+    historialDeAnalisis,
+    'SerieDeTiempo'
+  ),
+  // RF-11: las cinco comparaciones se anotan como un mismo tipo de análisis.
+  compararPorTipoAccesoUseCase: conHistorialDelCatalogo(
+    new CompararPorTipoAcceso(vulnerabilidadRepository),
+    historialDeAnalisis,
+    'ComparacionPorCategorias',
+    ([analistaId]) => analistaId
+  ),
+  compararPorTipoDeVulnerabilidadUseCase: conHistorialDelCatalogo(
+    new CompararPorTipoDeVulnerabilidad(vulnerabilidadRepository),
+    historialDeAnalisis,
+    'ComparacionPorCategorias',
+    ([, , analistaId]) => analistaId
+  ),
+  compararPorSoftwareUseCase: conHistorialDelCatalogo(
+    new CompararPorSoftware(vulnerabilidadRepository),
+    historialDeAnalisis,
+    'ComparacionPorCategorias',
+    ([, , analistaId]) => analistaId
+  ),
   listarSoftwareDisponibleUseCase: new ListarSoftwareDisponible(vulnerabilidadRepository),
   // M-08 (retoma, RF-62/63/64/65/67): N categorías (cerradas o abiertas) y
   // cross-tab — CompararPorTipoAcceso/CompararPorTipoDeVulnerabilidad/
   // CompararPorSoftware (arriba) quedan intactos, sin relación con estos dos.
-  compararPorCategoriaUseCase: new CompararPorCategoria(vulnerabilidadRepository),
-  compararPorCategoriasCruzadasUseCase: new CompararPorCategoriasCruzadas(vulnerabilidadRepository),
+  compararPorCategoriaUseCase: conHistorialDelCatalogo(
+    new CompararPorCategoria(vulnerabilidadRepository),
+    historialDeAnalisis,
+    'ComparacionPorCategorias',
+    ([analistaId]) => analistaId
+  ),
+  compararPorCategoriasCruzadasUseCase: conHistorialDelCatalogo(
+    new CompararPorCategoriasCruzadas(vulnerabilidadRepository),
+    historialDeAnalisis,
+    'ComparacionPorCategorias',
+    ([analistaId]) => analistaId
+  ),
   clasificarRiesgoUseCase: new ClasificarRiesgo(vulnerabilidadRepository),
-  generarRankingUrgenciaUseCase: new GenerarRankingUrgencia(vulnerabilidadRepository, emisorDeAlertasDePlazo),
+  generarRankingUrgenciaUseCase: conHistorialDelCatalogo(
+    new GenerarRankingUrgencia(vulnerabilidadRepository, emisorDeAlertasDePlazo),
+    historialDeAnalisis,
+    'RankingDeUrgencia',
+    ([analistaId]) => analistaId
+  ),
   // RF-94: cambios de estado de remediación quedan auditados (quién y cuándo).
   marcarEnProcesoDeRemediacionUseCase: new MarcarEnProcesoDeRemediacionConAuditoria(
     new MarcarEnProcesoDeRemediacion(vulnerabilidadRepository),
@@ -295,10 +353,16 @@ export const container = {
   // RF-95: fecha, autor y tipo de cada informe generado quedan auditados.
   // RF-101: y de paso se notifica al analista que lo pidió que ya está listo.
   generarInformeUseCase: generarInformeConAuditoria,
-  generarResumenEjecutivoUseCase: new GenerarResumenEjecutivoConAuditoria(
-    new GenerarResumenEjecutivo(vulnerabilidadRepository, geradorDeInformes, auditoriaRepository, analistaRepository),
-    auditoriaRepository,
-    servicioDeNotificaciones
+  generarResumenEjecutivoUseCase: conHistorialDelCatalogo(
+    new GenerarResumenEjecutivoConAuditoria(
+      new GenerarResumenEjecutivo(vulnerabilidadRepository, geradorDeInformes, auditoriaRepository, analistaRepository),
+      auditoriaRepository,
+      servicioDeNotificaciones
+    ),
+    historialDeAnalisis,
+    'ResumenEjecutivo',
+    ([analistaId]) => analistaId,
+    () => ({ cadaVez: true, detalle: 'Formato PDF' })
   ),
   // RF-83: adaptador real (node-cron) conectado — antes el caso de uso
   // existía pero no había forma de invocarlo.
@@ -320,9 +384,12 @@ export const container = {
   // Generalización de M-03 (RF-17/18/21/23): además de la sesión efímera de
   // siempre, ahora persiste en datasets_genericos/registros_datasets_genericos
   // — decorado con auditoría (RNF-49), sin notificación (ver el decorador).
+  // — decorado con auditoría (RNF-49) e historial (RF-11), sin notificación
+  // (ver el decorador).
   analizarDatasetGenericoUseCase: new AnalizarDatasetGenericoConAuditoria(
     new AnalizarDatasetGenerico(new LectorDatasetGenerico(), sesionAnalisisStore, datasetGenericoRepository),
-    auditoriaRepository
+    auditoriaRepository,
+    historialDeAnalisis
   ),
   // RF-24 generalizado: exporta el dataset genérico persistido tal cual, sin
   // agrupar por severidad (eso sigue siendo exclusivo de exportarDatasetValidadoUseCase).
@@ -334,8 +401,12 @@ export const container = {
   ),
   // M-14, Ronda 2 (RF-108/110/111). Las dos que escriben (variable objetivo
   // y corrección de tipo) van con auditoría; las dos de lectura, no.
-  evaluarSerieDeTiempoGenericoUseCase: new EvaluarSerieDeTiempoGenerico(sesionAnalisisStore),
-  sugerirVariableObjetivoUseCase: new SugerirVariableObjetivo(sesionAnalisisStore, datasetGenericoRepository),
+  evaluarSerieDeTiempoGenericoUseCase: conHistorialDeSesion(new EvaluarSerieDeTiempoGenerico(sesionAnalisisStore), historialDeAnalisis, 'SerieDeTiempo'),
+  sugerirVariableObjetivoUseCase: conHistorialDeSesion(
+    new SugerirVariableObjetivo(sesionAnalisisStore, datasetGenericoRepository),
+    historialDeAnalisis,
+    'VariableObjetivo'
+  ),
   definirVariableObjetivoUseCase: new DefinirVariableObjetivoConAuditoria(
     new DefinirVariableObjetivo(sesionAnalisisStore, datasetGenericoRepository),
     auditoriaRepository
@@ -350,7 +421,8 @@ export const container = {
   aplicarLimpiezaDeDatasetUseCase: new AplicarLimpiezaDeDatasetConAuditoria(
     new AplicarLimpiezaDeDataset(sesionAnalisisStore, datasetGenericoRepository),
     auditoriaRepository,
-    servicioDeNotificaciones
+    servicioDeNotificaciones,
+    historialDeAnalisis
   ),
   consultarBitacoraDeDatasetUseCase: new ConsultarBitacoraDeDataset(datasetGenericoRepository),
   // RF-136 (M-12): consultar y recuperar versiones de un dataset.
@@ -366,24 +438,51 @@ export const container = {
   verificarIntegridadDatasetUseCase: new VerificarIntegridadDataset(datasetGenericoRepository),
   // Fase 3: reciben sesionId en vez de un archivo — leen del mismo
   // sesionAnalisisStore que acaba de poblar analizarDatasetGenericoUseCase.
-  calcularEstadisticasDescriptivasGenericoUseCase: new CalcularEstadisticasDescriptivasGenerico(sesionAnalisisStore),
-  analizarColumnaUnivariadoGenericoUseCase: new AnalizarColumnaUnivariadoGenerico(sesionAnalisisStore),
+  // RF-11: cada uno queda en el historial la primera vez que se pide en una
+  // sesión de análisis.
+  calcularEstadisticasDescriptivasGenericoUseCase: conHistorialDeSesion(
+    new CalcularEstadisticasDescriptivasGenerico(sesionAnalisisStore),
+    historialDeAnalisis,
+    'EstadisticasDescriptivas'
+  ),
+  analizarColumnaUnivariadoGenericoUseCase: conHistorialDeSesion(
+    new AnalizarColumnaUnivariadoGenerico(sesionAnalisisStore),
+    historialDeAnalisis,
+    'AnalisisUnivariado'
+  ),
   // Fase 4: bivariado/multivariado (correlación) y detección de outliers —
   // mismo sesionAnalisisStore, mismo criterio IDOR.
-  calcularMatrizCorrelacionGenericoUseCase: new CalcularMatrizCorrelacionGenerico(sesionAnalisisStore),
-  detectarOutliersGenericoUseCase: new DetectarOutliersGenerico(sesionAnalisisStore),
+  calcularMatrizCorrelacionGenericoUseCase: conHistorialDeSesion(
+    new CalcularMatrizCorrelacionGenerico(sesionAnalisisStore),
+    historialDeAnalisis,
+    'MatrizDeCorrelacion'
+  ),
+  detectarOutliersGenericoUseCase: conHistorialDeSesion(new DetectarOutliersGenerico(sesionAnalisisStore), historialDeAnalisis, 'ValoresAtipicos'),
   // M-15 (RF-114/RF-116/RF-117), Ronda 1: mismo sesionAnalisisStore, mismo
   // criterio IDOR que el resto de la familia de endpoints de sesión.
-  analizarCalidadDatasetGenericoUseCase: new AnalizarCalidadDatasetGenerico(sesionAnalisisStore),
+  analizarCalidadDatasetGenericoUseCase: conHistorialDeSesion(
+    new AnalizarCalidadDatasetGenerico(sesionAnalisisStore),
+    historialDeAnalisis,
+    'CalidadDeDatos'
+  ),
   // Fase 5: mismo geradorDeInformes (GeneradorInformePDF) ya compartido con
   // generarInformeUseCase/generarResumenEjecutivoUseCase — un "documento de
   // datos" distinto (DatosInformeDataset), mismo generador PDF/Word.
-  generarInformeDatasetUseCase: new GenerarInformeDataset(
+  generarInformeDatasetUseCase: new GenerarInformeDatasetConAuditoria(
+    new GenerarInformeDataset(
+      sesionAnalisisStore,
+      geradorDeInformes,
+      analistaRepository,
+      // Para decir en el informe de qué versión son los datos y qué limpieza
+      // la produjo (sección 8, RF-123/136).
+      datasetGenericoRepository
+    ),
+    // RF-95/RF-101/RF-11: auditado, notificado y en el historial, igual que
+    // el informe del catálogo.
+    auditoriaRepository,
+    servicioDeNotificaciones,
+    historialDeAnalisis,
     sesionAnalisisStore,
-    geradorDeInformes,
-    analistaRepository,
-    // Para decir en el informe de qué versión son los datos y qué limpieza
-    // la produjo (sección 8, RF-123/136).
     datasetGenericoRepository
   ),
   // "Restablecer datos": acción administrativa (requiereRol('administrador')

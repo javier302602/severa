@@ -1,10 +1,12 @@
+import { Fragment, StrictMode } from 'react';
 import { describe, test, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AnalisisDatosPage } from '../../../src/pages/analisis-datos/AnalisisDatosPage';
 import { analisisDatosService, type DatasetAbierto, type DiagnosticoColumna } from '../../../src/api/analisisDatosService';
 import { HttpError } from '../../../src/api/httpClient';
-import { EnvoltorioQuery } from '../../testUtils';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { EnvoltorioQuery, EnvoltorioQueryConRutas } from '../../testUtils';
 
 vi.mock('../../../src/api/analisisDatosService', () => ({
   analisisDatosService: {
@@ -80,7 +82,7 @@ describe('AnalisisDatosPage', () => {
       filasDuplicadas: 0,
       columnas: [columna('edad', 2)]
     });
-    render(<AnalisisDatosPage />, { wrapper: EnvoltorioQuery });
+    render(<AnalisisDatosPage />, { wrapper: EnvoltorioQueryConRutas });
 
     const archivo = await subirArchivo();
 
@@ -102,14 +104,14 @@ describe('AnalisisDatosPage', () => {
   });
 
   test('acepta los cinco formatos que lee el backend (RF-105)', () => {
-    render(<AnalisisDatosPage />, { wrapper: EnvoltorioQuery });
+    render(<AnalisisDatosPage />, { wrapper: EnvoltorioQueryConRutas });
 
     expect(screen.getByLabelText('Archivo a analizar')).toHaveAttribute('accept', '.csv,.tsv,.json,.xlsx,.xls');
   });
 
   test('si el backend no informa el dataset guardado, no ofrece lo que necesita guardarse', async () => {
     vi.mocked(analisisDatosService.analizar).mockResolvedValue({ sesionId: 'sesion-1', totalFilas: 10, filasDuplicadas: 0, columnas: [columna('edad', 2)] });
-    render(<AnalisisDatosPage />, { wrapper: EnvoltorioQuery });
+    render(<AnalisisDatosPage />, { wrapper: EnvoltorioQueryConRutas });
 
     await subirArchivo();
     await screen.findByTestId('version-abierta');
@@ -127,7 +129,7 @@ describe('AnalisisDatosPage', () => {
     vi.mocked(analisisDatosService.abrirDataset).mockResolvedValue(
       abierto({ sesionId: 'sesion-9', datasetId: 'dataset-v1', version: 1, versionBase: 0, diagnostico: { totalFilas: 8, filasDuplicadas: 0, columnas: [columna('edad', 0)] } })
     );
-    render(<AnalisisDatosPage />, { wrapper: EnvoltorioQuery });
+    render(<AnalisisDatosPage />, { wrapper: EnvoltorioQueryConRutas });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Abrir la versión 1 de encuesta.csv' }));
 
@@ -143,7 +145,7 @@ describe('AnalisisDatosPage', () => {
   test('si no se puede abrir el dataset, muestra el error y sigue en la pantalla de entrada', async () => {
     vi.mocked(analisisDatosService.listarDatasets).mockResolvedValue([DATASET_GUARDADO]);
     vi.mocked(analisisDatosService.abrirDataset).mockRejectedValue(new HttpError(404, 'Dataset no encontrado'));
-    render(<AnalisisDatosPage />, { wrapper: EnvoltorioQuery });
+    render(<AnalisisDatosPage />, { wrapper: EnvoltorioQueryConRutas });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Abrir el original de encuesta.csv' }));
 
@@ -186,7 +188,7 @@ describe('AnalisisDatosPage', () => {
       versionBase: 0,
       resumen
     });
-    render(<AnalisisDatosPage />, { wrapper: EnvoltorioQuery });
+    render(<AnalisisDatosPage />, { wrapper: EnvoltorioQueryConRutas });
     await userEvent.click(await screen.findByRole('button', { name: 'Abrir el original de encuesta.csv' }));
     await screen.findByTestId('version-abierta');
 
@@ -207,7 +209,7 @@ describe('AnalisisDatosPage', () => {
   test('"Cerrar y elegir otro" vuelve a la pantalla de entrada', async () => {
     vi.mocked(analisisDatosService.listarDatasets).mockResolvedValue([DATASET_GUARDADO]);
     vi.mocked(analisisDatosService.abrirDataset).mockResolvedValue(abierto({}));
-    render(<AnalisisDatosPage />, { wrapper: EnvoltorioQuery });
+    render(<AnalisisDatosPage />, { wrapper: EnvoltorioQueryConRutas });
     await userEvent.click(await screen.findByRole('button', { name: 'Abrir el original de encuesta.csv' }));
     await screen.findByTestId('version-abierta');
 
@@ -216,5 +218,88 @@ describe('AnalisisDatosPage', () => {
     expect(screen.queryByTestId('version-abierta')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Archivo a analizar')).toBeInTheDocument();
     expect(await screen.findByText('Mis datasets')).toBeInTheDocument();
+  });
+  // RF-11: "el analista puede reabrir un análisis previo".
+  describe('reabrir desde el historial', () => {
+    function EstadoDeRuta() {
+      const location = useLocation();
+      return <p data-testid="estado-de-ruta">{JSON.stringify(location.state)}</p>;
+    }
+
+    function montarConEstado(state: unknown, { modoEstricto = false } = {}) {
+      const Envoltorio = modoEstricto ? StrictMode : Fragment;
+      return render(
+        <Envoltorio>
+          <MemoryRouter initialEntries={[{ pathname: '/analisis-datos', state }]}>
+            <EnvoltorioQuery>
+              <Routes>
+                <Route
+                  path="/analisis-datos"
+                  element={
+                    <>
+                      <AnalisisDatosPage />
+                      <EstadoDeRuta />
+                    </>
+                  }
+                />
+              </Routes>
+            </EnvoltorioQuery>
+          </MemoryRouter>
+        </Envoltorio>
+      );
+    }
+
+    // La aplicación corre con <StrictMode> (main.tsx): en desarrollo cada
+    // componente se monta, se desmonta y se vuelve a montar. Una reapertura
+    // disparada en la primera pasada terminaba sin que la pantalla se enterara.
+    test('también funciona con el doble montaje de StrictMode, y abre una sola vez', async () => {
+      vi.mocked(analisisDatosService.abrirDataset).mockResolvedValue(abierto({ sesionId: 'sesion-v1', datasetId: 'dataset-v1', version: 1, versionBase: 0 }));
+
+      montarConEstado({ reabrir: { datasetId: 'dataset-v1', pestana: 'correlacion' } }, { modoEstricto: true });
+
+      expect(await screen.findByTestId('version-abierta')).toHaveTextContent('Versión 1');
+      expect(analisisDatosService.abrirDataset).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText('Abriendo el dataset…')).not.toBeInTheDocument();
+    });
+
+    test('abre el dataset pedido, en la pestaña del análisis, sin que el analista tenga que buscarlo', async () => {
+      vi.mocked(analisisDatosService.abrirDataset).mockResolvedValue(abierto({ sesionId: 'sesion-v1', datasetId: 'dataset-v1', version: 1, versionBase: 0 }));
+
+      montarConEstado({ reabrir: { datasetId: 'dataset-v1', pestana: 'versiones' } });
+
+      expect(await screen.findByTestId('version-abierta')).toHaveTextContent('Versión 1');
+      expect(analisisDatosService.abrirDataset).toHaveBeenCalledTimes(1);
+      expect(analisisDatosService.abrirDataset).toHaveBeenCalledWith('dataset-v1');
+      expect(screen.getByRole('tab', { name: 'Versiones y bitácora' })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    test('la solicitud se consume: no queda en la ruta para reabrir de nuevo al recargar o volver atrás', async () => {
+      vi.mocked(analisisDatosService.abrirDataset).mockResolvedValue(abierto({}));
+
+      montarConEstado({ reabrir: { datasetId: 'dataset-1', pestana: 'descriptivas' } });
+
+      await screen.findByTestId('version-abierta');
+      expect(screen.getByTestId('estado-de-ruta')).toHaveTextContent('null');
+      expect(analisisDatosService.abrirDataset).toHaveBeenCalledTimes(1);
+    });
+
+    test('si el dataset ya no existe, lo dice y deja la pantalla lista para elegir otro', async () => {
+      vi.mocked(analisisDatosService.abrirDataset).mockRejectedValue(new HttpError(404, 'Dataset no encontrado'));
+
+      montarConEstado({ reabrir: { datasetId: 'dataset-borrado', pestana: 'correlacion' } });
+
+      expect(await screen.findByText('Dataset no encontrado')).toBeInTheDocument();
+      expect(screen.getByLabelText('Archivo a analizar')).toBeInTheDocument();
+    });
+
+    test.each([null, {}, { reabrir: null }, { reabrir: { datasetId: 7 } }, { reabrir: { datasetId: '' } }])(
+      'un estado de navegación que no es una solicitud válida (%j) se ignora',
+      async (state) => {
+        montarConEstado(state);
+
+        expect(await screen.findByLabelText('Archivo a analizar')).toBeInTheDocument();
+        expect(analisisDatosService.abrirDataset).not.toHaveBeenCalled();
+      }
+    );
   });
 });

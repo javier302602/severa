@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 
 // Compartido por los tests de hooks/componentes que usan React Query — mismo
 // retry:false que main.tsx (ver comentario ahí: un 400/404 real no debe
@@ -16,4 +17,14 @@ export function crearQueryClientDePrueba(): QueryClient {
 
 export function EnvoltorioQuery({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={crearQueryClientDePrueba()}>{children}</QueryClientProvider>;
+}
+
+// Para las pantallas que además navegan o leen la ruta (useNavigate,
+// useLocation, <Link>).
+export function EnvoltorioQueryConRutas({ children }: { children: ReactNode }) {
+  return (
+    <MemoryRouter>
+      <EnvoltorioQuery>{children}</EnvoltorioQuery>
+    </MemoryRouter>
+  );
 }

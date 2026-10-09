@@ -12,6 +12,7 @@ import {
 } from '../../../ports/in/module_deteccion_variables/VariableObjetivoUseCases';
 import { DatasetExportado, ExportarDatasetGenericoUseCase } from '../../../ports/in/module_carga_gestion_datasets/ExportarDatasetGenericoUseCase';
 import { DecisionDeTratamiento } from '../../../../domain/services/data-cleaning/TratamientoDeFaltantesGenerico';
+import { RegistrarEnHistorialDeAnalisisUseCase } from '../../../ports/in/module_perfil_analista/RegistrarEnHistorialDeAnalisisUseCase';
 import { ETIQUETA_DE_TIPO_DETALLADO, TipoColumnaDetallado } from '../../../../domain/services/variable-detection/DetectorDeTipoDeColumna';
 
 // RF-138 (M-12): la auditoría central registra las operaciones relevantes
@@ -40,12 +41,14 @@ function describirVersion(nombreArchivo: string, version: number): string {
 }
 
 // RF-120/121/123 + RF-122: además de auditar, emite LA notificación de
-// resumen de la limpieza — una sola por proceso.
+// resumen de la limpieza — una sola por proceso — y la anota en el historial
+// de análisis del analista (RF-11), contra la versión que la limpieza generó.
 export class AplicarLimpiezaDeDatasetConAuditoria implements AplicarLimpiezaDeDatasetUseCase {
   constructor(
     private readonly usecase: AplicarLimpiezaDeDatasetUseCase,
     private readonly auditoriaRepository: AuditoriaRepository,
-    private readonly servicioDeNotificaciones: ServicioDeNotificaciones
+    private readonly servicioDeNotificaciones: ServicioDeNotificaciones,
+    private readonly historial: RegistrarEnHistorialDeAnalisisUseCase
   ) {}
 
   // La vista previa no guarda nada: no hay operación que auditar.
@@ -92,6 +95,13 @@ export class AplicarLimpiezaDeDatasetConAuditoria implements AplicarLimpiezaDeDa
       columnasEliminadas: resumen.columnasEliminadas,
       celdasImputadas: resumen.celdasImputadas,
       metodosPorVariable: resumen.operaciones.map((operacion) => ({ variable: operacion.variable, metodo: operacion.metodo }))
+    });
+
+    await this.historial.deSesion(analistaId, resultado.sesionId, 'LimpiezaDeDatos', {
+      cadaVez: true,
+      detalle:
+        `Generó la versión ${resultado.version}: ${resumen.filasEliminadas} fila(s) eliminada(s), ` +
+        `${resumen.columnasEliminadas.length} variable(s) eliminada(s), ${resumen.celdasImputadas} valor(es) imputado(s)`
     });
 
     return resultado;

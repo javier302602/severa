@@ -2,7 +2,7 @@ import { GenerarInformeUseCase } from '../../../ports/in/module_reportes_exporta
 import { ArchivoGenerado, FormatoDeInforme, OpcionesDeInforme } from '../../../ports/out/reportes/GeneradorDeInformes';
 import { AuditoriaRepository } from '../../../ports/out/persistencia/repositorios/AuditoriaRepository';
 import { ServicioDeNotificaciones } from '../../../ports/out/notificaciones/ServicioDeNotificaciones';
-import { RegistrarAnalisisRealizadoUseCase } from '../../../ports/in/module_perfil_analista/RegistrarAnalisisRealizadoUseCase';
+import { RegistrarEnHistorialDeAnalisisUseCase } from '../../../ports/in/module_perfil_analista/RegistrarEnHistorialDeAnalisisUseCase';
 
 // RF-95: registra fecha, autor y tipo de cada informe generado. Mismo motivo
 // que los decoradores de remediación para no implementar GenerarInformeUseCase
@@ -11,20 +11,17 @@ import { RegistrarAnalisisRealizadoUseCase } from '../../../ports/in/module_perf
 // aquí, para notificar que el informe quedó listo — no hace falta un tercer
 // decorador ni pasar el id de nuevo por otro lado.
 //
-// Auditoría M-12: además de registros_auditoria (global, solo lectura para
-// administradores vía GET /auditoria), ahora también alimenta
-// analisis_realizados (RF-11/M-02) — infraestructura que existía desde M-02
-// pero sin ningún productor conectado (ver container.ts). Esto le da a cada
-// analista su propio historial de informes vía GET /perfil/historial, sin
-// depender del rol de administrador. Este decorador ya es compartido entre
-// la ruta manual y ProgramarInformePeriodico (RF-83), así que conectarlo acá
-// cubre ambos casos de una sola vez.
+// RF-11 (M-02): además de registros_auditoria (global, solo lectura para
+// administradores vía GET /auditoria), cada informe queda en el historial de
+// análisis del propio analista (GET /perfil/historial), sin depender del rol
+// de administrador. Este decorador es compartido entre la ruta manual y
+// ProgramarInformePeriodico (RF-83), así que cubre ambos casos de una vez.
 export class GenerarInformeConAuditoria {
   constructor(
     private readonly usecase: GenerarInformeUseCase,
     private readonly auditoriaRepository: AuditoriaRepository,
     private readonly servicioDeNotificaciones: ServicioDeNotificaciones,
-    private readonly registrarAnalisisRealizadoUseCase: RegistrarAnalisisRealizadoUseCase
+    private readonly historial: RegistrarEnHistorialDeAnalisisUseCase
   ) {}
 
   async ejecutar(formato: FormatoDeInforme, analistaId: string, opciones: OpcionesDeInforme = {}): Promise<ArchivoGenerado> {
@@ -36,11 +33,7 @@ export class GenerarInformeConAuditoria {
       detalle: `Informe completo (${formato}${opciones.adjuntarGraficos ? ', con gráficos adjuntos' : ''})`
     });
 
-    await this.registrarAnalisisRealizadoUseCase.ejecutar({
-      analistaId,
-      tipoEvento: 'InformeGenerado',
-      payload: { formato }
-    });
+    await this.historial.delCatalogo(analistaId, 'InformeGenerado', { cadaVez: true, detalle: `Formato ${formato.toUpperCase()}` });
 
     await this.servicioDeNotificaciones.notificarInformeListo(analistaId, formato);
 

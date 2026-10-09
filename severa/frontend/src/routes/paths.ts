@@ -4,6 +4,7 @@ export const RUTAS = {
   login: '/login',
   registro: '/registro',
   perfil: '/perfil',
+  historial: '/historial',
   dataset: '/dataset',
   analisisDatos: '/analisis-datos',
   catalogo: '/catalogo',

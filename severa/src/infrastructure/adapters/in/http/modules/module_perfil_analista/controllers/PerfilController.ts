@@ -1,5 +1,7 @@
 import express from 'express';
 import { container } from '../../../../../../config/container';
+import { leerEnteroNoNegativo } from '../../../shared/leerEnteroNoNegativo';
+import { LIMITE_MAXIMO_DE_HISTORIAL } from '../../../../../../../application/usecases/module_perfil_analista/ObtenerHistorialAnalisis';
 
 export const perfilRouter = express.Router();
 
@@ -27,26 +29,30 @@ perfilRouter.put('/perfil', async (req, res) => {
 // M-01) — EliminarCuentaUseCase pertenece a ese módulo, no a M-02. Mismo
 // comportamiento, solo cambia el archivo.
 
-// RF-11: historial de análisis del analista autenticado, más reciente
-// primero. Igual que arriba, el id sale exclusivamente de
-// req.analistaAutenticado.id. `limite`/`offset` son opcionales (mismo
-// contrato que Paginacion en VulnerabilidadRepository) — sin ellos se
-// devuelve el historial completo.
+// RF-11: historial de análisis del analista autenticado, del más reciente al
+// más antiguo, con fecha, dataset y tipo de análisis de cada uno. Igual que
+// arriba, el id sale exclusivamente de req.analistaAutenticado.id. Devuelve
+// UNA página (?limite=, por defecto 50 y como máximo 200; ?desplazamiento=,
+// por defecto 0) junto con el total.
 perfilRouter.get('/perfil/historial', async (req, res) => {
   const analistaId = req.analistaAutenticado!.id;
-  const { limite, offset } = req.query;
-  const paginacion =
-    typeof limite === 'string' && typeof offset === 'string'
-      ? { limite: Number(limite), offset: Number(offset) }
-      : undefined;
+  const limite = leerEnteroNoNegativo(req.query.limite);
+  const desplazamiento = leerEnteroNoNegativo(req.query.desplazamiento);
 
-  const eventos = await container.obtenerHistorialAnalisisUseCase.ejecutar(analistaId, paginacion);
-  res.json(
-    eventos.map((evento) => ({
-      id: evento.id,
-      tipoEvento: evento.tipoEvento,
-      payload: evento.payload,
-      fechaHora: evento.fechaHora
-    }))
-  );
+  if (limite === null || limite === 0 || desplazamiento === null) {
+    res.status(400).json({ error: `"limite" debe ser un entero entre 1 y ${LIMITE_MAXIMO_DE_HISTORIAL} y "desplazamiento" un entero mayor o igual a 0` });
+    return;
+  }
+
+  res.json(await container.obtenerHistorialAnalisisUseCase.ejecutar(analistaId, { limite, desplazamiento }));
+});
+
+// RF-14: el historial completo, como libro de Excel. Va en una ruta propia
+// (no como ?formato= de la anterior) porque no se pagina: exporta todo.
+perfilRouter.get('/perfil/historial/exportar', async (req, res) => {
+  const archivo = await container.exportarHistorialAnalisisUseCase.ejecutar(req.analistaAutenticado!.id);
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="historial-de-analisis.xlsx"');
+  res.send(archivo);
 });

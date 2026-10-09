@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -6,6 +7,7 @@ import { usePerfil, useEditarPerfil } from '../../hooks/usePerfil';
 import { Spinner } from '../../components/ui/Spinner';
 import { MensajeError } from '../../components/ui/MensajeError';
 import { mensajeDeError } from '../../utils/mensajeDeError';
+import { RUTAS } from '../../routes/paths';
 
 const ETIQUETA_ROL: Record<string, string> = {
   analista: 'Analista',
@@ -100,6 +102,14 @@ export function PerfilPage() {
           </button>
         </form>
       )}
+
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        Los análisis que hiciste, con su fecha y su dataset, están en tu{' '}
+        <Link to={RUTAS.historial} className="font-medium text-slate-900 underline dark:text-slate-100">
+          historial de análisis
+        </Link>
+        .
+      </p>
     </div>
   );
 }

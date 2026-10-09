@@ -1,5 +1,6 @@
 import { AnalizarDatasetGenericoUseCase, ResultadoAnalisisDataset } from '../../../ports/in/module_carga_gestion_datasets/AnalizarDatasetGenericoUseCase';
 import { AuditoriaRepository } from '../../../ports/out/persistencia/repositorios/AuditoriaRepository';
+import { RegistrarEnHistorialDeAnalisisUseCase } from '../../../ports/in/module_perfil_analista/RegistrarEnHistorialDeAnalisisUseCase';
 
 // RF-94/RNF-49: registra cada importación de dataset genérico. Deliberadamente
 // solo auditoría, sin notificación (a diferencia de ImportarDatasetConAuditoria):
@@ -9,10 +10,15 @@ import { AuditoriaRepository } from '../../../ports/out/persistencia/repositorio
 // inventar una notificación genérica no estaba pedido en esta ronda, así que
 // se documenta como decisión explícita en vez de forzar un mensaje que no
 // encaja.
+//
+// RF-11: la carga es además el primer análisis del historial del analista
+// sobre ese dataset (el perfil de variables se calcula ahí mismo). Se anota
+// contra la sesión que la propia carga acaba de crear.
 export class AnalizarDatasetGenericoConAuditoria implements AnalizarDatasetGenericoUseCase {
   constructor(
     private readonly usecase: AnalizarDatasetGenericoUseCase,
-    private readonly auditoriaRepository: AuditoriaRepository
+    private readonly auditoriaRepository: AuditoriaRepository,
+    private readonly historial: RegistrarEnHistorialDeAnalisisUseCase
   ) {}
 
   async ejecutar(rutaArchivo: string, analistaId: string, nombreArchivoOriginal: string): Promise<ResultadoAnalisisDataset> {
@@ -30,6 +36,10 @@ export class AnalizarDatasetGenericoConAuditoria implements AnalizarDatasetGener
       detalle,
       // RF-138: la carga es la primera operación de la auditoría del dataset.
       datasetId: resultado.datasetId
+    });
+
+    await this.historial.deSesion(analistaId, resultado.sesionId, 'DatasetCargado', {
+      detalle: `${diagnostico.totalFilas} fila(s), ${diagnostico.columnas.length} variable(s)`
     });
 
     return resultado;

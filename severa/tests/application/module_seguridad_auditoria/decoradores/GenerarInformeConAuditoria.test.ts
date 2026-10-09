@@ -2,8 +2,7 @@ import { GenerarInformeConAuditoria } from '../../../../src/application/usecases
 import { GenerarInformeUseCase } from '../../../../src/application/ports/in/module_reportes_exportacion/GenerarInformeUseCase';
 import { AuditoriaRepository } from '../../../../src/application/ports/out/persistencia/repositorios/AuditoriaRepository';
 import { ServicioDeNotificaciones } from '../../../../src/application/ports/out/notificaciones/ServicioDeNotificaciones';
-import { RegistrarAnalisisRealizadoUseCase } from '../../../../src/application/ports/in/module_perfil_analista/RegistrarAnalisisRealizadoUseCase';
-import { AnalisisRealizado } from '../../../../src/domain/entities/AnalisisRealizado';
+import { historialFalso } from '../../../dobles/HistorialAnalisisRepositoryEnMemoria';
 
 function auditoriaFalsa(): AuditoriaRepository {
   return {
@@ -26,20 +25,14 @@ function servicioDeNotificacionesFalso(): ServicioDeNotificaciones {
   };
 }
 
-function registrarAnalisisRealizadoFalso(): RegistrarAnalisisRealizadoUseCase {
-  return {
-    ejecutar: jest.fn().mockResolvedValue(new AnalisisRealizado('h1', 'analista-3', 'InformeGenerado', { formato: 'pdf' }))
-  };
-}
-
 describe('GenerarInformeConAuditoria', () => {
   test('registra autor y formato del informe generado (RF-95), el historial del analista (RF-11/M-02) y notifica que quedó listo (RF-101)', async () => {
     const archivo = { contenido: Buffer.from('pdf-falso'), tipoMime: 'application/pdf', extension: 'pdf' };
     const usecase: GenerarInformeUseCase = { ejecutar: jest.fn().mockResolvedValue(archivo) };
     const auditoriaRepository = auditoriaFalsa();
     const servicioDeNotificaciones = servicioDeNotificacionesFalso();
-    const registrarAnalisisRealizadoUseCase = registrarAnalisisRealizadoFalso();
-    const decorator = new GenerarInformeConAuditoria(usecase, auditoriaRepository, servicioDeNotificaciones, registrarAnalisisRealizadoUseCase);
+    const historial = historialFalso();
+    const decorator = new GenerarInformeConAuditoria(usecase, auditoriaRepository, servicioDeNotificaciones, historial);
 
     const resultado = await decorator.ejecutar('pdf', 'analista-3');
 
@@ -48,11 +41,7 @@ describe('GenerarInformeConAuditoria', () => {
     expect(auditoriaRepository.registrar).toHaveBeenCalledWith(
       expect.objectContaining({ usuario: 'analista-3', accion: 'GenerarInforme', detalle: 'Informe completo (pdf)' })
     );
-    expect(registrarAnalisisRealizadoUseCase.ejecutar).toHaveBeenCalledWith({
-      analistaId: 'analista-3',
-      tipoEvento: 'InformeGenerado',
-      payload: { formato: 'pdf' }
-    });
+    expect(historial.delCatalogo).toHaveBeenCalledWith('analista-3', 'InformeGenerado', { cadaVez: true, detalle: 'Formato PDF' });
     expect(servicioDeNotificaciones.notificarInformeListo).toHaveBeenCalledWith('analista-3', 'pdf');
   });
 
@@ -61,7 +50,7 @@ describe('GenerarInformeConAuditoria', () => {
     const usecase: GenerarInformeUseCase = { ejecutar: jest.fn().mockResolvedValue(archivo) };
     const auditoriaRepository = auditoriaFalsa();
     const servicioDeNotificaciones = servicioDeNotificacionesFalso();
-    const decorator = new GenerarInformeConAuditoria(usecase, auditoriaRepository, servicioDeNotificaciones, registrarAnalisisRealizadoFalso());
+    const decorator = new GenerarInformeConAuditoria(usecase, auditoriaRepository, servicioDeNotificaciones, historialFalso());
 
     const resultado = await decorator.ejecutar('html', 'analista-3', { adjuntarGraficos: true });
 
@@ -77,10 +66,12 @@ describe('GenerarInformeConAuditoria', () => {
     const usecase: GenerarInformeUseCase = { ejecutar: jest.fn().mockRejectedValue(new Error('catálogo vacío')) };
     const auditoriaRepository = auditoriaFalsa();
     const servicioDeNotificaciones = servicioDeNotificacionesFalso();
-    const decorator = new GenerarInformeConAuditoria(usecase, auditoriaRepository, servicioDeNotificaciones, registrarAnalisisRealizadoFalso());
+    const historial = historialFalso();
+    const decorator = new GenerarInformeConAuditoria(usecase, auditoriaRepository, servicioDeNotificaciones, historial);
 
     await expect(decorator.ejecutar('pdf', 'analista-3')).rejects.toThrow('catálogo vacío');
     expect(auditoriaRepository.registrar).not.toHaveBeenCalled();
+    expect(historial.delCatalogo).not.toHaveBeenCalled();
     expect(servicioDeNotificaciones.notificarInformeListo).not.toHaveBeenCalled();
   });
 });
