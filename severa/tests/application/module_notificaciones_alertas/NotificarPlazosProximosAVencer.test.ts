@@ -8,6 +8,8 @@ import { Vulnerabilidad } from '../../../src/domain/entities/Vulnerabilidad';
 import { IdentificadorCVE } from '../../../src/domain/shared/value-objects/IdentificadorCVE';
 import { CvssScore } from '../../../src/domain/shared/value-objects/CvssScore';
 import { TipoAccesoValue } from '../../../src/domain/shared/value-objects/TipoAcceso';
+import { EmisorDeAlertasDePlazo } from '../../../src/application/usecases/module_notificaciones_alertas/EmisorDeAlertasDePlazo';
+import { RegistroDeAlertasEmitidasEnMemoria, emisorDeAlertasDePrueba } from '../../dobles/RegistroDeAlertasEmitidasEnMemoria';
 
 function analistaRepositoryFalso(analistas: Analista[]): AnalistaRepository {
   return {
@@ -51,6 +53,7 @@ function servicioDeNotificacionesFalso(): ServicioDeNotificaciones {
     notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
     notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
     notificarLimpiezaCompletada: jest.fn().mockResolvedValue(undefined),
+    notificarResumenDeAlertasDePlazo: jest.fn().mockResolvedValue(undefined),
     notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
   };
 }
@@ -79,7 +82,7 @@ describe('NotificarPlazosProximosAVencer', () => {
     const usecase = new NotificarPlazosProximosAVencer(
       analistaRepositoryFalso([analistaA, analistaB]),
       vulnerabilidadRepository,
-      servicioDeNotificaciones
+      emisorDeAlertasDePrueba(servicioDeNotificaciones)
     );
 
     await usecase.ejecutar();
@@ -98,7 +101,7 @@ describe('NotificarPlazosProximosAVencer', () => {
     const usecase = new NotificarPlazosProximosAVencer(
       analistaRepositoryFalso([analista]),
       vulnerabilidadRepository,
-      servicioDeNotificaciones
+      emisorDeAlertasDePrueba(servicioDeNotificaciones)
     );
 
     await usecase.ejecutar();
@@ -113,12 +116,82 @@ describe('NotificarPlazosProximosAVencer', () => {
     const usecase = new NotificarPlazosProximosAVencer(
       analistaRepositoryFalso([]),
       vulnerabilidadRepository,
-      servicioDeNotificaciones
+      emisorDeAlertasDePrueba(servicioDeNotificaciones)
     );
 
     await usecase.ejecutar();
 
     expect(vulnerabilidadRepository.listar).not.toHaveBeenCalled();
     expect(servicioDeNotificaciones.notificarPlazoProximoAVencer).not.toHaveBeenCalled();
+  });
+
+  // RF-100: "la notificación se envía 48 horas antes del vencimiento". La
+  // tarea corre todos los días y una vulnerabilidad pasa dos días dentro de
+  // esa ventana: antes se avisaba las dos veces.
+  test('la corrida del día siguiente no repite el aviso de una vulnerabilidad que sigue en la ventana de 48 horas', async () => {
+    const analista = new Analista('analista-A', 'Ana', new Correo('ana@example.com'), 'hash', 'analista');
+    const servicioDeNotificaciones = servicioDeNotificacionesFalso();
+    const usecase = new NotificarPlazosProximosAVencer(
+      analistaRepositoryFalso([analista]),
+      vulnerabilidadRepositoryFalso({ 'analista-A': [vulnerabilidadProximaAVencer('1')] }),
+      emisorDeAlertasDePrueba(servicioDeNotificaciones)
+    );
+
+    await usecase.ejecutar();
+    await usecase.ejecutar();
+
+    expect(servicioDeNotificaciones.notificarPlazoProximoAVencer).toHaveBeenCalledTimes(1);
+  });
+
+  test('muchas por vencer a la vez: un resumen por analista, no una notificación por vulnerabilidad', async () => {
+    const analista = new Analista('analista-A', 'Ana', new Correo('ana@example.com'), 'hash', 'analista');
+    const muchas = Array.from({ length: 40 }, (_, i) => vulnerabilidadProximaAVencer(String(i + 1)));
+    const servicioDeNotificaciones = servicioDeNotificacionesFalso();
+    const usecase = new NotificarPlazosProximosAVencer(
+      analistaRepositoryFalso([analista]),
+      vulnerabilidadRepositoryFalso({ 'analista-A': muchas }),
+      emisorDeAlertasDePrueba(servicioDeNotificaciones)
+    );
+
+    await usecase.ejecutar();
+
+    expect(servicioDeNotificaciones.notificarPlazoProximoAVencer).not.toHaveBeenCalled();
+    expect(servicioDeNotificaciones.notificarResumenDeAlertasDePlazo).toHaveBeenCalledTimes(1);
+    expect(servicioDeNotificaciones.notificarResumenDeAlertasDePlazo).toHaveBeenCalledWith('analista-A', 'PlazoProximoAVencer', muchas);
+  });
+
+  test('la alerta de "por vencer" y la de "vencido" de una misma vulnerabilidad son independientes', async () => {
+    const registro = new RegistroDeAlertasEmitidasEnMemoria();
+    const servicioDeNotificaciones = servicioDeNotificacionesFalso();
+    const emisor = new EmisorDeAlertasDePlazo(registro, servicioDeNotificaciones);
+    const vulnerabilidad = vulnerabilidadProximaAVencer('1');
+
+    expect(await emisor.emitir('analista-A', 'PlazoProximoAVencer', [vulnerabilidad])).toBe(1);
+    expect(await emisor.emitir('analista-A', 'PlazoVencido', [vulnerabilidad])).toBe(1);
+    expect(await emisor.emitir('analista-A', 'PlazoVencido', [vulnerabilidad])).toBe(0);
+
+    expect(servicioDeNotificaciones.notificarPlazoProximoAVencer).toHaveBeenCalledTimes(1);
+    expect(servicioDeNotificaciones.notificarPlazoExcedido).toHaveBeenCalledTimes(1);
+  });
+
+  test('si falla con un analista, sigue con los demás y al final informa el fallo', async () => {
+    const analistaA = new Analista('analista-A', 'Ana', new Correo('ana@example.com'), 'hash', 'analista');
+    const analistaB = new Analista('analista-B', 'Beto', new Correo('beto@example.com'), 'hash', 'analista');
+    const servicioDeNotificaciones = servicioDeNotificacionesFalso();
+    (servicioDeNotificaciones.notificarPlazoProximoAVencer as jest.Mock).mockRejectedValueOnce(new Error('base caída'));
+    const usecase = new NotificarPlazosProximosAVencer(
+      analistaRepositoryFalso([analistaA, analistaB]),
+      vulnerabilidadRepositoryFalso({ 'analista-A': [vulnerabilidadProximaAVencer('1')], 'analista-B': [vulnerabilidadProximaAVencer('2')] }),
+      emisorDeAlertasDePrueba(servicioDeNotificaciones)
+    );
+
+    await expect(usecase.ejecutar()).rejects.toThrow('No se pudieron emitir las alertas de plazo de 1 analista(s): analista-A: base caída');
+
+    // Al analista B sí le llegó la suya.
+    expect(servicioDeNotificaciones.notificarPlazoProximoAVencer).toHaveBeenLastCalledWith(expect.objectContaining({ id: '2' }), 'analista-B');
+
+    // Y la del analista A quedó pendiente: la próxima corrida la emite.
+    await usecase.ejecutar();
+    expect(servicioDeNotificaciones.notificarPlazoProximoAVencer).toHaveBeenLastCalledWith(expect.objectContaining({ id: '1' }), 'analista-A');
   });
 });

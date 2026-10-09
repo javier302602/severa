@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   useEliminarNotificaciones,
+  useEliminarNotificacionesLeidas,
   useMarcarNotificacionLeida,
   useMarcarTodasLasNotificacionesLeidas,
   useNotificaciones
 } from '../../hooks/useNotificaciones';
+import { NOTIFICACIONES_POR_PAGINA } from '../../api/notificacionService';
 import { Spinner } from '../../components/ui/Spinner';
 import { MensajeError } from '../../components/ui/MensajeError';
 import { EstadoVacio } from '../../components/ui/EstadoVacio';
@@ -31,20 +33,43 @@ function etiquetaDeTipo(tipo: string): string {
   return (ETIQUETA_TIPO as Record<string, string>)[tipo] ?? 'Notificación';
 }
 
-// M-13 (RF-99 a RF-104). Reutiliza los hooks de Fase 1 (useNotificaciones,
-// useMarcarNotificacionLeida) — el badge del Header ya los usaba para el
-// contador; esta página es la vista completa a la que ese badge lleva.
+// M-13 (RF-99 a RF-104). El centro de notificaciones, de a páginas.
+//
+// Antes montaba una fila por cada notificación del analista, todas juntas:
+// con decenas de miles acumuladas la pantalla se quedaba sin memoria. Ahora
+// pide y dibuja una página (NOTIFICACIONES_POR_PAGINA) por vez; el total y la
+// cantidad de no leídas los informa el backend sobre todo el centro.
 export function NotificacionesPage() {
-  const { data, isLoading, isError, error } = useNotificaciones();
+  const [pagina, setPagina] = useState(0);
+  const { data, isLoading, isError, error, isPlaceholderData } = useNotificaciones(pagina);
   const marcarLeida = useMarcarNotificacionLeida();
   const marcarTodas = useMarcarTodasLasNotificacionesLeidas();
   const eliminarVarias = useEliminarNotificaciones();
-  const hayNoLeidas = (data ?? []).some((notificacion) => !notificacion.leida);
+  const eliminarLeidas = useEliminarNotificacionesLeidas();
 
-  // "Eliminar seleccionadas" (2026-07-20): Set de ids marcados con el
-  // checkbox — se limpia solo cuando cambia la lista de notificaciones
-  // (después de eliminar, o al refrescar), no en cada render.
+  const notificaciones = data?.notificaciones ?? [];
+  const total = data?.total ?? 0;
+  const noLeidas = data?.noLeidas ?? 0;
+  const leidas = total - noLeidas;
+  const totalDePaginas = Math.max(1, Math.ceil(total / NOTIFICACIONES_POR_PAGINA));
+
+  // "Eliminar seleccionadas": los ids marcados con la casilla. La selección
+  // es de la página que se está viendo: se vacía al cambiar de página.
   const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set());
+
+  const irAPagina = (nueva: number) => {
+    setPagina(nueva);
+    setSeleccionadas(new Set());
+  };
+
+  // Si la página que se estaba viendo quedó vacía (se eliminó lo último que
+  // tenía) y no es la primera, se retrocede a la última que sí tiene algo.
+  useEffect(() => {
+    if (data && !isPlaceholderData && pagina > 0 && pagina >= totalDePaginas) {
+      setPagina(totalDePaginas - 1);
+      setSeleccionadas(new Set());
+    }
+  }, [data, isPlaceholderData, pagina, totalDePaginas]);
 
   const alternarSeleccion = (id: string) => {
     setSeleccionadas((actual) => {
@@ -65,26 +90,32 @@ export function NotificacionesPage() {
     });
   };
 
+  const onEliminarLeidas = () => {
+    eliminarLeidas.mutate(undefined, { onSuccess: () => setSeleccionadas(new Set()) });
+  };
+
+  const claseBoton =
+    'rounded-md border border-slate-300 dark:border-slate-600 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50';
+  const claseBotonRojo =
+    'rounded-md border border-red-300 dark:border-red-700 px-3 py-1.5 text-xs text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-50';
+  const desde = total === 0 ? 0 : pagina * NOTIFICACIONES_POR_PAGINA + 1;
+  const hasta = pagina * NOTIFICACIONES_POR_PAGINA + notificaciones.length;
+
   return (
     <div className="max-w-2xl space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Notificaciones</h1>
-        <div className="flex shrink-0 gap-2">
-          <button
-            type="button"
-            disabled={seleccionadas.size === 0 || eliminarVarias.isPending}
-            onClick={onEliminarSeleccionadas}
-            className="rounded-md border border-red-300 dark:border-red-700 px-3 py-1.5 text-xs text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-50"
-          >
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <button type="button" disabled={seleccionadas.size === 0 || eliminarVarias.isPending} onClick={onEliminarSeleccionadas} className={claseBotonRojo}>
             {eliminarVarias.isPending ? 'Eliminando…' : `Eliminar seleccionadas${seleccionadas.size > 0 ? ` (${seleccionadas.size})` : ''}`}
           </button>
-          {hayNoLeidas && (
-            <button
-              type="button"
-              disabled={marcarTodas.isPending}
-              onClick={() => marcarTodas.mutate()}
-              className="rounded-md border border-slate-300 dark:border-slate-600 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50"
-            >
+          {leidas > 0 && (
+            <button type="button" disabled={eliminarLeidas.isPending} onClick={onEliminarLeidas} className={claseBotonRojo}>
+              {eliminarLeidas.isPending ? 'Eliminando…' : `Eliminar las leídas (${leidas})`}
+            </button>
+          )}
+          {noLeidas > 0 && (
+            <button type="button" disabled={marcarTodas.isPending} onClick={() => marcarTodas.mutate()} className={claseBoton}>
               {marcarTodas.isPending ? 'Marcando…' : 'Marcar todas como leídas'}
             </button>
           )}
@@ -96,11 +127,18 @@ export function NotificacionesPage() {
       {marcarLeida.isError && <MensajeError mensaje={mensajeDeError(marcarLeida.error)} />}
       {marcarTodas.isError && <MensajeError mensaje={mensajeDeError(marcarTodas.error)} />}
       {eliminarVarias.isError && <MensajeError mensaje={mensajeDeError(eliminarVarias.error)} />}
-      {data && data.length === 0 && <EstadoVacio mensaje="No tenés notificaciones." />}
+      {eliminarLeidas.isError && <MensajeError mensaje={mensajeDeError(eliminarLeidas.error)} />}
+      {data && total === 0 && <EstadoVacio mensaje="No tenés notificaciones." />}
 
-      {data && data.length > 0 && (
+      {data && total > 0 && (
+        <p className="text-sm text-slate-600 dark:text-slate-400" role="status">
+          {total} notificación(es), {noLeidas} sin leer. Mostrando {desde}–{hasta}.
+        </p>
+      )}
+
+      {notificaciones.length > 0 && (
         <ul className="divide-y divide-slate-200 dark:divide-slate-700 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
-          {data.map((notificacion) => {
+          {notificaciones.map((notificacion) => {
             const marcandoEsta = marcarLeida.isPending && marcarLeida.variables === notificacion.id;
 
             return (
@@ -138,6 +176,20 @@ export function NotificacionesPage() {
             );
           })}
         </ul>
+      )}
+
+      {totalDePaginas > 1 && (
+        <nav className="flex items-center justify-between gap-4" aria-label="Páginas de notificaciones">
+          <button type="button" disabled={pagina === 0} onClick={() => irAPagina(pagina - 1)} className={claseBoton}>
+            ← Más recientes
+          </button>
+          <span className="text-xs text-slate-600 dark:text-slate-400">
+            Página {pagina + 1} de {totalDePaginas}
+          </span>
+          <button type="button" disabled={pagina >= totalDePaginas - 1} onClick={() => irAPagina(pagina + 1)} className={claseBoton}>
+            Más antiguas →
+          </button>
+        </nav>
       )}
     </div>
   );

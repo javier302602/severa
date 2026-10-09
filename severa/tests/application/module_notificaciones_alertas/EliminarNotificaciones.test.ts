@@ -4,6 +4,8 @@ import { NotificacionRepository } from '../../../src/application/ports/out/persi
 function notificacionRepositoryFalso(eliminarVarias: jest.Mock): NotificacionRepository {
   return {
     guardar: jest.fn(),
+    contarPorAnalista: jest.fn().mockResolvedValue({ total: 0, noLeidas: 0 }),
+    eliminarLeidas: jest.fn().mockResolvedValue(0),
     listarPorAnalista: jest.fn(),
     marcarComoLeida: jest.fn(),
     marcarTodasComoLeidas: jest.fn(),

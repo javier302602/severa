@@ -19,3 +19,13 @@ export interface Notificacion {
   fecha: string;
   mensaje: string;
 }
+
+// GET /notificaciones devuelve una página, más el total y la cantidad de no
+// leídas de TODO el centro de notificaciones (no solo de la página).
+export interface PaginaDeNotificaciones {
+  notificaciones: Notificacion[];
+  total: number;
+  noLeidas: number;
+  limite: number;
+  desplazamiento: number;
+}

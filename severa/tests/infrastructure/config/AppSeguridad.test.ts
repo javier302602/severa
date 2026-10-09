@@ -48,7 +48,10 @@ jest.mock('../../../src/infrastructure/config/container', () => ({
       ejecutar: jest.fn(async (id: string) => ANALISTAS[id])
     },
     obtenerNotificacionesUseCase: {
-      ejecutar: jest.fn(async (analistaId: string) => NOTIFICACIONES[analistaId] ?? [])
+      ejecutar: jest.fn(async (analistaId: string) => {
+        const notificaciones = NOTIFICACIONES[analistaId] ?? [];
+        return { notificaciones, total: notificaciones.length, noLeidas: notificaciones.length, limite: 50, desplazamiento: 0 };
+      })
     },
     marcarNotificacionLeidaUseCase: {
       // Simula el scoping por dueño de PostgresNotificacionRepository.marcarComoLeida:
@@ -192,8 +195,9 @@ describe('Seguridad HTTP de la aplicación (M-12)', () => {
     const res = await conHttps(request(app).get('/notificaciones').set('Authorization', `Bearer ${tokenA}`));
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(1);
-    expect(res.body[0].id).toBe('notif-a');
+    expect(res.body.notificaciones).toHaveLength(1);
+    expect(res.body.notificaciones[0].id).toBe('notif-a');
+    expect(res.body.total).toBe(1);
   });
 
   test('PATCH /notificaciones/:id/leida en una notificación de OTRO analista devuelve 404, no la marca como leída', async () => {

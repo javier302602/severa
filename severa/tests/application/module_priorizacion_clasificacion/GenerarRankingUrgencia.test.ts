@@ -6,6 +6,7 @@ import { IdentificadorCVE } from '../../../src/domain/shared/value-objects/Ident
 import { CvssScore } from '../../../src/domain/shared/value-objects/CvssScore';
 import { TipoAccesoValue } from '../../../src/domain/shared/value-objects/TipoAcceso';
 import { EstadoRemediacionValue } from '../../../src/domain/shared/value-objects/EstadoRemediacion';
+import { emisorDeAlertasDePrueba } from '../../dobles/RegistroDeAlertasEmitidasEnMemoria';
 
 function repoFalso(vulnerabilidades: Vulnerabilidad[]): VulnerabilidadRepository {
   return {
@@ -50,9 +51,10 @@ describe('GenerarRankingUrgencia', () => {
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
       notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
     notificarLimpiezaCompletada: jest.fn().mockResolvedValue(undefined),
+    notificarResumenDeAlertasDePlazo: jest.fn().mockResolvedValue(undefined),
     notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
     };
-    const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
+    const usecase = new GenerarRankingUrgencia(repo, emisorDeAlertasDePrueba(servicioDeNotificaciones));
 
     const ranking = await usecase.ejecutar('analista-1');
 
@@ -91,9 +93,10 @@ describe('GenerarRankingUrgencia', () => {
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
       notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
     notificarLimpiezaCompletada: jest.fn().mockResolvedValue(undefined),
+    notificarResumenDeAlertasDePlazo: jest.fn().mockResolvedValue(undefined),
     notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
     };
-    const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
+    const usecase = new GenerarRankingUrgencia(repo, emisorDeAlertasDePrueba(servicioDeNotificaciones));
 
     await usecase.ejecutar('analista-1');
 
@@ -119,9 +122,10 @@ describe('GenerarRankingUrgencia', () => {
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
       notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
     notificarLimpiezaCompletada: jest.fn().mockResolvedValue(undefined),
+    notificarResumenDeAlertasDePlazo: jest.fn().mockResolvedValue(undefined),
     notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
     };
-    const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
+    const usecase = new GenerarRankingUrgencia(repo, emisorDeAlertasDePrueba(servicioDeNotificaciones));
 
     await usecase.ejecutar('analista-7');
 
@@ -146,9 +150,10 @@ describe('GenerarRankingUrgencia', () => {
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
       notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
     notificarLimpiezaCompletada: jest.fn().mockResolvedValue(undefined),
+    notificarResumenDeAlertasDePlazo: jest.fn().mockResolvedValue(undefined),
     notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
     };
-    const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
+    const usecase = new GenerarRankingUrgencia(repo, emisorDeAlertasDePrueba(servicioDeNotificaciones));
 
     const ranking = await usecase.ejecutar('analista-1', undefined, 'Crítica');
 
@@ -168,9 +173,10 @@ describe('GenerarRankingUrgencia', () => {
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
       notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
     notificarLimpiezaCompletada: jest.fn().mockResolvedValue(undefined),
+    notificarResumenDeAlertasDePlazo: jest.fn().mockResolvedValue(undefined),
     notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
     };
-    const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
+    const usecase = new GenerarRankingUrgencia(repo, emisorDeAlertasDePrueba(servicioDeNotificaciones));
 
     await usecase.ejecutar('analista-1');
 
@@ -178,53 +184,118 @@ describe('GenerarRankingUrgencia', () => {
     expect(repo.filtrarPorSeveridad).not.toHaveBeenCalled();
   });
 
-  // Bug real (2026-07-19): con miles de vulnerabilidades vencidas, un solo
-  // Promise.all sin límite dispara todas las notificaciones (cada una un
-  // INSERT real) en paralelo — satura el pool de conexiones de Postgres.
-  // Se procesan en lotes chicos y secuenciales entre sí, sin cambiar CUÁLES
-  // vulnerabilidades se notifican.
-  test('con muchas vulnerabilidades vencidas, notifica en lotes (no todas en un solo Promise.all sin límite)', async () => {
-    const TOTAL = 450; // > 2 lotes de 200
-    const vencidas = Array.from(
-      { length: TOTAL },
-      (_, i) =>
-        new Vulnerabilidad(
-          String(i),
-          new IdentificadorCVE(`CVE-2021-${20000 + i}`),
-          new CvssScore(9.5),
-          'Software',
-          new TipoAccesoValue('Sí'),
-          5,
-          undefined,
-          undefined,
-          undefined,
-          new Date('2000-01-01T00:00:00Z') // Crítico, cargada hace décadas -> vencida
-        )
+  function vencida(id: string, cvss = 9.5): Vulnerabilidad {
+    // Crítico (plazo de 7 días), cargada hace décadas -> vencida.
+    return new Vulnerabilidad(
+      id,
+      new IdentificadorCVE(`CVE-2021-${20000 + Number(id)}`),
+      new CvssScore(cvss),
+      'Software',
+      new TipoAccesoValue('Sí'),
+      5,
+      undefined,
+      undefined,
+      undefined,
+      new Date('2000-01-01T00:00:00Z')
     );
-    const repo = repoFalso(vencidas);
-    let maximoEnParalelo = 0;
-    let enCurso = 0;
-    const servicioDeNotificaciones: ServicioDeNotificaciones = {
-      notificarPlazoExcedido: jest.fn().mockImplementation(async () => {
-        enCurso++;
-        maximoEnParalelo = Math.max(maximoEnParalelo, enCurso);
-        await Promise.resolve();
-        enCurso--;
-      }),
+  }
+
+  function servicioFalso(): jest.Mocked<ServicioDeNotificaciones> {
+    return {
+      notificarPlazoExcedido: jest.fn().mockResolvedValue(undefined),
       notificarPlazoProximoAVencer: jest.fn().mockResolvedValue(undefined),
       notificarVulnerabilidadCritica: jest.fn().mockResolvedValue(undefined),
       notificarInformeListo: jest.fn().mockResolvedValue(undefined),
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
       notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
-    notificarLimpiezaCompletada: jest.fn().mockResolvedValue(undefined),
-    notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
+      notificarLimpiezaCompletada: jest.fn().mockResolvedValue(undefined),
+      notificarResumenDeAlertasDePlazo: jest.fn().mockResolvedValue(undefined),
+      notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
     };
-    const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
+  }
+
+  // Bug real: generar el ranking es una consulta que se hace en cada visita
+  // a Priorización, y cada vez notificaba TODAS las vencidas otra vez. Con
+  // un catálogo grande el centro de notificaciones juntaba decenas de miles
+  // de avisos repetidos (y la pantalla que los mostraba se colgaba).
+  test('volver a generar el ranking no repite las alertas que ya se emitieron', async () => {
+    const servicioDeNotificaciones = servicioFalso();
+    const usecase = new GenerarRankingUrgencia(repoFalso([vencida('1'), vencida('2')]), emisorDeAlertasDePrueba(servicioDeNotificaciones));
+
+    await usecase.ejecutar('analista-1');
+    await usecase.ejecutar('analista-1');
+    await usecase.ejecutar('analista-1');
+
+    expect(servicioDeNotificaciones.notificarPlazoExcedido).toHaveBeenCalledTimes(2);
+  });
+
+  test('una vulnerabilidad que vence después sí se avisa, sin repetir las anteriores', async () => {
+    const servicioDeNotificaciones = servicioFalso();
+    const repo = repoFalso([vencida('1')]);
+    const usecase = new GenerarRankingUrgencia(repo, emisorDeAlertasDePrueba(servicioDeNotificaciones));
+    await usecase.ejecutar('analista-1');
+
+    (repo.listar as jest.Mock).mockResolvedValue([vencida('1'), vencida('2')]);
+    await usecase.ejecutar('analista-1');
+
+    expect(servicioDeNotificaciones.notificarPlazoExcedido).toHaveBeenCalledTimes(2);
+    expect(servicioDeNotificaciones.notificarPlazoExcedido).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: '2' }),
+      'analista-1'
+    );
+  });
+
+  test('cada analista recibe la alerta de sus propias vulnerabilidades, aunque compartan id', async () => {
+    const servicioDeNotificaciones = servicioFalso();
+    const usecase = new GenerarRankingUrgencia(repoFalso([vencida('1')]), emisorDeAlertasDePrueba(servicioDeNotificaciones));
+
+    await usecase.ejecutar('analista-1');
+    await usecase.ejecutar('analista-2');
+
+    expect(servicioDeNotificaciones.notificarPlazoExcedido.mock.calls.map(([, analistaId]) => analistaId)).toEqual(['analista-1', 'analista-2']);
+  });
+
+  test('con muchas vulnerabilidades vencidas emite UN resumen, no una notificación por cada una', async () => {
+    const TOTAL = 450;
+    const vencidas = Array.from({ length: TOTAL }, (_, i) => vencida(String(i)));
+    const servicioDeNotificaciones = servicioFalso();
+    const usecase = new GenerarRankingUrgencia(repoFalso(vencidas), emisorDeAlertasDePrueba(servicioDeNotificaciones));
 
     await usecase.ejecutar('analista-1');
 
-    expect(servicioDeNotificaciones.notificarPlazoExcedido).toHaveBeenCalledTimes(TOTAL);
-    expect(maximoEnParalelo).toBeLessThanOrEqual(200);
+    expect(servicioDeNotificaciones.notificarPlazoExcedido).not.toHaveBeenCalled();
+    expect(servicioDeNotificaciones.notificarResumenDeAlertasDePlazo).toHaveBeenCalledTimes(1);
+    const [analistaId, tipo, incluidas] = servicioDeNotificaciones.notificarResumenDeAlertasDePlazo.mock.calls[0];
+    expect(analistaId).toBe('analista-1');
+    expect(tipo).toBe('PlazoVencido');
+    expect(incluidas).toHaveLength(TOTAL);
+
+    // Y la segunda vez, nada.
+    await usecase.ejecutar('analista-1');
+    expect(servicioDeNotificaciones.notificarResumenDeAlertasDePlazo).toHaveBeenCalledTimes(1);
+  });
+
+  test('hasta 5 vencidas nuevas se avisan una por una; a partir de 6, en un resumen', async () => {
+    const cinco = servicioFalso();
+    await new GenerarRankingUrgencia(repoFalso(['1', '2', '3', '4', '5'].map((id) => vencida(id))), emisorDeAlertasDePrueba(cinco)).ejecutar('analista-1');
+    expect(cinco.notificarPlazoExcedido).toHaveBeenCalledTimes(5);
+    expect(cinco.notificarResumenDeAlertasDePlazo).not.toHaveBeenCalled();
+
+    const seis = servicioFalso();
+    await new GenerarRankingUrgencia(repoFalso(['1', '2', '3', '4', '5', '6'].map((id) => vencida(id))), emisorDeAlertasDePrueba(seis)).ejecutar('analista-1');
+    expect(seis.notificarPlazoExcedido).not.toHaveBeenCalled();
+    expect(seis.notificarResumenDeAlertasDePlazo).toHaveBeenCalledTimes(1);
+  });
+
+  test('si no se pudo avisar, el ranking falla y la alerta se vuelve a intentar la próxima vez (no se pierde)', async () => {
+    const servicioDeNotificaciones = servicioFalso();
+    servicioDeNotificaciones.notificarPlazoExcedido.mockRejectedValueOnce(new Error('base caída'));
+    const usecase = new GenerarRankingUrgencia(repoFalso([vencida('1')]), emisorDeAlertasDePrueba(servicioDeNotificaciones));
+
+    await expect(usecase.ejecutar('analista-1')).rejects.toThrow('base caída');
+    await usecase.ejecutar('analista-1');
+
+    expect(servicioDeNotificaciones.notificarPlazoExcedido).toHaveBeenCalledTimes(2);
   });
 
   // RF-71 (auditoría M-09, frente B): plazosPersonalizados llega hasta
@@ -248,9 +319,10 @@ describe('GenerarRankingUrgencia', () => {
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
       notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
       notificarLimpiezaCompletada: jest.fn().mockResolvedValue(undefined),
+      notificarResumenDeAlertasDePlazo: jest.fn().mockResolvedValue(undefined),
       notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
     };
-    const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
+    const usecase = new GenerarRankingUrgencia(repo, emisorDeAlertasDePrueba(servicioDeNotificaciones));
 
     await usecase.ejecutar('analista-1', undefined, undefined, { plazosPersonalizados: { Crítico: 1, Alto: 30, Moderado: 90, Bajo: 180 } });
 
@@ -274,9 +346,10 @@ describe('GenerarRankingUrgencia', () => {
       notificarActualizacionDisponible: jest.fn().mockResolvedValue(undefined),
       notificarPerfilActualizado: jest.fn().mockResolvedValue(undefined),
       notificarLimpiezaCompletada: jest.fn().mockResolvedValue(undefined),
+      notificarResumenDeAlertasDePlazo: jest.fn().mockResolvedValue(undefined),
       notificarImportacionCompletada: jest.fn().mockResolvedValue(undefined)
     };
-    const usecase = new GenerarRankingUrgencia(repo, servicioDeNotificaciones);
+    const usecase = new GenerarRankingUrgencia(repo, emisorDeAlertasDePrueba(servicioDeNotificaciones));
 
     const ranking = await usecase.ejecutar('analista-1', undefined, undefined, { pesoCriterio: 0.3, pesoUrgencia: 0.7 });
 

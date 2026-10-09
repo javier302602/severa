@@ -4,6 +4,7 @@ import { Notificacion } from '../../../../domain/entities/Notificacion';
 import { ResumenDeLimpiezaNotificable, ServicioDeNotificaciones } from '../../../../application/ports/out/notificaciones/ServicioDeNotificaciones';
 import { NotificacionRepository } from '../../../../application/ports/out/persistencia/repositorios/NotificacionRepository';
 import { FormatoDeInforme } from '../../../../application/ports/out/reportes/GeneradorDeInformes';
+import { TipoDeAlertaDePlazo, redactarResumenDeAlertasDePlazo } from '../../../../domain/services/notificaciones/AlertasDePlazo';
 
 // Stub de Sprint 09 (RF-76), ampliado en Sprint 13 (RF-99 a RF-102): el envío
 // real (correo/Slack/etc.) sigue pendiente, pero ahora además de escribir en
@@ -38,6 +39,13 @@ export class ConsolaServicioDeNotificaciones implements ServicioDeNotificaciones
     await this.notificacionRepository.guardar(
       new Notificacion(randomUUID(), 'PlazoProximoAVencer', analistaId, false, new Date(), mensaje)
     );
+  }
+
+  async notificarResumenDeAlertasDePlazo(analistaId: string, tipo: TipoDeAlertaDePlazo, vulnerabilidades: Vulnerabilidad[]): Promise<void> {
+    if (vulnerabilidades.length === 0) return;
+    const mensaje = redactarResumenDeAlertasDePlazo(tipo, vulnerabilidades);
+    console.log(`[ALERTA ${tipo === 'PlazoVencido' ? 'RF-76' : 'RF-100'}] ${mensaje}`);
+    await this.notificacionRepository.guardar(new Notificacion(randomUUID(), tipo, analistaId, false, new Date(), mensaje));
   }
 
   async notificarVulnerabilidadCritica(vulnerabilidad: Vulnerabilidad, analistaId: string): Promise<void> {

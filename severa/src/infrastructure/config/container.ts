@@ -49,6 +49,8 @@ import { GenerarRankingUrgencia } from '../../application/usecases/module_priori
 import { MarcarEnProcesoDeRemediacion } from '../../application/usecases/module_priorizacion_clasificacion/MarcarEnProcesoDeRemediacion';
 import { MarcarComoRemediada } from '../../application/usecases/module_priorizacion_clasificacion/MarcarComoRemediada';
 import { ConsolaServicioDeNotificaciones } from '../adapters/out/notificaciones/ConsolaServicioDeNotificaciones';
+import { PostgresRegistroDeAlertasEmitidas } from '../adapters/out/persistencia/repositorios/PostgresRegistroDeAlertasEmitidas';
+import { EmisorDeAlertasDePlazo } from '../../application/usecases/module_notificaciones_alertas/EmisorDeAlertasDePlazo';
 import { GenerarInforme } from '../../application/usecases/module_reportes_exportacion/GenerarInforme';
 import { GenerarResumenEjecutivo } from '../../application/usecases/module_reportes_exportacion/GenerarResumenEjecutivo';
 import { ProgramarInformePeriodico } from '../../application/usecases/module_reportes_exportacion/ProgramarInformePeriodico';
@@ -64,6 +66,7 @@ import { ObtenerNotificaciones } from '../../application/usecases/module_notific
 import { MarcarNotificacionLeida } from '../../application/usecases/module_notificaciones_alertas/MarcarNotificacionLeida';
 import { MarcarTodasLasNotificacionesLeidas } from '../../application/usecases/module_notificaciones_alertas/MarcarTodasLasNotificacionesLeidas';
 import { EliminarNotificaciones } from '../../application/usecases/module_notificaciones_alertas/EliminarNotificaciones';
+import { EliminarNotificacionesLeidas } from '../../application/usecases/module_notificaciones_alertas/EliminarNotificacionesLeidas';
 import { IniciarSesionConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/IniciarSesionConAuditoria';
 import { ImportarDatasetConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/ImportarDatasetConAuditoria';
 import { MarcarEnProcesoDeRemediacionConAuditoria } from '../../application/usecases/module_seguridad_auditoria/decoradores/MarcarEnProcesoDeRemediacionConAuditoria';
@@ -130,6 +133,9 @@ const graficosOutputPort = new SvgGraficosAdapter();
 // de notificaciones persistido), compartido por todos los casos de uso que
 // disparan alertas.
 const servicioDeNotificaciones = new ConsolaServicioDeNotificaciones(notificacionRepository);
+// RF-76/RF-100: un solo emisor para las dos alertas de plazo, con memoria
+// de lo ya emitido (migración 017) para no repetirlas en cada evaluación.
+const emisorDeAlertasDePlazo = new EmisorDeAlertasDePlazo(new PostgresRegistroDeAlertasEmitidas(pool), servicioDeNotificaciones);
 const geradorDeInformes = new GeneradorInformePDF();
 const programadorDeTareas = new NodeCronProgramadorDeTareas();
 // Mejora 4 (Análisis de Datos General) — Fase 3: una sola instancia
@@ -276,7 +282,7 @@ export const container = {
   compararPorCategoriaUseCase: new CompararPorCategoria(vulnerabilidadRepository),
   compararPorCategoriasCruzadasUseCase: new CompararPorCategoriasCruzadas(vulnerabilidadRepository),
   clasificarRiesgoUseCase: new ClasificarRiesgo(vulnerabilidadRepository),
-  generarRankingUrgenciaUseCase: new GenerarRankingUrgencia(vulnerabilidadRepository, servicioDeNotificaciones),
+  generarRankingUrgenciaUseCase: new GenerarRankingUrgencia(vulnerabilidadRepository, emisorDeAlertasDePlazo),
   // RF-94: cambios de estado de remediación quedan auditados (quién y cuándo).
   marcarEnProcesoDeRemediacionUseCase: new MarcarEnProcesoDeRemediacionConAuditoria(
     new MarcarEnProcesoDeRemediacion(vulnerabilidadRepository),
@@ -307,6 +313,7 @@ export const container = {
   marcarNotificacionLeidaUseCase: new MarcarNotificacionLeida(notificacionRepository),
   marcarTodasLasNotificacionesLeidasUseCase: new MarcarTodasLasNotificacionesLeidas(notificacionRepository),
   eliminarNotificacionesUseCase: new EliminarNotificaciones(notificacionRepository),
+  eliminarNotificacionesLeidasUseCase: new EliminarNotificacionesLeidas(notificacionRepository),
   // Mejora 4 (Análisis de Datos General) — Fase 2: módulo nuevo y separado,
   // sin ninguna dependencia de los repositorios/casos de uso de
   // vulnerabilidades de arriba.
@@ -398,7 +405,7 @@ export const container = {
   notificarPlazosProximosAVencerUseCase: new NotificarPlazosProximosAVencer(
     analistaRepository,
     vulnerabilidadRepository,
-    servicioDeNotificaciones
+    emisorDeAlertasDePlazo
   ),
   // RF-100 (M-13, retoma): expuesto para que server.ts registre la tarea
   // cron de plazos próximos a vencer al arrancar — antes era una variable

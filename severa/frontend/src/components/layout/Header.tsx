@@ -12,7 +12,9 @@ export function Header() {
   // centro de notificaciones (Fase 2, M-13) sí maneja carga/error/vacío como
   // pantalla propia.
   const { data: notificaciones } = useNotificaciones();
-  const noLeidas = notificaciones?.filter((notificacion) => !notificacion.leida).length ?? 0;
+  // El número lo calcula el backend sobre TODAS las notificaciones, no sobre
+  // la página que se trajo.
+  const noLeidas = notificaciones?.noLeidas ?? 0;
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm px-6">
@@ -20,7 +22,7 @@ export function Header() {
         🔔
         {noLeidas > 0 && (
           <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-medium text-white">
-            {noLeidas}
+            {noLeidas > 99 ? '99+' : noLeidas}
           </span>
         )}
       </Link>

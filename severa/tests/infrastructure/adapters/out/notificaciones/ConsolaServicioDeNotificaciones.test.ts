@@ -14,9 +14,14 @@ function notificacionRepositoryEnMemoria(): NotificacionRepository & { registros
       registros.push(notificacion);
     }),
     listarPorAnalista: jest.fn(async (analistaId: string) => registros.filter((n) => n.destinatario === analistaId)),
+    contarPorAnalista: jest.fn(async (analistaId: string) => {
+      const propias = registros.filter((n) => n.destinatario === analistaId);
+      return { total: propias.length, noLeidas: propias.filter((n) => !n.leida).length };
+    }),
     marcarComoLeida: jest.fn().mockResolvedValue(true),
-  marcarTodasComoLeidas: jest.fn().mockResolvedValue(0),
-  eliminarVarias: jest.fn().mockResolvedValue(0)
+    marcarTodasComoLeidas: jest.fn().mockResolvedValue(0),
+    eliminarVarias: jest.fn().mockResolvedValue(0),
+    eliminarLeidas: jest.fn().mockResolvedValue(0)
   };
 }
 
@@ -222,5 +227,44 @@ describe('ConsolaServicioDeNotificaciones — notificarLimpiezaCompletada (RF-12
     await servicio.notificarLimpiezaCompletada('analista-7', resumen);
 
     expect(await notificacionRepository.listarPorAnalista('analista-8')).toHaveLength(0);
+  });
+});
+
+// RF-76/RF-100: muchas vulnerabilidades que entran juntas en la misma
+// situación de plazo generan UNA notificación.
+describe('ConsolaServicioDeNotificaciones — notificarResumenDeAlertasDePlazo', () => {
+  const vulnerabilidades = Array.from(
+    { length: 300 },
+    (_, i) => new Vulnerabilidad(String(i), new IdentificadorCVE(`CVE-2021-${10000 + i}`), new CvssScore(9.5), 'Software', new TipoAccesoValue('Sí'))
+  );
+
+  test('guarda una sola notificación para las 300, del tipo que corresponde', async () => {
+    const notificacionRepository = notificacionRepositoryEnMemoria();
+    const servicio = new ConsolaServicioDeNotificaciones(notificacionRepository);
+
+    await servicio.notificarResumenDeAlertasDePlazo('analista-7', 'PlazoVencido', vulnerabilidades);
+
+    expect(notificacionRepository.registros).toHaveLength(1);
+    expect(notificacionRepository.registros[0]).toMatchObject({ tipo: 'PlazoVencido', destinatario: 'analista-7', leida: false });
+    expect(notificacionRepository.registros[0].mensaje).toMatch(/^Plazo de remediación excedido en 300 vulnerabilidades: .* y 297 más\. El detalle está en Priorización\.$/);
+  });
+
+  test('el resumen de "próximo a vencer" queda con su propio tipo', async () => {
+    const notificacionRepository = notificacionRepositoryEnMemoria();
+    const servicio = new ConsolaServicioDeNotificaciones(notificacionRepository);
+
+    await servicio.notificarResumenDeAlertasDePlazo('analista-7', 'PlazoProximoAVencer', vulnerabilidades);
+
+    expect(notificacionRepository.registros[0].tipo).toBe('PlazoProximoAVencer');
+    expect(notificacionRepository.registros[0].mensaje).toMatch(/próximo a vencer/);
+  });
+
+  test('sin vulnerabilidades no guarda nada', async () => {
+    const notificacionRepository = notificacionRepositoryEnMemoria();
+    const servicio = new ConsolaServicioDeNotificaciones(notificacionRepository);
+
+    await servicio.notificarResumenDeAlertasDePlazo('analista-7', 'PlazoVencido', []);
+
+    expect(notificacionRepository.guardar).not.toHaveBeenCalled();
   });
 });

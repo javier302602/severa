@@ -16,6 +16,7 @@ import { BuscarConFiltros } from '../../src/application/usecases/module_busqueda
 import { recopilarDatosDeInforme } from '../../src/application/usecases/module_reportes_exportacion/RecopilarDatosDeInforme';
 import { GraficosOutputPort } from '../../src/application/ports/out/graphics/GraficosOutputPort';
 import { ServicioDeNotificaciones } from '../../src/application/ports/out/notificaciones/ServicioDeNotificaciones';
+import { emisorDeAlertasDePrueba } from '../dobles/RegistroDeAlertasEmitidasEnMemoria';
 
 // Test de integración REAL (Paso 5 — multi-tenancy): pega contra el mismo
 // Postgres real que PostgresVulnerabilidadRepository.integration.test.ts
@@ -70,6 +71,7 @@ function servicioDeNotificacionesFalso(): ServicioDeNotificaciones {
     notificarInformeListo: async () => {},
     notificarActualizacionDisponible: async () => {},
     notificarLimpiezaCompletada: async () => {},
+    notificarResumenDeAlertasDePlazo: async () => {},
     notificarImportacionCompletada: async () => {}
   };
 }
@@ -233,7 +235,7 @@ describe('Multi-tenancy: aislamiento de datos por analista (Paso 5) — integrac
   // ------------------------------------------------------------------
   describe('Priorización (GenerarRankingUrgencia)', () => {
     test('el ranking de B nunca incluye CVEs exclusivos de A, y viceversa', async () => {
-      const usecase = new GenerarRankingUrgencia(vulnerabilidadRepository, servicioDeNotificacionesFalso());
+      const usecase = new GenerarRankingUrgencia(vulnerabilidadRepository, emisorDeAlertasDePrueba(servicioDeNotificacionesFalso()));
 
       const rankingA = await usecase.ejecutar(ANALISTA_A);
       const rankingB = await usecase.ejecutar(ANALISTA_B);

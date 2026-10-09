@@ -1,5 +1,6 @@
 import { Vulnerabilidad } from '../../../../domain/entities/Vulnerabilidad';
 import { FormatoDeInforme } from '../reportes/GeneradorDeInformes';
+import { TipoDeAlertaDePlazo } from '../../../../domain/services/notificaciones/AlertasDePlazo';
 
 // RF-76 (Sprint 09) + RF-99 a RF-102 (Sprint 13): único puerto de salida para
 // "algo notificable ocurrió". Cada método es responsable de avisar (hoy,
@@ -21,6 +22,11 @@ export interface ServicioDeNotificaciones {
   // 'PlazoVencido'), reusarlo para "está por vencer" confundiría al analista
   // sobre si ya venció o no (ver auditoría de retoma M-13, punto 7).
   notificarPlazoProximoAVencer(vulnerabilidad: Vulnerabilidad, analistaId: string): Promise<void>;
+  // RF-76/RF-100: UNA notificación para muchas vulnerabilidades que entran
+  // juntas en la misma situación de plazo, en vez de una por cada una (ver
+  // EmisorDeAlertasDePlazo, que decide cuándo corresponde esta y cuándo las
+  // individuales de arriba).
+  notificarResumenDeAlertasDePlazo(analistaId: string, tipo: TipoDeAlertaDePlazo, vulnerabilidades: Vulnerabilidad[]): Promise<void>;
   // RF-99: alerta de vulnerabilidad crítica (CVSS >= 9.0) recién importada.
   // Ya no se dispara una vez por fila crítica (bug real reportado: importar
   // un dataset con muchas críticas inundaba el centro de notificaciones con
