@@ -12,8 +12,14 @@ export interface RegistroAuditoria {
   accion: string;
   detalle: string;
   fechaHora: string;
+  // RF-138: el dataset genérico sobre el que se hizo la operación, si la
+  // operación fue sobre uno (carga, limpieza, imputación, exportación…).
+  // Es siempre el id del dataset ORIGINAL de la familia.
+  datasetId?: string | null;
 }
 
 export const auditoriaService = {
-  listar: (): Promise<RegistroAuditoria[]> => httpClient.get('/auditoria')
+  // Con datasetId, solo la auditoría de ese dataset (sirve el id del
+  // original o el de cualquiera de sus versiones).
+  listar: (datasetId?: string): Promise<RegistroAuditoria[]> => httpClient.get('/auditoria', datasetId ? { datasetId } : undefined)
 };

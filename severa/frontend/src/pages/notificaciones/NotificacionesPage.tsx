@@ -11,13 +11,25 @@ import { EstadoVacio } from '../../components/ui/EstadoVacio';
 import { mensajeDeError } from '../../utils/mensajeDeError';
 import type { TipoNotificacion } from '../../types/Notificacion';
 
+// Una etiqueta por cada tipo que emite el backend (TipoNotificacion en
+// Notificacion.ts). Faltaban 'PlazoProximoAVencer' y 'PerfilActualizado': esas
+// notificaciones se mostraban sin etiqueta.
 const ETIQUETA_TIPO: Record<TipoNotificacion, string> = {
   VulnerabilidadCritica: 'Vulnerabilidad crítica',
   PlazoVencido: 'Plazo vencido',
+  PlazoProximoAVencer: 'Plazo próximo a vencer',
   InformeListo: 'Informe listo',
   ActualizacionNVD: 'Actualización NVD',
-  ImportacionCompletada: 'Importación completada'
+  ImportacionCompletada: 'Importación completada',
+  PerfilActualizado: 'Perfil actualizado',
+  LimpiezaCompletada: 'Limpieza completada'
 };
+
+// Si el backend sumara un tipo que esta pantalla todavía no conoce, se
+// muestra una etiqueta genérica en vez de dejar el lugar vacío.
+function etiquetaDeTipo(tipo: string): string {
+  return (ETIQUETA_TIPO as Record<string, string>)[tipo] ?? 'Notificación';
+}
 
 // M-13 (RF-99 a RF-104). Reutiliza los hooks de Fase 1 (useNotificaciones,
 // useMarcarNotificacionLeida) — el badge del Header ya los usaba para el
@@ -106,7 +118,7 @@ export function NotificacionesPage() {
                 <div className="flex flex-1 items-start justify-between gap-4">
                   <div>
                     <p className="text-xs font-medium uppercase tracking-wide text-slate-600 dark:text-slate-400">
-                      {ETIQUETA_TIPO[notificacion.tipo]}
+                      {etiquetaDeTipo(notificacion.tipo)}
                     </p>
                     <p className="text-sm text-slate-900 dark:text-slate-100">{notificacion.mensaje}</p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">{new Date(notificacion.fecha).toLocaleString()}</p>
