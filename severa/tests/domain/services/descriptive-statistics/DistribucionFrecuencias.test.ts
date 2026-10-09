@@ -71,6 +71,53 @@ describe('generarIntervalosEquiespaciados (RF-34/RF-39)', () => {
   });
 });
 
+// Bug real: los límites se redondeaban siempre a 6 decimales. Una columna de
+// precios quedaba con intervalos "[12-1643.333333)", etiquetas que se pisaban
+// en el eje del histograma del informe.
+describe('generarIntervalosEquiespaciados — precisión de los límites según el ancho del intervalo', () => {
+  test('rango grande: límites enteros', () => {
+    expect(generarIntervalosEquiespaciados(12, 9800, 6).map((intervalo) => intervalo.superior)).toEqual([1643, 3275, 4906, 6537, 8169, 9800]);
+  });
+
+  test('rango de unidades: dos decimales', () => {
+    expect(generarIntervalosEquiespaciados(1, 44, 6).map((intervalo) => intervalo.superior)).toEqual([8.17, 15.33, 22.5, 29.67, 36.83, 44]);
+  });
+
+  test('rango muy chico: los decimales necesarios para que los límites no se confundan entre sí', () => {
+    const intervalos = generarIntervalosEquiespaciados(0, 0.01, 4);
+    expect(intervalos.map((intervalo) => intervalo.superior)).toEqual([0.0025, 0.005, 0.0075, 0.01]);
+  });
+
+  test('los extremos son el mínimo y el máximo reales, sin redondear (el mínimo nunca queda fuera de su intervalo)', () => {
+    const intervalos = generarIntervalosEquiespaciados(12.6, 9800.4, 6);
+    expect(intervalos[0].inferior).toBe(12.6);
+    expect(intervalos[intervalos.length - 1].superior).toBe(9800.4);
+  });
+
+  test('los intervalos son contiguos y estrictamente crecientes', () => {
+    [
+      [12, 9800, 6],
+      [1, 44, 6],
+      [0, 0.01, 4],
+      [-50.5, 50.5, 7],
+      [0, 1e-7, 3]
+    ].forEach(([minimo, maximo, cantidad]) => {
+      const intervalos = generarIntervalosEquiespaciados(minimo, maximo, cantidad);
+      expect(intervalos).toHaveLength(cantidad);
+      intervalos.forEach((intervalo, indice) => {
+        expect(intervalo.superior).toBeGreaterThan(intervalo.inferior);
+        if (indice > 0) expect(intervalo.inferior).toBe(intervalos[indice - 1].superior);
+      });
+    });
+  });
+
+  test('toda la muestra cae en algún intervalo de la tabla agrupada (ningún valor se pierde por el redondeo)', () => {
+    const valores = [12.6, 13, 500.25, 1643.4, 1643.6, 4906.49, 4906.5, 9800.4];
+    const tabla = generarTablaAgrupada(valores, generarIntervalosEquiespaciados(12.6, 9800.4, 6));
+    expect(tabla.reduce((total, fila) => total + fila.frecuenciaAbsoluta, 0)).toBe(valores.length);
+  });
+});
+
 describe('validarNumeroDeIntervalos (RF-39)', () => {
   test.each([2, 5, 10, 30])('acepta %i como válido (entero dentro de [2,30])', (numero) => {
     expect(() => validarNumeroDeIntervalos(numero)).not.toThrow();

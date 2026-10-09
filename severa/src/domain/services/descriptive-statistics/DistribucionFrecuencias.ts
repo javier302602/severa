@@ -80,14 +80,37 @@ export function calcularCantidadIntervalosAutomatica(cantidadDeValores: number):
   );
 }
 
-// Sin este redondeo, dividir un rango arbitrario en N partes iguales deja
-// restos de coma flotante en los límites (ej. 36.400000000000006 en vez de
-// 36.4) — bug real confirmado generando el informe de Fase 5. Los intervalos
-// con límites fijos (INTERVALOS_POR_DEFECTO) nunca lo sufren porque sus
-// límites ya son enteros exactos; acá sí hace falta porque el ancho de cada
-// intervalo se calcula en el momento a partir de min/max.
-function redondear(valor: number): number {
-  return Math.round(valor * 1e6) / 1e6;
+// Sin redondeo, dividir un rango arbitrario en N partes iguales deja restos
+// de coma flotante en los límites (ej. 36.400000000000006 en vez de 36.4) —
+// bug real confirmado generando el informe de Fase 5. Los intervalos con
+// límites fijos (INTERVALOS_POR_DEFECTO) nunca lo sufren porque sus límites
+// ya son enteros exactos; acá sí hace falta porque el ancho de cada intervalo
+// se calcula en el momento a partir de min/max.
+//
+// El primer arreglo redondeaba siempre a 6 decimales. Eso quitaba el resto de
+// coma flotante pero dejaba límites como 1643.333333 para una columna de
+// precios: etiquetas "[12-1643.333333)" que no entran en el eje de un
+// histograma (se pisaban unas con otras en el informe) y que sugieren una
+// precisión que el dato no tiene. Ahora la cantidad de decimales depende del
+// ancho del intervalo: la suficiente para que el ancho conserve al menos 3
+// cifras significativas (ancho 1631 -> 0 decimales; 7.17 -> 2; 0.004 -> 5).
+// Se redondea el LÍMITE real, no solo su etiqueta: la tabla dice exactamente
+// con qué número se decidió a qué intervalo va cada valor.
+//
+// El tope de 12 decimales no es una decisión de presentación sino el límite
+// de lo que un double representa con sentido; con el tope fijo de 6 que tenía
+// la versión anterior, una variable de rango muy chico (0 a 0.0000001)
+// quedaba con todos sus límites redondeados al mismo número.
+const DECIMALES_MAXIMOS_DE_LIMITE = 12;
+
+function decimalesParaAncho(ancho: number): number {
+  if (!Number.isFinite(ancho) || ancho <= 0) return DECIMALES_MAXIMOS_DE_LIMITE;
+  return Math.min(DECIMALES_MAXIMOS_DE_LIMITE, Math.max(0, 2 - Math.floor(Math.log10(ancho))));
+}
+
+function redondear(valor: number, decimales: number): number {
+  const factor = 10 ** decimales;
+  return Math.round(valor * factor) / factor;
 }
 
 // RF-34/RF-39: reparto equiespaciado genérico, compartido por ambos
@@ -109,10 +132,16 @@ export function generarIntervalosEquiespaciados(
   }
 
   const ancho = (maximo - minimo) / cantidadIntervalos;
+  const decimales = decimalesParaAncho(ancho);
+  // Los dos extremos del rango no se redondean: son el mínimo y el máximo
+  // reales. Redondear el primero hacia arriba dejaría al propio mínimo fuera
+  // de la tabla (12.6 redondeado a 13 excluye a 12.6).
+  const limite = (indice: number): number =>
+    indice === 0 ? minimo : indice === cantidadIntervalos ? maximo : redondear(minimo + indice * ancho, decimales);
 
   return Array.from({ length: cantidadIntervalos }, (_, indice) => ({
-    inferior: redondear(minimo + indice * ancho),
-    superior: indice === cantidadIntervalos - 1 ? maximo : redondear(minimo + (indice + 1) * ancho)
+    inferior: limite(indice),
+    superior: limite(indice + 1)
   }));
 }
 
