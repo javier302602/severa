@@ -10,13 +10,18 @@ import { TEXTO_AYUDA_LINK_DATASET } from '../../constants/textosImportacion';
 
 const MIME_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
-function base64AArrayBuffer(base64: string): Uint8Array {
+// Devuelve el ArrayBuffer (no la vista Uint8Array): con el TypeScript del
+// lockfile (5.9), Uint8Array es genérico sobre su buffer y el tipo de retorno
+// "Uint8Array" a secas incluye SharedArrayBuffer, que Blob no acepta —
+// `npm run build` fallaba en esta línea (`vite dev` no chequea tipos, por eso
+// en desarrollo no se veía).
+function base64AArrayBuffer(base64: string): ArrayBuffer {
   const binario = atob(base64);
   const bytes = new Uint8Array(binario.length);
   for (let i = 0; i < binario.length; i++) {
     bytes[i] = binario.charCodeAt(i);
   }
-  return bytes;
+  return bytes.buffer;
 }
 
 type Modo = 'archivo' | 'link';
