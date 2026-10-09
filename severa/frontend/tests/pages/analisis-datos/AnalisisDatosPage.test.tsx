@@ -97,7 +97,8 @@ describe('AnalisisDatosPage', () => {
       'Serie de tiempo',
       'Variable objetivo',
       'Valores faltantes',
-      'Versiones y bitácora'
+      'Versiones y bitácora',
+      'Plantillas'
     ]);
     // RF-111: el tipo de cada variable se puede corregir desde la tabla.
     expect(screen.getByLabelText('Tipo de edad')).toBeEnabled();
@@ -121,6 +122,7 @@ describe('AnalisisDatosPage', () => {
     expect(pestanas).not.toContain('Variable objetivo');
     expect(pestanas).not.toContain('Valores faltantes');
     expect(pestanas).not.toContain('Versiones y bitácora');
+    expect(pestanas).not.toContain('Plantillas');
     expect(screen.queryByLabelText('Tipo de edad')).not.toBeInTheDocument();
   });
 

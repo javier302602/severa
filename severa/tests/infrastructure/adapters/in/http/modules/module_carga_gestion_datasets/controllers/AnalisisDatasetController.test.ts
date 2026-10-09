@@ -226,7 +226,12 @@ describe('PATCH /analisis-datos/:datasetId/criterio-clasificacion — RF-139', (
     const datasetActualizado = new DatasetGenerico(
       'dataset-1', 'analista-A', 'riesgos.xlsx', ['Producto', 'Puntaje'], 'archivo', null, 0, new Date(), criterio, null
     );
-    (container.configurarCriterioDeClasificacionUseCase.ejecutar as jest.Mock).mockResolvedValueOnce(datasetActualizado);
+    (container.configurarCriterioDeClasificacionUseCase.ejecutar as jest.Mock).mockResolvedValueOnce({
+      dataset: datasetActualizado,
+      huboCambio: true,
+      criterioAnterior: null,
+      columnaClaveAnterior: null
+    });
 
     const res = await conHttps(
       request(app)

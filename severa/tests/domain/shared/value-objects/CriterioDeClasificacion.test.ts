@@ -88,4 +88,37 @@ describe('CriterioDeClasificacionValue', () => {
       expect(reconstruido.tipo).toBe('ordinal');
     });
   });
+
+  describe('esIgualA — mismo criterio, sin importar cómo se mandó', () => {
+    const base = CriterioDeClasificacionValue.numerica('Puntaje', [
+      { minimo: 0, etiqueta: 'Bajo' },
+      { minimo: 8, etiqueta: 'Alto' }
+    ]);
+
+    test('los mismos umbrales en otro orden son el mismo criterio', () => {
+      const otro = CriterioDeClasificacionValue.desdeJSON({
+        nombreColumna: 'Puntaje',
+        tipo: 'numerica',
+        umbrales: [
+          { etiqueta: 'Bajo', minimo: 0 },
+          { etiqueta: 'Alto', minimo: 8 }
+        ]
+      });
+      expect(base.esIgualA(otro)).toBe(true);
+    });
+
+    test('otra etiqueta, otro mínimo, otra columna o null: distinto', () => {
+      expect(base.esIgualA(CriterioDeClasificacionValue.numerica('Puntaje', [{ minimo: 0, etiqueta: 'Bajo' }, { minimo: 8, etiqueta: 'Muy alto' }]))).toBe(false);
+      expect(base.esIgualA(CriterioDeClasificacionValue.numerica('Puntaje', [{ minimo: 0, etiqueta: 'Bajo' }, { minimo: 7, etiqueta: 'Alto' }]))).toBe(false);
+      expect(base.esIgualA(CriterioDeClasificacionValue.numerica('Nota', [{ minimo: 0, etiqueta: 'Bajo' }, { minimo: 8, etiqueta: 'Alto' }]))).toBe(false);
+      expect(base.esIgualA(null)).toBe(false);
+    });
+
+    test('en un criterio ordinal el orden de las categorías sí importa', () => {
+      const ordinal = CriterioDeClasificacionValue.ordinal('Prioridad', ['Baja', 'Alta']);
+      expect(ordinal.esIgualA(CriterioDeClasificacionValue.ordinal('Prioridad', ['Baja', 'Alta']))).toBe(true);
+      expect(ordinal.esIgualA(CriterioDeClasificacionValue.ordinal('Prioridad', ['Alta', 'Baja']))).toBe(false);
+    });
+  });
 });
+

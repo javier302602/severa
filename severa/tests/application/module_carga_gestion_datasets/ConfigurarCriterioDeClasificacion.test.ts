@@ -4,6 +4,7 @@ import { DatasetGenerico } from '../../../src/domain/entities/DatasetGenerico';
 import { RegistroDatasetGenerico } from '../../../src/domain/entities/RegistroDatasetGenerico';
 import { DatasetGenericoNoEncontradoError } from '../../../src/domain/errors/DatasetGenericoNoEncontradoError';
 import { ColumnaDeDatasetInvalidaError } from '../../../src/domain/errors/ColumnaDeDatasetInvalidaError';
+import { CriterioDeClasificacionValue } from '../../../src/domain/shared/value-objects/CriterioDeClasificacion';
 
 function repositorioFalso(dataset: DatasetGenerico | null, registros: RegistroDatasetGenerico[] = []): jest.Mocked<DatasetGenericoRepository> {
   return {
@@ -56,7 +57,7 @@ describe('ConfigurarCriterioDeClasificacion', () => {
       ]
     });
 
-    expect(resultado.criterioClasificacion?.clasificar(9)).toBe('Alto');
+    expect(resultado.dataset.criterioClasificacion?.clasificar(9)).toBe('Alto');
     expect(repository.actualizarCriterioClasificacion).toHaveBeenCalledWith(
       'd1',
       'analista-A',
@@ -75,7 +76,7 @@ describe('ConfigurarCriterioDeClasificacion', () => {
       ordenCategorias: ['Baja', 'Alta']
     });
 
-    expect(resultado.criterioClasificacion?.clasificar('Alta')).toBe('Alta');
+    expect(resultado.dataset.criterioClasificacion?.clasificar('Alta')).toBe('Alta');
   });
 
   test('acepta columnaClave junto con el criterio en el mismo llamado', async () => {
@@ -89,7 +90,7 @@ describe('ConfigurarCriterioDeClasificacion', () => {
       columnaClave: 'Producto'
     });
 
-    expect(resultado.columnaClave).toBe('Producto');
+    expect(resultado.dataset.columnaClave).toBe('Producto');
     expect(repository.actualizarCriterioClasificacion).toHaveBeenCalledWith(
       'd1',
       'analista-A',
@@ -111,7 +112,7 @@ describe('ConfigurarCriterioDeClasificacion', () => {
       umbrales: [{ minimo: 0, etiqueta: 'Bajo' }]
     });
 
-    expect(resultado.columnaClave).toBe('Producto');
+    expect(resultado.dataset.columnaClave).toBe('Producto');
   });
 
   test('lanza DatasetGenericoNoEncontradoError si el dataset no existe o es de otro analista', async () => {
@@ -201,5 +202,89 @@ describe('ConfigurarCriterioDeClasificacion', () => {
     await expect(
       usecase.ejecutar('d2', 'analista-A', { nombreColumna: 'Prioridad', tipo: 'ordinal', ordenCategorias: [] })
     ).rejects.toThrow(ColumnaDeDatasetInvalidaError);
+  });
+
+  test('RF-123: cada cambio de criterio queda en la bitácora con el criterio anterior y el nuevo', async () => {
+    const repository = repositorioFalso(datasetNumerico, registrosNumericos);
+    const usecase = new ConfigurarCriterioDeClasificacion(repository);
+
+    const resultado = await usecase.ejecutar('d1', 'analista-A', {
+      nombreColumna: 'Puntaje',
+      tipo: 'numerica',
+      umbrales: [{ minimo: 0, etiqueta: 'Bajo' }],
+      columnaClave: 'Producto'
+    });
+
+    expect(resultado.huboCambio).toBe(true);
+    expect(repository.registrarEnBitacora).toHaveBeenCalledTimes(1);
+    const [dataset, operaciones] = repository.registrarEnBitacora.mock.calls[0];
+    expect(dataset).toBe(datasetNumerico);
+    expect(operaciones).toEqual([
+      expect.objectContaining({
+        operacion: 'configurar_criterio',
+        variable: 'Puntaje',
+        registrosAfectados: 2,
+        metodo: 'umbrales numéricos',
+        detalle: {
+          anterior: { criterio: null, columnaClave: null },
+          nuevo: { criterio: expect.objectContaining({ nombreColumna: 'Puntaje', tipo: 'numerica' }), columnaClave: 'Producto' }
+        }
+      })
+    ]);
+  });
+
+  test('el mismo criterio y la misma columna clave no guardan ni anotan nada (aunque los umbrales vengan en otro orden)', async () => {
+    const criterio = CriterioDeClasificacionValue.numerica('Puntaje', [
+      { minimo: 8, etiqueta: 'Alto' },
+      { minimo: 0, etiqueta: 'Bajo' }
+    ]);
+    const yaConfigurado = new DatasetGenerico(
+      'd1', 'analista-A', 'riesgos.xlsx', ['Producto', 'Puntaje'], 'archivo', null, 0, new Date(), criterio, 'Producto'
+    );
+    const repository = repositorioFalso(yaConfigurado, registrosNumericos);
+    const usecase = new ConfigurarCriterioDeClasificacion(repository);
+
+    const resultado = await usecase.ejecutar('d1', 'analista-A', {
+      nombreColumna: 'Puntaje',
+      tipo: 'numerica',
+      umbrales: [
+        { etiqueta: 'Bajo', minimo: 0 },
+        { etiqueta: 'Alto', minimo: 8 }
+      ]
+    });
+
+    expect(resultado.huboCambio).toBe(false);
+    expect(repository.actualizarCriterioClasificacion).not.toHaveBeenCalled();
+    expect(repository.registrarEnBitacora).not.toHaveBeenCalled();
+  });
+
+  test('cambiar solo la columna clave sí cuenta como cambio', async () => {
+    const criterio = CriterioDeClasificacionValue.numerica('Puntaje', [{ minimo: 0, etiqueta: 'Bajo' }]);
+    const yaConfigurado = new DatasetGenerico(
+      'd1', 'analista-A', 'riesgos.xlsx', ['Producto', 'Puntaje'], 'archivo', null, 0, new Date(), criterio, null
+    );
+    const repository = repositorioFalso(yaConfigurado, registrosNumericos);
+    const usecase = new ConfigurarCriterioDeClasificacion(repository);
+
+    const resultado = await usecase.ejecutar('d1', 'analista-A', {
+      nombreColumna: 'Puntaje',
+      tipo: 'numerica',
+      umbrales: [{ minimo: 0, etiqueta: 'Bajo' }],
+      columnaClave: 'Producto'
+    });
+
+    expect(resultado.huboCambio).toBe(true);
+    expect(resultado.columnaClaveAnterior).toBeNull();
+    expect(repository.registrarEnBitacora).toHaveBeenCalledTimes(1);
+  });
+
+  test('un criterio rechazado no deja nada en la bitácora', async () => {
+    const repository = repositorioFalso(datasetNumerico, registrosNumericos);
+    const usecase = new ConfigurarCriterioDeClasificacion(repository);
+
+    await expect(
+      usecase.ejecutar('d1', 'analista-A', { nombreColumna: 'Puntaje', tipo: 'ordinal', ordenCategorias: ['a'] })
+    ).rejects.toThrow(ColumnaDeDatasetInvalidaError);
+    expect(repository.registrarEnBitacora).not.toHaveBeenCalled();
   });
 });

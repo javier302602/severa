@@ -190,7 +190,7 @@ export interface ResultadoDeLimpiezaAplicada extends DatasetAbierto {
 }
 
 // --- RF-123/136: bitácora y versiones ----------------------------------------
-export type OperacionDeBitacora = EstrategiaDeFaltantes | 'corregir_tipo' | 'definir_variable_objetivo';
+export type OperacionDeBitacora = EstrategiaDeFaltantes | 'corregir_tipo' | 'definir_variable_objetivo' | 'configurar_criterio';
 
 export interface EntradaDeBitacora {
   id: string;
@@ -352,6 +352,74 @@ export interface ResultadoOutliers {
 }
 
 
+// --- RF-12: plantillas de análisis -------------------------------------------
+export interface UmbralDeClasificacion {
+  minimo: number;
+  etiqueta: string;
+}
+
+export interface CriterioDeClasificacion {
+  nombreColumna: string;
+  tipo: 'numerica' | 'ordinal';
+  umbrales?: UmbralDeClasificacion[];
+  ordenCategorias?: string[];
+}
+
+export interface ConfiguracionDePlantilla {
+  tiposCorregidos: CorreccionesDeTipo;
+  // Solo una variable objetivo confirmada viaja en la plantilla.
+  variableObjetivo: string | null;
+  clasificacion: { criterio: CriterioDeClasificacion; columnaClave: string | null } | null;
+}
+
+export interface PlantillaDeAnalisis {
+  id: string;
+  nombre: string;
+  fechaCreacion: string;
+  configuracion: ConfiguracionDePlantilla;
+  // Las columnas que un dataset tiene que tener para poder aplicarla.
+  columnas: string[];
+}
+
+export type CambioDePlantilla =
+  | { tipo: 'tipo_de_variable'; columna: string; tipoActual: TipoColumnaDetallado; tipoNuevo: TipoColumnaDetallado }
+  | { tipo: 'variable_objetivo'; columna: string; actual: DecisionVariableObjetivo }
+  | {
+      tipo: 'criterio_de_clasificacion';
+      criterioActual: CriterioDeClasificacion | null;
+      criterioNuevo: CriterioDeClasificacion;
+      columnaClaveActual: string | null;
+      columnaClaveNueva: string | null;
+      categoriasSinOrden: string[];
+    };
+
+export interface PlanDeAplicacionDePlantilla {
+  columnasFaltantes: string[];
+  problemas: string[];
+  // Solo lo que todavía falta aplicar, en el orden en que se aplica.
+  cambios: CambioDePlantilla[];
+  yaVigentes: number;
+  aplicable: boolean;
+}
+
+interface DatosDeLaAplicacion {
+  plantilla: { id: string; nombre: string };
+  datasetOriginalId: string;
+  nombreArchivo: string;
+  version: number;
+}
+
+export interface VistaPreviaDePlantilla extends DatosDeLaAplicacion {
+  plan: PlanDeAplicacionDePlantilla;
+  huella: string;
+}
+
+export interface ResultadoDeAplicacionDePlantilla extends DatosDeLaAplicacion {
+  cambiosAplicados: CambioDePlantilla[];
+  tiposCorregidos: CorreccionesDeTipo;
+  diagnostico: DiagnosticoDeCalidad;
+}
+
 export const analisisDatosService = {
   analizar: (archivo: File): Promise<DiagnosticoDataset> => {
     const formData = new FormData();
@@ -399,5 +467,18 @@ export const analisisDatosService = {
   listarVersiones: (datasetId: string): Promise<ResumenDeVersion[]> => httpClient.get(`/analisis-datos/${datasetId}/versiones`),
   abrirDataset: (datasetId: string): Promise<DatasetAbierto> => httpClient.post(`/analisis-datos/${datasetId}/abrir`),
   obtenerBitacora: (datasetId: string): Promise<EntradaDeBitacora[]> => httpClient.get(`/analisis-datos/${datasetId}/bitacora`),
-  exportarDataset: (datasetId: string): Promise<Blob> => httpClient.get(`/analisis-datos/${datasetId}/exportar`)
+  exportarDataset: (datasetId: string): Promise<Blob> => httpClient.get(`/analisis-datos/${datasetId}/exportar`),
+
+  // RF-12 (M-02): plantillas de análisis.
+  listarPlantillas: (): Promise<PlantillaDeAnalisis[]> => httpClient.get('/plantillas-analisis'),
+  guardarPlantilla: (sesionId: string, nombre: string): Promise<PlantillaDeAnalisis> =>
+    httpClient.post(`/analisis-datos/${sesionId}/plantillas`, { nombre }),
+  eliminarPlantilla: (plantillaId: string): Promise<void> => httpClient.delete(`/plantillas-analisis/${plantillaId}`),
+  previsualizarPlantilla: (sesionId: string, plantillaId: string): Promise<VistaPreviaDePlantilla> =>
+    httpClient.get(`/analisis-datos/${sesionId}/plantillas/${plantillaId}/vista-previa`),
+  // Como aplicarLimpieza: manda la confirmación siempre; quien lo llama es
+  // responsable de habérsela pedido al analista, mostrándole la vista previa
+  // cuya huella manda (ver PlantillasSeccion).
+  aplicarPlantilla: (sesionId: string, plantillaId: string, huella: string): Promise<ResultadoDeAplicacionDePlantilla> =>
+    httpClient.post(`/analisis-datos/${sesionId}/plantillas/${plantillaId}/aplicar`, { huella, confirmado: true })
 };

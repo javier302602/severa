@@ -167,3 +167,59 @@ export function useAbrirDataset() {
 export function useExportarDataset() {
   return useMutation({ mutationFn: (datasetId: string) => analisisDatosService.exportarDataset(datasetId) });
 }
+
+// --- RF-12: plantillas de análisis --------------------------------------------
+
+// Las plantillas son del analista, no de un dataset ni de una sesión.
+const CLAVE_PLANTILLAS = ['plantillas-analisis'] as const;
+
+export function usePlantillas() {
+  return useQuery({ queryKey: CLAVE_PLANTILLAS, queryFn: analisisDatosService.listarPlantillas });
+}
+
+export function useGuardarPlantilla(sesionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (nombre: string) => analisisDatosService.guardarPlantilla(sesionId, nombre),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: CLAVE_PLANTILLAS });
+    }
+  });
+}
+
+export function useEliminarPlantilla() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (plantillaId: string) => analisisDatosService.eliminarPlantilla(plantillaId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: CLAVE_PLANTILLAS });
+    }
+  });
+}
+
+// Cuelga de la sesión: corregir un tipo o aplicar la plantilla la invalida, y
+// la vista previa se vuelve a pedir mostrando solo lo que todavía falta.
+export function useVistaPreviaDePlantilla(sesionId: string, plantillaId: string | null) {
+  return useQuery({
+    queryKey: ['analisis-datos', sesionId, 'plantilla-vista-previa', plantillaId],
+    queryFn: () => analisisDatosService.previsualizarPlantilla(sesionId, plantillaId!),
+    enabled: plantillaId !== null
+  });
+}
+
+// Aplicar cambia tipos, variable objetivo y criterio: se recalculan todos los
+// análisis de la sesión (igual que al corregir un tipo a mano, RF-111) y la
+// bitácora tiene entradas nuevas. Si falla (por ejemplo, la vista previa ya
+// no era la vigente), también se invalida la sesión: la vista previa se
+// vuelve a pedir y muestra lo que de verdad falta.
+export function useAplicarPlantilla(sesionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ plantillaId, huella }: { plantillaId: string; huella: string }) =>
+      analisisDatosService.aplicarPlantilla(sesionId, plantillaId, huella),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['analisis-datos', sesionId] });
+      void queryClient.invalidateQueries({ queryKey: CLAVE_BITACORAS });
+    }
+  });
+}

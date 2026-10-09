@@ -188,7 +188,7 @@ analisisDatasetAnalizarRouter.patch('/analisis-datos/:datasetId/criterio-clasifi
   }
 
   try {
-    const dataset = await container.configurarCriterioDeClasificacionUseCase.ejecutar(req.params.datasetId, analistaId, {
+    const { dataset } = await container.configurarCriterioDeClasificacionUseCase.ejecutar(req.params.datasetId, analistaId, {
       nombreColumna,
       tipo,
       umbrales,

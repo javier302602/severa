@@ -14,6 +14,17 @@ import { DatasetExportado, ExportarDatasetGenericoUseCase } from '../../../ports
 import { DecisionDeTratamiento } from '../../../../domain/services/data-cleaning/TratamientoDeFaltantesGenerico';
 import { RegistrarEnHistorialDeAnalisisUseCase } from '../../../ports/in/module_perfil_analista/RegistrarEnHistorialDeAnalisisUseCase';
 import { ETIQUETA_DE_TIPO_DETALLADO, TipoColumnaDetallado } from '../../../../domain/services/variable-detection/DetectorDeTipoDeColumna';
+import {
+  ConfigurarCriterioDeClasificacionInput,
+  ConfigurarCriterioDeClasificacionUseCase,
+  ResultadoConfiguracionDeCriterio
+} from '../../../ports/in/module_carga_gestion_datasets/ConfigurarCriterioDeClasificacionUseCase';
+import { CriterioDeClasificacionValue } from '../../../../domain/shared/value-objects/CriterioDeClasificacion';
+import {
+  AplicarPlantillaDeAnalisisUseCase,
+  ResultadoDeAplicacionDePlantilla,
+  VistaPreviaDePlantilla
+} from '../../../ports/in/module_perfil_analista/PlantillasDeAnalisisUseCases';
 
 // RF-138 (M-12): la auditoría central registra las operaciones relevantes
 // sobre datasets genéricos, cada una con el id del dataset ORIGINAL en
@@ -29,8 +40,9 @@ import { ETIQUETA_DE_TIPO_DETALLADO, TipoColumnaDetallado } from '../../../../do
 //   - eliminación:  no existe como operación — el sistema no tiene forma de
 //                   borrar un dataset genérico (solo se va con la cuenta,
 //                   RF-98, que ya audita EliminarCuentaConAuditoria)
-// y además las dos que cambian cómo se interpreta un dataset: corrección de
-// tipo (RF-111) y variable objetivo (RF-110).
+// y además las tres que cambian cómo se interpreta un dataset: corrección de
+// tipo (RF-111), variable objetivo (RF-110) y criterio de clasificación
+// (RF-139).
 //
 // Complementa, no reemplaza, la bitácora de RF-123: la bitácora es del
 // analista y tiene el detalle operación por operación; esto es el registro
@@ -175,5 +187,77 @@ export class ExportarDatasetGenericoConAuditoria implements ExportarDatasetGener
     });
 
     return exportado;
+  }
+}
+
+function describirCriterio(criterio: CriterioDeClasificacionValue): string {
+  if (criterio.tipo === 'numerica') {
+    const umbrales = (criterio.umbrales ?? []).map((umbral) => `${umbral.etiqueta} desde ${umbral.minimo}`).join(', ');
+    return `"${criterio.nombreColumna}" por umbrales (${umbrales})`;
+  }
+  return `"${criterio.nombreColumna}" por orden de categorías (${(criterio.ordenCategorias ?? []).join(' < ')})`;
+}
+
+export class ConfigurarCriterioDeClasificacionConAuditoria implements ConfigurarCriterioDeClasificacionUseCase {
+  constructor(
+    private readonly usecase: ConfigurarCriterioDeClasificacionUseCase,
+    private readonly auditoriaRepository: AuditoriaRepository
+  ) {}
+
+  async ejecutar(datasetId: string, analistaId: string, input: ConfigurarCriterioDeClasificacionInput): Promise<ResultadoConfiguracionDeCriterio> {
+    const resultado = await this.usecase.ejecutar(datasetId, analistaId, input);
+    const { dataset } = resultado;
+
+    if (resultado.huboCambio && dataset.criterioClasificacion) {
+      await this.auditoriaRepository.registrar({
+        usuario: analistaId,
+        accion: 'ConfigurarCriterioDeClasificacion',
+        detalle:
+          `${describirVersion(dataset.nombreArchivo, dataset.version)}: criterio de clasificación ${describirCriterio(dataset.criterioClasificacion)}` +
+          (dataset.columnaClave ? `, columna clave "${dataset.columnaClave}"` : ''),
+        datasetId: dataset.idDelOriginal
+      });
+    }
+
+    return resultado;
+  }
+}
+
+// RF-12: cada cambio que aplica una plantilla ya se audita por su lado (pasa
+// por los casos de uso decorados de arriba). Esto agrega UN registro que dice
+// que vinieron de una plantilla y de cuál, para que el administrador pueda
+// leer la historia completa.
+export class AplicarPlantillaDeAnalisisConAuditoria implements AplicarPlantillaDeAnalisisUseCase {
+  constructor(
+    private readonly usecase: AplicarPlantillaDeAnalisisUseCase,
+    private readonly auditoriaRepository: AuditoriaRepository
+  ) {}
+
+  // La vista previa no guarda nada: no hay operación que auditar.
+  previsualizar(analistaId: string, sesionId: string, plantillaId: string): Promise<VistaPreviaDePlantilla> {
+    return this.usecase.previsualizar(analistaId, sesionId, plantillaId);
+  }
+
+  async ejecutar(
+    analistaId: string,
+    sesionId: string,
+    plantillaId: string,
+    huella: string,
+    confirmado: boolean
+  ): Promise<ResultadoDeAplicacionDePlantilla> {
+    const resultado = await this.usecase.ejecutar(analistaId, sesionId, plantillaId, huella, confirmado);
+
+    if (resultado.cambiosAplicados.length > 0) {
+      await this.auditoriaRepository.registrar({
+        usuario: analistaId,
+        accion: 'AplicarPlantillaDeAnalisis',
+        detalle:
+          `${describirVersion(resultado.nombreArchivo, resultado.version)}: plantilla "${resultado.plantilla.nombre}" aplicada ` +
+          `(${resultado.cambiosAplicados.length} cambio(s))`,
+        datasetId: resultado.datasetOriginalId
+      });
+    }
+
+    return resultado;
   }
 }

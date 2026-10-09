@@ -29,7 +29,23 @@ function versionDeLaEntrada(entrada: EntradaDeBitacora): string {
   return entrada.versionResultado === null ? `sobre ${origen}` : `de ${origen} a versión ${entrada.versionResultado}`;
 }
 
+// RF-139: el criterio con el que quedó el dataset ("Alto desde 8, Bajo desde 0"
+// o "Baja < Media < Alta"), más la columna clave si la hay.
+function detalleDelCriterio(entrada: EntradaDeBitacora): string {
+  const nuevo = entrada.detalle.nuevo as
+    | { criterio?: { umbrales?: Array<{ minimo: number; etiqueta: string }>; ordenCategorias?: string[] } | null; columnaClave?: string | null }
+    | undefined;
+  const criterio = nuevo?.criterio;
+  if (!criterio) return entrada.metodo;
+  const reglas = criterio.umbrales
+    ? criterio.umbrales.map((umbral) => `${umbral.etiqueta} desde ${umbral.minimo}`).join(', ')
+    : (criterio.ordenCategorias ?? []).join(' < ');
+  const clave = nuevo?.columnaClave ? `; columna clave: ${nuevo.columnaClave}` : '';
+  return `${entrada.metodo}: ${reglas}${clave}`;
+}
+
 function detalleDeLaEntrada(entrada: EntradaDeBitacora): string {
+  if (entrada.operacion === 'configurar_criterio') return detalleDelCriterio(entrada);
   const valor = entrada.detalle.valorImputado;
   if (typeof valor === 'number') return `${entrada.metodo} (valor: ${Number(valor.toFixed(4))})`;
   if (typeof valor === 'string' || typeof valor === 'boolean') return `${entrada.metodo} (valor: ${String(valor)})`;

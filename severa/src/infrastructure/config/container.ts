@@ -110,10 +110,17 @@ import { ListarVersionesDeDataset } from '../../application/usecases/module_carg
 import { AbrirDatasetGenerico } from '../../application/usecases/module_carga_gestion_datasets/AbrirDatasetGenerico';
 import {
   AplicarLimpiezaDeDatasetConAuditoria,
+  AplicarPlantillaDeAnalisisConAuditoria,
+  ConfigurarCriterioDeClasificacionConAuditoria,
   CorregirTipoDeVariableConAuditoria,
   DefinirVariableObjetivoConAuditoria,
   ExportarDatasetGenericoConAuditoria
 } from '../../application/usecases/module_seguridad_auditoria/decoradores/OperacionesDeDatasetGenericoConAuditoria';
+import { PostgresPlantillaDeAnalisisRepository } from '../adapters/out/persistencia/repositorios/PostgresPlantillaDeAnalisisRepository';
+import { GuardarPlantillaDeAnalisis } from '../../application/usecases/module_perfil_analista/GuardarPlantillaDeAnalisis';
+import { ListarPlantillasDeAnalisis } from '../../application/usecases/module_perfil_analista/ListarPlantillasDeAnalisis';
+import { EliminarPlantillaDeAnalisis } from '../../application/usecases/module_perfil_analista/EliminarPlantillaDeAnalisis';
+import { AplicarPlantillaDeAnalisis } from '../../application/usecases/module_perfil_analista/AplicarPlantillaDeAnalisis';
 import { ConfigurarUmbralCritico } from '../../application/usecases/module_notificaciones_alertas/ConfigurarUmbralCritico';
 import { NotificarPlazosProximosAVencer } from '../../application/usecases/module_notificaciones_alertas/NotificarPlazosProximosAVencer';
 
@@ -126,6 +133,7 @@ const notificacionRepository = new PostgresNotificacionRepository(pool);
 const tokenRecuperacionRepository = new PostgresTokenRecuperacionRepository(pool);
 const historialAnalisisRepository = new PostgresHistorialAnalisisRepository(pool);
 const datasetGenericoRepository = new PostgresDatasetGenericoRepository(pool);
+const plantillaDeAnalisisRepository = new PostgresPlantillaDeAnalisisRepository(pool);
 const hasher = new BcryptHasher();
 // RF-03: adaptador simulado (consola), mismo criterio que
 // ConsolaServicioDeNotificaciones — no hay infraestructura SMTP real.
@@ -189,6 +197,22 @@ const generarDistribucionFrecuenciasUseCase = conHistorialDelCatalogo(
   historialDeAnalisis,
   'DistribucionDeFrecuencias',
   ([, analistaId]) => analistaId
+);
+
+// M-14 Ronda 2 (RF-110/111) y RF-139: las tres operaciones que cambian cómo
+// se interpreta un dataset genérico, con auditoría. Fuera del objeto porque
+// las usan dos entradas: sus propias rutas y la aplicación de plantillas (RF-12).
+const definirVariableObjetivoUseCase = new DefinirVariableObjetivoConAuditoria(
+  new DefinirVariableObjetivo(sesionAnalisisStore, datasetGenericoRepository),
+  auditoriaRepository
+);
+const corregirTipoDeVariableUseCase = new CorregirTipoDeVariableConAuditoria(
+  new CorregirTipoDeVariable(sesionAnalisisStore, datasetGenericoRepository),
+  auditoriaRepository
+);
+const configurarCriterioDeClasificacionUseCase = new ConfigurarCriterioDeClasificacionConAuditoria(
+  new ConfigurarCriterioDeClasificacion(datasetGenericoRepository),
+  auditoriaRepository
 );
 
 export const container = {
@@ -407,14 +431,8 @@ export const container = {
     historialDeAnalisis,
     'VariableObjetivo'
   ),
-  definirVariableObjetivoUseCase: new DefinirVariableObjetivoConAuditoria(
-    new DefinirVariableObjetivo(sesionAnalisisStore, datasetGenericoRepository),
-    auditoriaRepository
-  ),
-  corregirTipoDeVariableUseCase: new CorregirTipoDeVariableConAuditoria(
-    new CorregirTipoDeVariable(sesionAnalisisStore, datasetGenericoRepository),
-    auditoriaRepository
-  ),
+  definirVariableObjetivoUseCase,
+  corregirTipoDeVariableUseCase,
   // M-15, Ronda 2 (RF-120 a RF-123). El decorador de la limpieza audita
   // (RF-138) y emite la única notificación de resumen del proceso (RF-122).
   proponerTratamientoDeFaltantesUseCase: new ProponerTratamientoDeFaltantes(sesionAnalisisStore),
@@ -429,10 +447,27 @@ export const container = {
   listarDatasetsGenericosUseCase: new ListarDatasetsGenericos(datasetGenericoRepository),
   listarVersionesDeDatasetUseCase: new ListarVersionesDeDataset(datasetGenericoRepository),
   abrirDatasetGenericoUseCase: new AbrirDatasetGenerico(datasetGenericoRepository, sesionAnalisisStore),
-  // RF-139 (M-09, pieza habilitadora): sin decorador de auditoría — es
-  // configuración de cómo se lee el dataset, no una de las operaciones que
-  // enumera RF-138, y no es una escritura de vulnerabilidades (RF-94).
-  configurarCriterioDeClasificacionUseCase: new ConfigurarCriterioDeClasificacion(datasetGenericoRepository),
+  // RF-139 (M-09, pieza habilitadora): auditado como la corrección de tipo y
+  // la variable objetivo — las tres cambian cómo se interpreta el dataset, y
+  // las tres puede aplicarlas una plantilla de análisis (RF-12).
+  configurarCriterioDeClasificacionUseCase,
+  // RF-12 (M-02): plantillas de análisis. Aplicar una pasa por los tres casos
+  // de uso de arriba, ya decorados: cada cambio queda auditado y en la
+  // bitácora como si el analista lo hubiera hecho a mano.
+  guardarPlantillaDeAnalisisUseCase: new GuardarPlantillaDeAnalisis(sesionAnalisisStore, datasetGenericoRepository, plantillaDeAnalisisRepository),
+  listarPlantillasDeAnalisisUseCase: new ListarPlantillasDeAnalisis(plantillaDeAnalisisRepository),
+  eliminarPlantillaDeAnalisisUseCase: new EliminarPlantillaDeAnalisis(plantillaDeAnalisisRepository),
+  aplicarPlantillaDeAnalisisUseCase: new AplicarPlantillaDeAnalisisConAuditoria(
+    new AplicarPlantillaDeAnalisis(
+      sesionAnalisisStore,
+      datasetGenericoRepository,
+      plantillaDeAnalisisRepository,
+      corregirTipoDeVariableUseCase,
+      definirVariableObjetivoUseCase,
+      configurarCriterioDeClasificacionUseCase
+    ),
+    auditoriaRepository
+  ),
   // RF-135 (M-12): sin decorador de auditoría — es una consulta de
   // verificación, no una escritura ni una de las operaciones de RF-138.
   verificarIntegridadDatasetUseCase: new VerificarIntegridadDataset(datasetGenericoRepository),

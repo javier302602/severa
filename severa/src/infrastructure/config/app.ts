@@ -26,6 +26,7 @@ import { analisisDatasetAnalizarRouter } from '../adapters/in/http/modules/modul
 import { analisisDatasetOutliersRouter } from '../adapters/in/http/modules/module_limpieza_calidad_datos/controllers/AnalisisDatasetOutliersController';
 import { analisisDatasetCalidadRouter } from '../adapters/in/http/modules/module_limpieza_calidad_datos/controllers/AnalisisDatasetCalidadController';
 import { analisisDatasetInformeRouter } from '../adapters/in/http/modules/module_reportes_exportacion/controllers/AnalisisDatasetInformeController';
+import { plantillasDeAnalisisRouter } from '../adapters/in/http/modules/module_perfil_analista/controllers/PlantillasDeAnalisisController';
 import { analisisDatasetVariablesRouter } from '../adapters/in/http/modules/module_deteccion_variables/controllers/AnalisisDatasetVariablesController';
 import { analisisDatasetLimpiezaRouter } from '../adapters/in/http/modules/module_limpieza_calidad_datos/controllers/AnalisisDatasetLimpiezaController';
 import { analisisDatasetVersionesRouter } from '../adapters/in/http/modules/module_carga_gestion_datasets/controllers/AnalisisDatasetVersionesController';
@@ -108,6 +109,8 @@ export function createApp(): express.Express {
   app.use(analisisDatasetVariablesRouter);
   app.use(analisisDatasetLimpiezaRouter);
   app.use(analisisDatasetVersionesRouter);
+  // RF-12 (M-02): plantillas de análisis sobre esas mismas sesiones.
+  app.use(plantillasDeAnalisisRouter);
 
   // Red de seguridad global: bug real encontrado en Sprint 15 — varios
   // controllers (EstadisticaController, InformeController, el gráfico

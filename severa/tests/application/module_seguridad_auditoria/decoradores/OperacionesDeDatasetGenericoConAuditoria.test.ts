@@ -1,5 +1,6 @@
 import {
   AplicarLimpiezaDeDatasetConAuditoria,
+  ConfigurarCriterioDeClasificacionConAuditoria,
   CorregirTipoDeVariableConAuditoria,
   DefinirVariableObjetivoConAuditoria,
   ExportarDatasetGenericoConAuditoria
@@ -7,6 +8,7 @@ import {
 import { AplicarLimpiezaDeDataset } from '../../../../src/application/usecases/module_limpieza_calidad_datos/AplicarLimpiezaDeDataset';
 import { CorregirTipoDeVariable } from '../../../../src/application/usecases/module_deteccion_variables/CorregirTipoDeVariable';
 import { DefinirVariableObjetivo } from '../../../../src/application/usecases/module_deteccion_variables/DefinirVariableObjetivo';
+import { ConfigurarCriterioDeClasificacion } from '../../../../src/application/usecases/module_carga_gestion_datasets/ConfigurarCriterioDeClasificacion';
 import { ExportarDatasetGenerico } from '../../../../src/application/usecases/module_carga_gestion_datasets/ExportarDatasetGenerico';
 import { AuditoriaRepository } from '../../../../src/application/ports/out/persistencia/repositorios/AuditoriaRepository';
 import { ServicioDeNotificaciones } from '../../../../src/application/ports/out/notificaciones/ServicioDeNotificaciones';
@@ -234,6 +236,45 @@ describe('RF-138 — corrección de tipo y variable objetivo', () => {
         datasetId
       }
     ]);
+  });
+});
+
+describe('RF-138 — criterio de clasificación (RF-139)', () => {
+  test('fijar un criterio se audita contra el dataset original; repetirlo igual, no', async () => {
+    const { repositorio, auditoria, datasetId } = await preparar();
+    const configurar = new ConfigurarCriterioDeClasificacionConAuditoria(new ConfigurarCriterioDeClasificacion(repositorio), auditoria);
+    const input = {
+      nombreColumna: 'edad',
+      tipo: 'numerica' as const,
+      umbrales: [
+        { minimo: 30, etiqueta: 'Mayor' },
+        { minimo: 0, etiqueta: 'Menor' }
+      ],
+      columnaClave: 'ciudad'
+    };
+
+    await configurar.ejecutar(datasetId, 'analista-A', input);
+    await configurar.ejecutar(datasetId, 'analista-A', input);
+
+    expect(auditoria.registrar.mock.calls.map(([registro]) => registro)).toEqual([
+      {
+        usuario: 'analista-A',
+        accion: 'ConfigurarCriterioDeClasificacion',
+        detalle: '"encuesta.csv" (original): criterio de clasificación "edad" por umbrales (Mayor desde 30, Menor desde 0), columna clave "ciudad"',
+        datasetId
+      }
+    ]);
+    expect(repositorio.bitacora.map((entrada) => entrada.operacion)).toEqual(['configurar_criterio']);
+  });
+
+  test('un criterio rechazado no se audita', async () => {
+    const { repositorio, auditoria, datasetId } = await preparar();
+    const configurar = new ConfigurarCriterioDeClasificacionConAuditoria(new ConfigurarCriterioDeClasificacion(repositorio), auditoria);
+
+    await expect(
+      configurar.ejecutar(datasetId, 'analista-A', { nombreColumna: 'edad', tipo: 'ordinal', ordenCategorias: ['a'] })
+    ).rejects.toThrow();
+    expect(auditoria.registrar).not.toHaveBeenCalled();
   });
 });
 

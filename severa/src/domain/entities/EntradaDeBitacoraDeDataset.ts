@@ -10,7 +10,10 @@ export type OperacionDeBitacora =
   // RF-111: el analista cambió el tipo de una variable (o volvió al detectado).
   | 'corregir_tipo'
   // RF-110: el analista confirmó, cambió o rechazó la variable objetivo.
-  | 'definir_variable_objetivo';
+  | 'definir_variable_objetivo'
+  // RF-139: el analista fijó o cambió el criterio de clasificación (y la
+  // columna clave que viaja con él).
+  | 'configurar_criterio';
 
 export class EntradaDeBitacoraDeDataset {
   constructor(

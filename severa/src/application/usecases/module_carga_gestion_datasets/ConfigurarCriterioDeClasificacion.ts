@@ -1,21 +1,26 @@
 import {
   ConfigurarCriterioDeClasificacionUseCase,
-  ConfigurarCriterioDeClasificacionInput
+  ConfigurarCriterioDeClasificacionInput,
+  ResultadoConfiguracionDeCriterio
 } from '../../ports/in/module_carga_gestion_datasets/ConfigurarCriterioDeClasificacionUseCase';
 import { DatasetGenericoRepository } from '../../ports/out/persistencia/repositorios/DatasetGenericoRepository';
-import { DatasetGenerico } from '../../../domain/entities/DatasetGenerico';
 import { DatasetGenericoNoEncontradoError } from '../../../domain/errors/DatasetGenericoNoEncontradoError';
 import { ColumnaDeDatasetInvalidaError } from '../../../domain/errors/ColumnaDeDatasetInvalidaError';
-import { CriterioDeClasificacionValue } from '../../../domain/shared/value-objects/CriterioDeClasificacion';
 import { resolverTipoColumna } from '../../../domain/services/variable-detection/DetectorDeTipoDeColumna';
+import { construirCriterioParaColumna } from '../../../domain/services/classification/ValidacionDeCriterioDeClasificacion';
 
 // RF-139: pieza habilitadora. NO genera ranking ni filtra nada — solo valida
 // y persiste la elección del analista, consumida más adelante por
 // ClasificadorDeRiesgoGenerico (ver auditoría M-09, frentes A/B/C).
+//
+// Cada cambio queda en la bitácora del dataset (RF-123) con el criterio
+// anterior y el nuevo; la auditoría central la agrega el decorador
+// (ConfigurarCriterioDeClasificacionConAuditoria). Volver a mandar el mismo
+// criterio con la misma columna clave no guarda ni anota nada.
 export class ConfigurarCriterioDeClasificacion implements ConfigurarCriterioDeClasificacionUseCase {
   constructor(private readonly datasetGenericoRepository: DatasetGenericoRepository) {}
 
-  async ejecutar(datasetId: string, analistaId: string, input: ConfigurarCriterioDeClasificacionInput): Promise<DatasetGenerico> {
+  async ejecutar(datasetId: string, analistaId: string, input: ConfigurarCriterioDeClasificacionInput): Promise<ResultadoConfiguracionDeCriterio> {
     const dataset = await this.datasetGenericoRepository.buscarPorId(datasetId, analistaId);
     if (!dataset) {
       throw new DatasetGenericoNoEncontradoError();
@@ -31,40 +36,41 @@ export class ConfigurarCriterioDeClasificacion implements ConfigurarCriterioDeCl
     const registros = await this.datasetGenericoRepository.listarRegistros(datasetId, analistaId);
     const valoresDeLaColumna = registros.map((registro) => registro.valores[input.nombreColumna]);
     // El tipo vigente: el detectado, o el que el analista fijó a mano (RF-111).
-    const tipoDetectado = resolverTipoColumna(input.nombreColumna, valoresDeLaColumna, dataset.tiposCorregidos);
+    const tipoVigente = resolverTipoColumna(input.nombreColumna, valoresDeLaColumna, dataset.tiposCorregidos);
 
-    if (tipoDetectado === 'texto' || tipoDetectado === 'fecha') {
-      throw new ColumnaDeDatasetInvalidaError(
-        `La columna "${input.nombreColumna}" no es apta para clasificación (tipo detectado: ${tipoDetectado}). RF-139 exige una variable numérica u ordinal.`
-      );
-    }
-
-    const criterio = this.construirCriterio(input, tipoDetectado);
+    const criterio = construirCriterioParaColumna(input, tipoVigente);
     const columnaClave = input.columnaClave ?? dataset.columnaClave;
+    const criterioAnterior = dataset.criterioClasificacion;
+    const columnaClaveAnterior = dataset.columnaClave;
+
+    if (criterio.esIgualA(criterioAnterior) && columnaClave === columnaClaveAnterior) {
+      return { dataset, huboCambio: false, criterioAnterior, columnaClaveAnterior };
+    }
 
     await this.datasetGenericoRepository.actualizarCriterioClasificacion(datasetId, analistaId, criterio, columnaClave);
+    await this.datasetGenericoRepository.registrarEnBitacora(
+      dataset,
+      [
+        {
+          operacion: 'configurar_criterio',
+          variable: criterio.nombreColumna,
+          // Las filas que pasan a clasificarse con este criterio: todas.
+          registrosAfectados: registros.length,
+          metodo: criterio.tipo === 'numerica' ? 'umbrales numéricos' : 'orden de categorías',
+          detalle: {
+            anterior: { criterio: criterioAnterior?.toJSON() ?? null, columnaClave: columnaClaveAnterior },
+            nuevo: { criterio: criterio.toJSON(), columnaClave }
+          }
+        }
+      ],
+      new Date()
+    );
 
-    return dataset.conConfiguracion({ criterioClasificacion: criterio, columnaClave });
-  }
-
-  private construirCriterio(
-    input: ConfigurarCriterioDeClasificacionInput,
-    tipoDetectado: 'numerica' | 'categorica'
-  ): CriterioDeClasificacionValue {
-    if (tipoDetectado === 'numerica') {
-      if (input.tipo !== 'numerica' || !input.umbrales || input.umbrales.length === 0) {
-        throw new ColumnaDeDatasetInvalidaError(
-          `La columna "${input.nombreColumna}" es numérica: debe indicar tipo "numerica" y al menos un umbral`
-        );
-      }
-      return CriterioDeClasificacionValue.numerica(input.nombreColumna, input.umbrales);
-    }
-
-    if (input.tipo !== 'ordinal' || !input.ordenCategorias || input.ordenCategorias.length === 0) {
-      throw new ColumnaDeDatasetInvalidaError(
-        `La columna "${input.nombreColumna}" es categórica: debe indicar tipo "ordinal" y el orden de categorías`
-      );
-    }
-    return CriterioDeClasificacionValue.ordinal(input.nombreColumna, input.ordenCategorias);
+    return {
+      dataset: dataset.conConfiguracion({ criterioClasificacion: criterio, columnaClave }),
+      huboCambio: true,
+      criterioAnterior,
+      columnaClaveAnterior
+    };
   }
 }

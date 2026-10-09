@@ -37,7 +37,8 @@ export const ETIQUETA_DE_OPERACION: Record<OperacionDeBitacora, string> = {
   eliminar_columna: 'Eliminación de la variable',
   imputar: 'Imputación',
   corregir_tipo: 'Corrección de tipo',
-  definir_variable_objetivo: 'Variable objetivo'
+  definir_variable_objetivo: 'Variable objetivo',
+  configurar_criterio: 'Criterio de clasificación'
 };
 
 export function nombreDeVersion(version: number): string {

@@ -15,9 +15,15 @@ import { SerieDeTiempoSeccion } from './SerieDeTiempoSeccion';
 import { VariableObjetivoSeccion } from './VariableObjetivoSeccion';
 import { LimpiezaSeccion } from './LimpiezaSeccion';
 import { VersionesSeccion } from './VersionesSeccion';
+import { PlantillasSeccion } from './PlantillasSeccion';
 import { MisDatasets } from './MisDatasets';
 import { ContextoDeReapertura } from './contextoDeReapertura';
-import type { DatasetAbierto, DiagnosticoDeCalidad, ResultadoDeLimpiezaAplicada } from '../../api/analisisDatosService';
+import type {
+  DatasetAbierto,
+  DiagnosticoDeCalidad,
+  ResultadoDeAplicacionDePlantilla,
+  ResultadoDeLimpiezaAplicada
+} from '../../api/analisisDatosService';
 import { nombreDeArchivoDeInforme, type OpcionesDescargaDeInforme } from '../../api/formatosDeInforme';
 import { DescargaDeInforme } from '../../components/ui/DescargaDeInforme';
 import { nombreDeVersion } from '../../constants/tiposDeVariable';
@@ -36,7 +42,8 @@ const PESTANAS: Array<{ clave: Pestana; etiqueta: string; requiereDataset?: bool
   { clave: 'serie', etiqueta: 'Serie de tiempo' },
   { clave: 'objetivo', etiqueta: 'Variable objetivo', requiereDataset: true },
   { clave: 'limpieza', etiqueta: 'Valores faltantes', requiereDataset: true },
-  { clave: 'versiones', etiqueta: 'Versiones y bitácora', requiereDataset: true }
+  { clave: 'versiones', etiqueta: 'Versiones y bitácora', requiereDataset: true },
+  { clave: 'plantillas', etiqueta: 'Plantillas', requiereDataset: true }
 ];
 
 function claseDePestana(activa: boolean): string {
@@ -167,6 +174,16 @@ export function AnalisisDatosPage() {
     setAviso(resumenDeLaLimpieza(resultado));
   };
 
+  // RF-12: la plantilla cambió tipos (y tal vez variable objetivo y
+  // criterio). La tabla de variables se actualiza con el diagnóstico que
+  // devolvió el backend; los análisis de cada pestaña se vuelven a pedir solos
+  // (useAplicarPlantilla invalida toda la sesión). El informe que se haya
+  // generado antes ya no corresponde.
+  const onPlantillaAplicada = (resultado: ResultadoDeAplicacionDePlantilla) => {
+    mutacionInforme.reset();
+    setAbierto((actual) => (actual ? { ...actual, diagnostico: resultado.diagnostico } : actual));
+  };
+
   const onDescargarInforme = (opciones: OpcionesDescargaDeInforme) => {
     if (!abierto) return;
     mutacionInforme.mutate(
@@ -291,6 +308,9 @@ export function AnalisisDatosPage() {
                 abriendo={mutacionAbrir.isPending}
                 onAbrir={(id) => abrirDataset(id, 'versiones')}
               />
+            )}
+            {pestanaActiva === 'plantillas' && datasetId && (
+              <PlantillasSeccion sesionId={abierto.sesionId} onReiniciar={onReiniciar} onPlantillaAplicada={onPlantillaAplicada} />
             )}
           </div>
 

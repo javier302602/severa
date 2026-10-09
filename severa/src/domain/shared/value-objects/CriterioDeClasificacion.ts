@@ -79,4 +79,21 @@ export class CriterioDeClasificacionValue {
   static desdeJSON(json: CriterioDeClasificacionJSON): CriterioDeClasificacionValue {
     return new CriterioDeClasificacionValue(json.nombreColumna, json.tipo, json.umbrales, json.ordenCategorias);
   }
+
+  // Dos criterios son el mismo si clasifican igual: misma columna, mismo tipo
+  // y mismos umbrales (sin importar el orden en que se mandaron) o el mismo
+  // orden de categorías (acá el orden sí importa: es el criterio).
+  esIgualA(otro: CriterioDeClasificacionValue | null): boolean {
+    if (!otro || otro.nombreColumna !== this.nombreColumna || otro.tipo !== this.tipo) {
+      return false;
+    }
+    if (this.tipo === 'numerica') {
+      const normalizar = (umbrales: UmbralDeClasificacion[] | undefined): string =>
+        JSON.stringify(
+          [...(umbrales ?? [])].sort((a, b) => b.minimo - a.minimo).map((umbral) => [umbral.minimo, umbral.etiqueta])
+        );
+      return normalizar(this.umbrales) === normalizar(otro.umbrales);
+    }
+    return JSON.stringify(this.ordenCategorias ?? []) === JSON.stringify(otro.ordenCategorias ?? []);
+  }
 }

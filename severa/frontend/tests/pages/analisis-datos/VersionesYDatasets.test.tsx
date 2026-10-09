@@ -124,6 +124,45 @@ describe('VersionesSeccion', () => {
     expect(analisisDatosService.obtenerBitacora).toHaveBeenCalledWith('dataset-v1');
   });
 
+  test('RF-139: el cambio de criterio de clasificación aparece en la bitácora con el criterio y la columna clave', async () => {
+    vi.mocked(analisisDatosService.listarVersiones).mockResolvedValue(versiones);
+    vi.mocked(analisisDatosService.obtenerBitacora).mockResolvedValue([
+      entrada({
+        id: 'b3',
+        operacion: 'configurar_criterio',
+        variable: 'puntaje',
+        registrosAfectados: 57,
+        metodo: 'umbrales numéricos',
+        versionOrigen: 1,
+        versionResultado: null,
+        detalle: {
+          anterior: { criterio: null, columnaClave: null },
+          nuevo: {
+            criterio: { nombreColumna: 'puntaje', tipo: 'numerica', umbrales: [{ minimo: 7, etiqueta: 'Alto' }, { minimo: 0, etiqueta: 'Bajo' }] },
+            columnaClave: 'codigo'
+          }
+        }
+      }),
+      entrada({
+        id: 'b4',
+        operacion: 'configurar_criterio',
+        variable: 'nivel',
+        registrosAfectados: 57,
+        metodo: 'orden de categorías',
+        versionOrigen: 1,
+        versionResultado: null,
+        detalle: { nuevo: { criterio: { nombreColumna: 'nivel', tipo: 'ordinal', ordenCategorias: ['Bajo', 'Medio', 'Alto'] }, columnaClave: null } }
+      })
+    ]);
+
+    renderizar();
+
+    const fila = (await screen.findByText('umbrales numéricos: Alto desde 7, Bajo desde 0; columna clave: codigo')).closest('tr') as HTMLElement;
+    expect(within(fila).getByText('Criterio de clasificación')).toBeInTheDocument();
+    expect(within(fila).getByText('puntaje')).toBeInTheDocument();
+    expect(screen.getByText('orden de categorías: Bajo < Medio < Alto')).toBeInTheDocument();
+  });
+
   test('un dataset sin operaciones lo dice en vez de mostrar una tabla vacía', async () => {
     vi.mocked(analisisDatosService.listarVersiones).mockResolvedValue([versiones[0]]);
     vi.mocked(analisisDatosService.obtenerBitacora).mockResolvedValue([]);

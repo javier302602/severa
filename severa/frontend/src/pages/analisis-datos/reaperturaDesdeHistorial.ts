@@ -2,7 +2,7 @@
 // Análisis de Datos con el dataset (la versión exacta sobre la que se hizo el
 // análisis) y la pestaña de ese análisis, como estado de navegación.
 
-export type PestanaDeAnalisis = 'descriptivas' | 'univariado' | 'correlacion' | 'outliers' | 'serie' | 'objetivo' | 'limpieza' | 'versiones';
+export type PestanaDeAnalisis = 'descriptivas' | 'univariado' | 'correlacion' | 'outliers' | 'serie' | 'objetivo' | 'limpieza' | 'versiones' | 'plantillas';
 
 export interface SolicitudDeReapertura {
   datasetId: string;
@@ -26,7 +26,7 @@ export function pestanaDeAnalisis(tipoEvento: string): PestanaDeAnalisis {
   return PESTANA_POR_TIPO[tipoEvento] ?? 'descriptivas';
 }
 
-const PESTANAS: readonly string[] = ['descriptivas', 'univariado', 'correlacion', 'outliers', 'serie', 'objetivo', 'limpieza', 'versiones'];
+const PESTANAS: readonly string[] = ['descriptivas', 'univariado', 'correlacion', 'outliers', 'serie', 'objetivo', 'limpieza', 'versiones', 'plantillas'];
 
 // El estado de navegación lo puede haber escrito cualquiera (otra pantalla,
 // una versión vieja guardada en el historial del navegador): se valida antes
