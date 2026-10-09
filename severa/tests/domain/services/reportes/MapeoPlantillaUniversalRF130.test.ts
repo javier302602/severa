@@ -1,6 +1,10 @@
 import fs from 'fs';
 import path from 'path';
-import { MAPEO_PLANTILLA_UNIVERSAL_RF130 } from '../../../../src/domain/services/reportes/MapeoPlantillaUniversalRF130';
+import {
+  MAPEO_PLANTILLA_UNIVERSAL_RF130,
+  REFERENCIAS_DE_SECCION_RF130,
+  referenciaASeccionRF130
+} from '../../../../src/domain/services/reportes/MapeoPlantillaUniversalRF130';
 
 // Este test es el "rastro auditable" pedido para RF-130: no alcanza con que
 // el mapeo sea un comentario suelto — si alguien renombra una sección citada
@@ -69,6 +73,26 @@ describe('MapeoPlantillaUniversalRF130', () => {
   test('toda entrada con estado "parcial" o "no-existe" o "bloqueada-por-M16" trae una nota explicando la limitación', () => {
     MAPEO_PLANTILLA_UNIVERSAL_RF130.filter((entrada) => entrada.estado !== 'cubierta').forEach((entrada) => {
       expect(entrada.nota?.trim()).toBeTruthy();
+    });
+  });
+});
+
+describe('referenciaASeccionRF130 — cómo una sección cita a otra', () => {
+  test('arma número y nombre desde el mapeo', () => {
+    expect(referenciaASeccionRF130(9)).toBe('la sección 9 (Estadística descriptiva)');
+    expect(referenciaASeccionRF130(11)).toBe('la sección 11 (Distribuciones)');
+  });
+
+  test('un número que no existe en la plantilla es un error de programación, no una cita vacía', () => {
+    expect(() => referenciaASeccionRF130(21)).toThrow();
+  });
+
+  test('las cuatro citas de los gráficos CVSS apuntan a secciones con contenido para CVSS (no a las de la numeración vieja de 12)', () => {
+    expect(REFERENCIAS_DE_SECCION_RF130).toEqual({
+      estadisticaDescriptiva: 'la sección 9 (Estadística descriptiva)',
+      distribuciones: 'la sección 11 (Distribuciones)',
+      indicadoresDePriorizacion: 'la sección 18 (Conclusiones)',
+      comparacionPorAcceso: 'la sección 14 (Análisis inferencial)'
     });
   });
 });

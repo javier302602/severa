@@ -45,6 +45,8 @@ import {
 // dibujarX() viejas, sin ningún cambio. El cutover del pipeline genérico
 // (generarInformeDataset) es el Paso 2, aparte.
 import { renderizarInformeUniversal } from './InformeUniversalRF130';
+import { formatearMomento, formatearDiaCalendario } from './FormatoDeFechasInforme';
+import type { ReferenciasDeSeccionInforme } from '../../../../domain/services/reportes/MapeoPlantillaUniversalRF130';
 
 // RF-77/RF-82: implementación única del puerto GeneradorDeInformes (mismo
 // patrón de "un solo adaptador por puerto de salida" que SvgGraficosAdapter
@@ -140,7 +142,7 @@ function dibujarPortada(doc: PDFKit.PDFDocument, titulo: string, datos: DatosInf
   doc.moveDown(1);
   doc.fontSize(12).fillColor('#334155').font('Times-Bold').text(`Generado por SIADE para ${datos.generadoPara}`, { align: 'center' });
   doc.moveDown(0.5);
-  doc.fontSize(10).fillColor('#64748b').font('Times-Roman').text(`Generado: ${datos.generadoEn.toLocaleString()}`, { align: 'center' });
+  doc.fontSize(10).fillColor('#64748b').font('Times-Roman').text(`Generado: ${formatearMomento(datos.generadoEn)}`, { align: 'center' });
   doc.text(`Total de vulnerabilidades analizadas: ${datos.totalVulnerabilidades}`, { align: 'center' });
   doc.moveDown(2);
 }
@@ -171,7 +173,7 @@ function dibujarOrigenYCalidad(doc: PDFKit.PDFDocument, datos: DatosInforme): vo
     parrafo(
       doc,
       `El último cambio de importación registrado en el historial de auditoría fue: "${ultimo.detalle}", el ` +
-        `${ultimo.fecha.toLocaleString()} (analista: ${ultimo.usuario}).`
+        `${formatearMomento(ultimo.fecha)} (analista: ${ultimo.usuario}).`
     );
   } else {
     parrafo(doc, 'No hay ningún registro de auditoría de importación disponible todavía para este dataset.');
@@ -459,7 +461,23 @@ interface DefinicionGrafico {
 // Exportada (M-10 Ronda 2, Pasada 2-A): InformeUniversalRF130.ts la reusa
 // para el índice de figuras del Anexo C unificado (§20) — misma lista de 10
 // gráficos, sin duplicarla.
-export function construirDefinicionesGraficos(datos: DatosInforme): DefinicionGrafico[] {
+//
+// `referencias`: cómo se cita cada sección en "Relación con secciones
+// anteriores". Por defecto, la numeración del documento de 12 secciones que
+// todavía arma este archivo (RF-82, Resumen Ejecutivo); InformeUniversalRF130.ts
+// pasa REFERENCIAS_DE_SECCION_RF130, porque en la plantilla de 20 esos
+// números son otras secciones.
+const REFERENCIAS_DE_SECCION_INFORME_CLASICO: ReferenciasDeSeccionInforme = {
+  estadisticaDescriptiva: 'la sección 5',
+  distribuciones: 'la sección 7',
+  indicadoresDePriorizacion: 'la sección de Aplicación práctica',
+  comparacionPorAcceso: 'la Comparación acceso remoto/local'
+};
+
+export function construirDefinicionesGraficos(
+  datos: DatosInforme,
+  referencias: ReferenciasDeSeccionInforme = REFERENCIAS_DE_SECCION_INFORME_CLASICO
+): DefinicionGrafico[] {
   const g = datos.graficos;
   const r = datos.resumenEstadistico;
   const remotoVsLocal = datos.comparacionAccesoRemotoLocal;
@@ -471,7 +489,7 @@ export function construirDefinicionesGraficos(datos: DatosInforme): DefinicionGr
       tipo: 'Descriptivo',
       objetivo: 'representar visualmente la forma completa de la distribución de CVSS Score.',
       fundamento: 'un histograma agrupa los valores continuos en clases y representa su frecuencia como la altura de cada barra.',
-      relacion: 'las líneas de media y mediana coinciden con las calculadas en la sección 5; las barras reflejan la Tabla de la sección 7.',
+      relacion: `las líneas de media y mediana coinciden con las calculadas en ${referencias.estadisticaDescriptiva}; las barras reflejan la Tabla de ${referencias.distribuciones}.`,
       dibujar: (d) => (d.y = dibujarHistograma(d, g.histogramaCvss.bins, g.histogramaCvss.media, g.histogramaCvss.mediana, { titulo: 'Gráfico 1: Histograma de CVSS Score', etiquetaEjeX: 'CVSS Score', etiquetaEjeY: 'Frecuencia' })),
       analisis: (d) => parrafo(d, interpretarHistogramaCvss(g.histogramaCvss))
     },
@@ -481,7 +499,7 @@ export function construirDefinicionesGraficos(datos: DatosInforme): DefinicionGr
       tipo: 'Descriptivo',
       objetivo: 'comparar cuántas vulnerabilidades hay en cada categoría de severidad.',
       fundamento: 'un gráfico de barras representa la frecuencia absoluta de una variable cualitativa ordinal.',
-      relacion: 'los conteos son los mismos usados para calcular el porcentaje "Crítica+Alta" de la sección de Aplicación práctica.',
+      relacion: `los conteos son los mismos usados para calcular el porcentaje "Crítica+Alta" de ${referencias.indicadoresDePriorizacion}.`,
       dibujar: (d) => (d.y = dibujarBarras(d, g.barrasSeveridad, { titulo: 'Gráfico 2: Distribución por severidad', etiquetaEjeX: 'Severidad', etiquetaEjeY: 'Cantidad' })),
       analisis: (d) => parrafo(d, interpretarBarrasSeveridad(g.barrasSeveridad))
     },
@@ -501,7 +519,7 @@ export function construirDefinicionesGraficos(datos: DatosInforme): DefinicionGr
       tipo: 'Descriptivo',
       objetivo: 'visualizar mediana, dispersión y posibles valores atípicos en un solo gráfico.',
       fundamento: 'la caja cubre el rango intercuartílico (Q1-Q3); los bigotes llegan hasta el mínimo y el máximo.',
-      relacion: `los valores de la caja son los mismos Q1=${r.q1.toFixed(2)} y Q3=${r.q3.toFixed(2)} de la sección 5.`,
+      relacion: `los valores de la caja son los mismos Q1=${r.q1.toFixed(2)} y Q3=${r.q3.toFixed(2)} de ${referencias.estadisticaDescriptiva}.`,
       dibujar: (d) => (d.y = dibujarBoxplot(d, g.boxplotCvss, { titulo: 'Gráfico 4: Boxplot de CVSS Score', etiquetaEjeY: 'CVSS Score' })),
       analisis: (d) => parrafo(d, interpretarBoxplotCvss(g.boxplotCvss))
     },
@@ -510,10 +528,10 @@ export function construirDefinicionesGraficos(datos: DatosInforme): DefinicionGr
       titulo: 'Histograma con intervalos agrupados',
       tipo: 'Descriptivo',
       objetivo: 'facilitar la lectura de en qué tramo de severidad se concentran las vulnerabilidades, con menos barras que el Gráfico 1.',
-      fundamento: 'mismos datos del Gráfico 1, agrupados en intervalos de amplitud fija (ver sección 7).',
-      relacion: 'los conteos por intervalo son los mismos de la tabla agrupada de la sección 7.',
+      fundamento: `mismos datos del Gráfico 1, agrupados en intervalos de amplitud fija (ver ${referencias.distribuciones}).`,
+      relacion: `los conteos por intervalo son los mismos de la tabla agrupada de ${referencias.distribuciones}.`,
       dibujar: (d) => (d.y = dibujarHistograma(d, g.histogramaAgrupado.bins, g.histogramaAgrupado.media, g.histogramaAgrupado.mediana, { titulo: 'Gráfico 5: Histograma agrupado', etiquetaEjeX: 'CVSS Score', etiquetaEjeY: 'Frecuencia' })),
-      analisis: (d) => parrafo(d, `${interpretarHistogramaAgrupado()} (ver Tabla de la sección 7).`)
+      analisis: (d) => parrafo(d, `${interpretarHistogramaAgrupado()} (ver Tabla de ${referencias.distribuciones}).`)
     },
     {
       numero: 6,
@@ -521,7 +539,7 @@ export function construirDefinicionesGraficos(datos: DatosInforme): DefinicionGr
       tipo: 'Inferencial',
       objetivo: 'comparar la severidad entre vulnerabilidades de acceso remoto y de acceso local.',
       fundamento: 'dos boxplots lado a lado permiten comparar mediana, dispersión y atípicos de cada grupo sin una prueba estadística formal.',
-      relacion: `las medias (remoto=${formatearEstadistico(remotoVsLocal.mediaA)}, local=${formatearEstadistico(remotoVsLocal.mediaB)}) son las mismas de la Comparación acceso remoto/local.`,
+      relacion: `las medias (remoto=${formatearEstadistico(remotoVsLocal.mediaA)}, local=${formatearEstadistico(remotoVsLocal.mediaB)}) son las mismas de ${referencias.comparacionPorAcceso}.`,
       dibujar: (d) =>
         (d.y = dibujarBoxplotDoble(
           d,
@@ -772,7 +790,7 @@ export function resumenColumnaComoTexto(columna: DatosInformeDataset['estadistic
     return `media=${columna.media.toFixed(2)}, mediana=${columna.mediana.toFixed(2)}, min=${columna.minimo.toFixed(2)}, max=${columna.maximo.toFixed(2)}`;
   }
   if (columna.tipo === 'fecha') {
-    return columna.minimo && columna.maximo ? `de ${new Date(columna.minimo).toLocaleDateString()} a ${new Date(columna.maximo).toLocaleDateString()}` : 'sin fechas válidas';
+    return columna.minimo && columna.maximo ? `de ${formatearDiaCalendario(columna.minimo)} a ${formatearDiaCalendario(columna.maximo)}` : 'sin fechas válidas';
   }
   const top = columna.masFrecuente[0];
   return top ? `${columna.valoresUnicos} valor(es) único(s); más frecuente: "${top.valor}" (${top.frecuencia})` : 'sin valores';
@@ -785,6 +803,6 @@ export function resumenColumnaComoTexto(columna: DatosInformeDataset['estadistic
 // para el Anexo del pipeline genérico.
 export function celdaComoTexto(valor: unknown): string {
   if (valor === null || valor === undefined || valor === '') return '—';
-  if (valor instanceof Date) return valor.toLocaleDateString();
+  if (valor instanceof Date) return formatearDiaCalendario(valor);
   return String(valor);
 }

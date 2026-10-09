@@ -4,6 +4,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { EstadoVacio } from '../../components/ui/EstadoVacio';
 import { AvisoErrorSeccion } from './AvisoErrorSeccion';
 import type { AnalisisUnivariado, DiagnosticoColumna } from '../../api/analisisDatosService';
+import { formatearDiaCalendario } from '../../utils/formatearDiaCalendario';
 
 function TablaDistribucionNumerica({ analisis }: { analisis: Extract<AnalisisUnivariado, { tipo: 'numerica' }> }) {
   const r = analisis.resumenCincoNumeros;
@@ -88,8 +89,8 @@ function TablaDistribucionFecha({ analisis }: { analisis: Extract<AnalisisUnivar
   return (
     <div className="space-y-3">
       <p className="text-sm text-slate-600 dark:text-slate-400">
-        Rango: {analisis.minimo ? new Date(analisis.minimo).toLocaleDateString() : '—'} a{' '}
-        {analisis.maximo ? new Date(analisis.maximo).toLocaleDateString() : '—'} — {analisis.valoresFaltantes} valor(es)
+        Rango: {analisis.minimo ? formatearDiaCalendario(analisis.minimo) : '—'} a{' '}
+        {analisis.maximo ? formatearDiaCalendario(analisis.maximo) : '—'} — {analisis.valoresFaltantes} valor(es)
         faltante(s).
       </p>
       <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">

@@ -253,7 +253,7 @@ export class DescargadorDeArchivosHttp implements DescargadorDeArchivos {
       const opciones: https.RequestOptions = {
         hostname: url.hostname,
         path: `${url.pathname}${url.search}`,
-        headers: { Host: url.hostname, 'User-Agent': 'SEVERA/1.0' },
+        headers: { Host: url.hostname, 'User-Agent': 'SIADE/1.0' },
         timeout: TIMEOUT_MS,
         lookup: lookupForzado
       };

@@ -54,7 +54,7 @@ const app = createApp();
 // catch-all de AnalisisDatasetInformeController.ts. Mismo criterio que los
 // otros dos: buscarPorId resuelve null a propósito (el nombre del analista
 // en la portada del PDF/Word no es lo que estos tests verifican) para que
-// resolverNombreAnalistaParaInforme caiga a su fallback ('Analista SEVERA')
+// resolverNombreAnalistaParaInforme caiga a su fallback ('Analista SIADE')
 // sin tocar la base de datos.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (container.generarInformeDatasetUseCase as any).analistaRepository = {

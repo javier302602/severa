@@ -6,7 +6,7 @@ import {
   ALTO_IMAGEN_GRAFICO
 } from './RasterizadorDeGraficosWord';
 import { DatosInforme, DatosInformeDataset } from '../../../../application/ports/out/reportes/GeneradorDeInformes';
-import { MAPEO_PLANTILLA_UNIVERSAL_RF130 } from '../../../../domain/services/reportes/MapeoPlantillaUniversalRF130';
+import { MAPEO_PLANTILLA_UNIVERSAL_RF130, REFERENCIAS_DE_SECCION_RF130 } from '../../../../domain/services/reportes/MapeoPlantillaUniversalRF130';
 import {
   interpretarHistogramaCvss,
   interpretarBarrasSeveridad,
@@ -34,6 +34,7 @@ import { ElementoDocumento, heading, texto, tabla, indice } from './LayoutInform
 // ejecución. La unión discriminada es la misma para los dos formatos a
 // propósito — un pipeline nuevo tiene que resolverse en ambos.
 import type { ContextoInformeUniversal } from './InformeUniversalRF130';
+import { formatearMomento, formatearDiaCalendario } from './FormatoDeFechasInforme';
 
 // M-10 Ronda 2, Pasada 2-D (RF-130), Paso 1: orquestador nuevo de la
 // plantilla universal de 20 secciones para el pipeline CVSS en Word,
@@ -91,7 +92,7 @@ function dibujarSeccionPortadaWord(datos: DatosInforme): ElementoDocumento[] {
   return [
     new Paragraph({ text: 'Informe SIADE — Análisis Estadístico de Vulnerabilidades', heading: HeadingLevel.TITLE }),
     new Paragraph({ children: [new TextRun({ text: `Generado por SIADE para ${datos.generadoPara}`, bold: true, size: 24 })] }),
-    texto(`Generado: ${datos.generadoEn.toLocaleString()}`),
+    texto(`Generado: ${formatearMomento(datos.generadoEn)}`),
     texto(`Total de vulnerabilidades analizadas: ${datos.totalVulnerabilidades}`)
   ];
 }
@@ -193,7 +194,7 @@ function dibujarSeccionCalidadDeDatosWord(datos: DatosInforme): ElementoDocument
     texto(
       ultimo
         ? `El último cambio de importación registrado en el historial de auditoría fue: "${ultimo.detalle}", el ` +
-          `${ultimo.fecha.toLocaleString()} (analista: ${ultimo.usuario}).`
+          `${formatearMomento(ultimo.fecha)} (analista: ${ultimo.usuario}).`
         : 'No hay ningún registro de auditoría de importación disponible todavía para este dataset.'
     ),
     texto(
@@ -352,7 +353,7 @@ function construirDefinicionesGraficosWord(datos: DatosInforme): DefinicionGrafi
       titulo: 'Histograma de CVSS Score (distribución sin agrupar)',
       objetivo: 'representar visualmente la forma completa de la distribución de CVSS Score.',
       fundamento: 'un histograma agrupa los valores continuos en clases y representa su frecuencia como la altura de cada barra.',
-      relacion: 'las líneas de media y mediana coinciden con las calculadas en la sección 5.',
+      relacion: `las líneas de media y mediana coinciden con las calculadas en ${REFERENCIAS_DE_SECCION_RF130.estadisticaDescriptiva}.`,
       tablaDatos: tabla(['Intervalo', 'Frecuencia'], g.histogramaCvss.bins.map((bin) => [bin.intervalo, String(bin.frecuencia)])),
       analisis: interpretarHistogramaCvss(g.histogramaCvss)
     },
@@ -361,7 +362,7 @@ function construirDefinicionesGraficosWord(datos: DatosInforme): DefinicionGrafi
       titulo: 'Distribución por severidad (barras)',
       objetivo: 'comparar cuántas vulnerabilidades hay en cada categoría de severidad.',
       fundamento: 'un gráfico de barras representa la frecuencia absoluta de una variable cualitativa ordinal.',
-      relacion: 'mismos conteos usados en la sección de Aplicación práctica.',
+      relacion: `mismos conteos usados en ${REFERENCIAS_DE_SECCION_RF130.indicadoresDePriorizacion}.`,
       tablaDatos: tabla(['Severidad', 'Cantidad'], g.barrasSeveridad.map((item) => [item.etiqueta, String(item.valor)])),
       analisis: interpretarBarrasSeveridad(g.barrasSeveridad)
     },
@@ -386,7 +387,7 @@ function construirDefinicionesGraficosWord(datos: DatosInforme): DefinicionGrafi
       titulo: 'Boxplot de CVSS Score',
       objetivo: 'visualizar mediana, dispersión y posibles valores atípicos.',
       fundamento: 'la caja cubre el rango intercuartílico (Q1-Q3); los bigotes llegan hasta el mínimo y el máximo.',
-      relacion: `los valores de la caja son los mismos Q1=${datos.resumenEstadistico.q1.toFixed(2)} y Q3=${datos.resumenEstadistico.q3.toFixed(2)} de la sección 5.`,
+      relacion: `los valores de la caja son los mismos Q1=${datos.resumenEstadistico.q1.toFixed(2)} y Q3=${datos.resumenEstadistico.q3.toFixed(2)} de ${REFERENCIAS_DE_SECCION_RF130.estadisticaDescriptiva}.`,
       tablaDatos: tabla(
         ['Mínimo', 'Q1', 'Mediana', 'Q3', 'Máximo', 'Media'],
         [
@@ -407,7 +408,7 @@ function construirDefinicionesGraficosWord(datos: DatosInforme): DefinicionGrafi
       titulo: 'Histograma con intervalos agrupados',
       objetivo: 'facilitar la lectura de en qué tramo de severidad se concentran las vulnerabilidades.',
       fundamento: 'mismos datos del Gráfico 1, agrupados en intervalos de amplitud fija.',
-      relacion: 'los conteos por intervalo son los mismos de la tabla agrupada de la sección 7.',
+      relacion: `los conteos por intervalo son los mismos de la tabla agrupada de ${REFERENCIAS_DE_SECCION_RF130.distribuciones}.`,
       tablaDatos: tabla(['Intervalo', 'Frecuencia'], g.histogramaAgrupado.bins.map((bin) => [bin.intervalo, String(bin.frecuencia)])),
       analisis: interpretarHistogramaAgrupado()
     },
@@ -416,7 +417,7 @@ function construirDefinicionesGraficosWord(datos: DatosInforme): DefinicionGrafi
       titulo: 'Comparación de CVSS por tipo de acceso',
       objetivo: 'comparar la severidad entre vulnerabilidades de acceso remoto y de acceso local.',
       fundamento: 'dos resúmenes de cinco números (uno por grupo) permiten comparar mediana, dispersión y atípicos.',
-      relacion: `las medias (remoto=${formatearEstadistico(remotoVsLocal.mediaA)}, local=${formatearEstadistico(remotoVsLocal.mediaB)}) son las de la Comparación acceso remoto/local.`,
+      relacion: `las medias (remoto=${formatearEstadistico(remotoVsLocal.mediaA)}, local=${formatearEstadistico(remotoVsLocal.mediaB)}) son las de ${REFERENCIAS_DE_SECCION_RF130.comparacionPorAcceso}.`,
       tablaDatos: tabla(
         ['Grupo', 'Mínimo', 'Q1', 'Mediana', 'Q3', 'Máximo', 'Media'],
         [filaResumenCincoNumeros('Remoto', g.boxplotPorAcceso.remoto), filaResumenCincoNumeros('Local', g.boxplotPorAcceso.local)]
@@ -757,7 +758,7 @@ function resumenColumnaComoTextoWord(columna: DatosInformeDataset['estadisticasD
   }
   if (columna.tipo === 'fecha') {
     return columna.minimo && columna.maximo
-      ? `de ${new Date(columna.minimo).toLocaleDateString()} a ${new Date(columna.maximo).toLocaleDateString()}`
+      ? `de ${formatearDiaCalendario(columna.minimo)} a ${formatearDiaCalendario(columna.maximo)}`
       : 'sin fechas válidas';
   }
   const top = columna.masFrecuente[0];
@@ -770,7 +771,7 @@ function resumenColumnaComoTextoWord(columna: DatosInformeDataset['estadisticasD
 // importarla que la función de arriba.
 function celdaGenericaComoTexto(valor: unknown): string {
   if (valor === null || valor === undefined || valor === '') return '—';
-  if (valor instanceof Date) return valor.toLocaleDateString();
+  if (valor instanceof Date) return formatearDiaCalendario(valor);
   return String(valor);
 }
 
@@ -779,7 +780,7 @@ function dibujarSeccionPortadaGenericoWord(datos: DatosInformeDataset): Elemento
   return [
     new Paragraph({ text: 'Informe SIADE — Análisis de Datos General', heading: HeadingLevel.TITLE }),
     new Paragraph({ children: [new TextRun({ text: `Generado por SIADE para ${datos.generadoPara}`, bold: true, size: 24 })] }),
-    texto(`Generado: ${datos.generadoEn.toLocaleString()}`),
+    texto(`Generado: ${formatearMomento(datos.generadoEn)}`),
     texto(`${datos.totalFilas} fila(s) — ${datos.totalColumnas} columna(s)`)
   ];
 }

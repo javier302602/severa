@@ -69,6 +69,20 @@ describe('EstadisticasDescriptivasGenerico — Mejora 4 (Análisis de Datos Gene
     expect(new Date(resumen.maximo!).toISOString().slice(0, 10)).toBe('2024-03-10');
   });
 
+  // Bug real: con new Date('15/01/2024') los días > 12 se descartaban y el
+  // resto quedaba con día y mes intercambiados — para esta columna se
+  // informaba valoresValidos=2 y un rango "3 de marzo a 1 de mayo".
+  test('columna de fecha en formato día/mes/año: cuenta todos los valores y el rango es el real', () => {
+    const filas = [{ fecha: '05/01/2024' }, { fecha: '15/01/2024' }, { fecha: '28/02/2024' }, { fecha: '03/03/2024' }];
+
+    const resumen = calcularEstadisticasDescriptivas(['fecha'], filas)[0] as ResumenColumnaFecha;
+
+    expect(resumen.tipo).toBe('fecha');
+    expect(resumen.valoresValidos).toBe(4);
+    expect(resumen.minimo).toBe('2024-01-05T00:00:00.000Z');
+    expect(resumen.maximo).toBe('2024-03-03T00:00:00.000Z');
+  });
+
   test('columna completamente vacía no rompe: se degrada a categórica/texto con 0 valores válidos', () => {
     const resumen = calcularEstadisticasDescriptivas(['x'], [{ x: null }, { x: null }])[0] as ResumenColumnaCategorica;
 

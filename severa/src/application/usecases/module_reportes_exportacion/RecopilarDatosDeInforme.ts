@@ -30,7 +30,7 @@ import {
 import { Vulnerabilidad } from '../../../domain/entities/Vulnerabilidad';
 
 const LIMITACIONES_CONOCIDAS: string[] = [
-  'El plazo de remediación (¿está vencido o no?) se calcula desde la fecha en que SEVERA importó cada registro, no desde la fecha real de publicación pública del CVE en la NVD — el dataset que consume SEVERA no incluye esa fecha (ver LIMITACIÓN CONOCIDA en MotorDePriorizacion.ts).',
+  'El plazo de remediación (¿está vencido o no?) se calcula desde la fecha en que SIADE importó cada registro, no desde la fecha real de publicación pública del CVE en la NVD — el dataset que consume SIADE no incluye esa fecha (ver LIMITACIÓN CONOCIDA en MotorDePriorizacion.ts).',
   'Los filtros de fecha de Búsqueda avanzada ("cargado desde/hasta") se aplican por el mismo motivo sobre la fecha de carga, no sobre la fecha de divulgación real del CVE.',
   'Este informe aplica estadística descriptiva sobre el conjunto de vulnerabilidades cargado en el sistema al momento de generarlo — no es una muestra probabilística ni se aplican pruebas de hipótesis; los hallazgos describen este conjunto de datos, no se generalizan estadísticamente más allá de él.'
 ];

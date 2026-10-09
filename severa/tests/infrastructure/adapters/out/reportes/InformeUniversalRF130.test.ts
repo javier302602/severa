@@ -471,3 +471,69 @@ describe('InformeUniversalRF130 — §6 genérico: tabla de valores atípicos (r
     expect(textos6).not.toContain('Valores atípicos (outliers)');
   });
 });
+
+// Bug real: la explicación de cada gráfico CVSS ("Relación con secciones
+// anteriores") citaba secciones con la numeración del informe viejo de 12
+// ("la sección 5", "la sección 7", "Aplicación práctica"). En la plantilla de
+// 20, la 5 es "Tipos de variables" y la 7 "Valores faltantes".
+describe('InformeUniversalRF130 — §12 CVSS: las citas a otras secciones usan la numeración de la plantilla de 20', () => {
+  let spyTexto: jest.SpyInstance;
+
+  beforeEach(() => {
+    (LayoutInformePdf.nuevaSeccion as jest.Mock).mockClear();
+    spyTexto = jest.spyOn(PDFDocument.prototype, 'text');
+  });
+
+  afterEach(() => {
+    spyTexto.mockRestore();
+  });
+
+  test('cita las secciones 9, 11, 14 y 18 por número y nombre, y ya no las del informe de 12 secciones', async () => {
+    await renderizarInformeUniversal(await contextoCvss());
+    const texto12 = textosPorSeccion(LayoutInformePdf.nuevaSeccion as jest.Mock, spyTexto)(12).join(' | ');
+
+    expect(texto12).toContain('la sección 9 (Estadística descriptiva)');
+    expect(texto12).toContain('la sección 11 (Distribuciones)');
+    expect(texto12).toContain('la sección 14 (Análisis inferencial)');
+    expect(texto12).toContain('la sección 18 (Conclusiones)');
+    expect(texto12).not.toMatch(/la sección 5\b/);
+    expect(texto12).not.toMatch(/la sección 7\b/);
+    expect(texto12).not.toContain('Aplicación práctica');
+  });
+});
+
+// Bug real: el rango de una columna de fecha se imprimía con
+// toLocaleDateString() — en un servidor en UTC-5 una columna del 10 de enero
+// al 28 de junio salía "1/9/2024 a 6/27/2024" (un día antes, y en el orden
+// mes/día del idioma del sistema).
+describe('InformeUniversalRF130 — §9 genérico: rango de una columna de fecha', () => {
+  const ZONA_ORIGINAL = process.env.TZ;
+  let spyTexto: jest.SpyInstance;
+
+  beforeEach(() => {
+    process.env.TZ = 'America/Lima';
+    (LayoutInformePdf.nuevaSeccion as jest.Mock).mockClear();
+    spyTexto = jest.spyOn(PDFDocument.prototype, 'text');
+  });
+
+  afterEach(() => {
+    process.env.TZ = ZONA_ORIGINAL;
+    spyTexto.mockRestore();
+  });
+
+  test.each([
+    ['ISO', ['2024-01-10', '2024-03-02', '2024-06-28']],
+    ['día/mes/año', ['10/01/2024', '02/03/2024', '28/06/2024']]
+  ])('columna en formato %s: imprime el día que dice el dato', async (_formato, fechas) => {
+    const datos = recopilarDatosDeInformeDataset(
+      ['FechaVenta', 'Monto'],
+      fechas.map((FechaVenta, indice) => ({ FechaVenta, Monto: 10 * (indice + 1) })),
+      'Analista de Prueba'
+    );
+
+    await renderizarInformeUniversal({ pipeline: 'generico', datos });
+    const textos9 = textosPorSeccion(LayoutInformePdf.nuevaSeccion as jest.Mock, spyTexto)(9);
+
+    expect(textos9).toContain('de 2024-01-10 a 2024-06-28');
+  });
+});

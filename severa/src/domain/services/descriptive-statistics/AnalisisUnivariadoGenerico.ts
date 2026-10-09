@@ -1,4 +1,4 @@
-import { TipoColumna, esVacio, esNumerico, inferirTipoColumna } from '../variable-detection/DetectorDeTipoDeColumna';
+import { TipoColumna, esVacio, esNumerico, inferirTipoColumna, aFechaGenerica } from '../variable-detection/DetectorDeTipoDeColumna';
 import {
   calcularModa,
   calcularVarianzaMuestral,
@@ -69,10 +69,6 @@ export type AnalisisUnivariado = AnalisisUnivariadoNumerico | AnalisisUnivariado
 
 function aNumero(valor: unknown): number {
   return typeof valor === 'number' ? valor : Number(String(valor).trim());
-}
-
-function aFecha(valor: unknown): Date {
-  return valor instanceof Date ? valor : new Date(String(valor));
 }
 
 // Regla de Sturges — solo cuando el analista no pide un número de
@@ -158,16 +154,16 @@ function analizarNumerica(
 
 function analizarFecha(nombre: string, noVacios: unknown[], valoresFaltantes: number): AnalisisUnivariadoFecha {
   const fechas = noVacios
-    .map(aFecha)
+    .map(aFechaGenerica)
     .filter((fecha) => !Number.isNaN(fecha.getTime()))
     .sort((a, b) => a.getTime() - b.getTime());
 
   // Se agrupa por día calendario (AAAA-MM-DD): una distribución por
   // timestamp exacto sería casi siempre "1 de cada valor" y no aportaría
-  // nada legible.
-  const distribucion = generarDistribucionCategorica(
-    noVacios.map((valor) => aFecha(valor).toISOString().slice(0, 10))
-  );
+  // nada legible. Sobre `fechas` (solo las válidas), no sobre `noVacios`:
+  // una columna "fecha" se detecta por mayoría, así que puede traer algún
+  // valor que no es una fecha — toISOString() sobre eso tira RangeError.
+  const distribucion = generarDistribucionCategorica(fechas.map((fecha) => fecha.toISOString().slice(0, 10)));
 
   return {
     tipo: 'fecha',

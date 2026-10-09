@@ -4,6 +4,7 @@ import {
   esIdentificador,
   esNumerico,
   esFecha,
+  aFechaGenerica,
   esVacio,
   calzaConTipo,
   MAPEO_A_TIPO_LEGADO,
@@ -315,6 +316,66 @@ describe('DetectorDeTipoDeColumna', () => {
 
     test.each(casos)('$etiqueta: MAPEO_A_TIPO_LEGADO[inferirTipoColumnaDetallado(valores)] coincide con inferirTipoColumna(valores)', ({ valores }) => {
       expect(MAPEO_A_TIPO_LEGADO[inferirTipoColumnaDetallado(valores)]).toBe(inferirTipoColumna(valores));
+    });
+  });
+});
+
+// Bug real: esFecha() acepta "15/01/2024", pero los módulos que calculan con
+// la columna convertían con new Date(String(valor)), que lee mes/día/año.
+// aFechaGenerica es la conversión única que reemplaza a esas copias.
+describe('aFechaGenerica — conversión única de valor crudo a fecha', () => {
+  const dia = (fecha: Date) => fecha.toISOString().slice(0, 10);
+
+  test('día/mes/año con día mayor a 12: es una fecha válida, no Invalid Date', () => {
+    expect(dia(aFechaGenerica('15/01/2024'))).toBe('2024-01-15');
+    expect(dia(aFechaGenerica('31/12/2023'))).toBe('2023-12-31');
+  });
+
+  test('día/mes/año ambiguo: el primer número es el día (5 de enero, no 1 de mayo)', () => {
+    expect(dia(aFechaGenerica('05/01/2024'))).toBe('2024-01-05');
+    expect(dia(aFechaGenerica('1/5/2024'))).toBe('2024-05-01');
+  });
+
+  test('año de dos dígitos: ventana 1970-2069', () => {
+    expect(dia(aFechaGenerica('15/01/24'))).toBe('2024-01-15');
+    expect(dia(aFechaGenerica('15/01/68'))).toBe('2068-01-15');
+    expect(dia(aFechaGenerica('15/01/69'))).toBe('1969-01-15');
+    expect(dia(aFechaGenerica('15/01/99'))).toBe('1999-01-15');
+  });
+
+  test('ISO solo fecha: mismo día en cualquier zona horaria del servidor', () => {
+    expect(aFechaGenerica('2024-01-15').toISOString()).toBe('2024-01-15T00:00:00.000Z');
+    expect(aFechaGenerica('2024-1-5').toISOString()).toBe('2024-01-05T00:00:00.000Z');
+  });
+
+  test('ISO con hora ("T" o espacio): la hora escrita se conserva tal cual, sin desplazarla por la zona del proceso', () => {
+    expect(aFechaGenerica('2024-01-15T10:30').toISOString()).toBe('2024-01-15T10:30:00.000Z');
+    expect(aFechaGenerica('2024-01-15 23:59:58').toISOString()).toBe('2024-01-15T23:59:58.000Z');
+  });
+
+  test('fecha imposible: Invalid Date en vez de desbordar al mes siguiente', () => {
+    expect(Number.isNaN(aFechaGenerica('31/02/2024').getTime())).toBe(true);
+    expect(Number.isNaN(aFechaGenerica('2024-02-30').getTime())).toBe(true);
+    expect(Number.isNaN(aFechaGenerica('2024-01-15 25:00').getTime())).toBe(true);
+    // 29 de febrero sí existe en año bisiesto.
+    expect(dia(aFechaGenerica('29/02/2024'))).toBe('2024-02-29');
+    expect(Number.isNaN(aFechaGenerica('29/02/2023').getTime())).toBe(true);
+  });
+
+  test('un Date real (celda de fecha de un .xlsx) se devuelve tal cual', () => {
+    const fecha = new Date(Date.UTC(2024, 0, 15));
+    expect(aFechaGenerica(fecha)).toBe(fecha);
+  });
+
+  test('texto que no es una fecha: Invalid Date, nunca una excepción', () => {
+    expect(Number.isNaN(aFechaGenerica('pendiente').getTime())).toBe(true);
+    expect(Number.isNaN(aFechaGenerica(null).getTime())).toBe(true);
+  });
+
+  test('todo lo que esFecha acepta como string, aFechaGenerica lo convierte (salvo fechas imposibles)', () => {
+    ['2024-01-15', '2024-01-15T10:30:00', '15/01/2024', '1/1/24'].forEach((texto) => {
+      expect(esFecha(texto)).toBe(true);
+      expect(Number.isNaN(aFechaGenerica(texto).getTime())).toBe(false);
     });
   });
 });

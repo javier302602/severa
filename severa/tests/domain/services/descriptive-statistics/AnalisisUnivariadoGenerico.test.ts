@@ -97,6 +97,36 @@ describe('AnalisisUnivariadoGenerico — Mejora 4 (Análisis de Datos General) F
     expect(bin15Enero?.frecuenciaAbsoluta).toBe(2);
   });
 
+  // Bug real: esta columna tiraba RangeError ("Invalid time value") — el
+  // análisis univariado de cualquier columna de fecha día/mes/año con algún
+  // día mayor a 12 devolvía error en vez de un resultado.
+  test('columna de fecha en formato día/mes/año: no explota, y agrupa por el día correcto', () => {
+    const filas = [{ fecha: '05/01/2024' }, { fecha: '15/01/2024' }, { fecha: '15/01/2024' }, { fecha: '03/03/2024' }];
+
+    const analisis = analizarColumnaUnivariado('fecha', ['fecha'], filas) as AnalisisUnivariadoFecha;
+
+    expect(analisis.tipo).toBe('fecha');
+    expect(analisis.valoresValidos).toBe(4);
+    expect(analisis.minimo).toBe('2024-01-05T00:00:00.000Z');
+    expect(analisis.maximo).toBe('2024-03-03T00:00:00.000Z');
+    expect(analisis.distribucion.find((fila) => fila.valor === '2024-01-15')?.frecuenciaAbsoluta).toBe(2);
+    expect(analisis.distribucion.find((fila) => fila.valor === '2024-05-01')).toBeUndefined();
+  });
+
+  // El tipo se decide por mayoría: una columna "fecha" puede traer algún
+  // valor suelto que no lo es. Antes la distribución llamaba toISOString()
+  // sobre ese valor y tiraba RangeError.
+  test('columna de fecha con un valor que no es fecha: se ignora ese valor, no explota', () => {
+    const filas = [{ fecha: '2024-01-15' }, { fecha: '2024-01-16' }, { fecha: '2024-01-17' }, { fecha: '2024-01-18' }, { fecha: 'pendiente' }];
+
+    const analisis = analizarColumnaUnivariado('fecha', ['fecha'], filas) as AnalisisUnivariadoFecha;
+
+    expect(analisis.tipo).toBe('fecha');
+    expect(analisis.valoresValidos).toBe(4);
+    expect(analisis.distribucion).toHaveLength(4);
+    expect(analisis.distribucion.reduce((total, fila) => total + fila.frecuenciaAbsoluta, 0)).toBe(4);
+  });
+
   // Bug real (mismo encontrado en GraficosEstadisticos/GeometriaDeGraficos,
   // 2026-07-19): generarIntervalosAutomaticos usaba Math.min(...valores)/
   // Math.max(...valores) — con una columna numérica de más de ~120k-130k

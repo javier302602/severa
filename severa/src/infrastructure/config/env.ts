@@ -9,6 +9,7 @@ export interface AppConfig {
   port: number;
   nodeEnv: string;
   corsOrigin: string;
+  zonaHorariaInformes: string;
 }
 
 export const config: AppConfig = {
@@ -26,5 +27,10 @@ export const config: AppConfig = {
   // peticiones del SPA por CORS antes de que lleguen a Express — hueco
   // encontrado al conectar el frontend real (Sprint 15). Default al puerto
   // por defecto de `vite dev`.
-  corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173'
+  corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+  // Zona horaria (nombre IANA) con la que los informes PDF/Word imprimen la
+  // hora de generación — ver FormatoDeFechasInforme.ts. No se usa la zona
+  // del proceso: dentro de un contenedor es UTC, y el informe saldría con la
+  // hora 5 horas adelantada respecto de quien lo pidió.
+  zonaHorariaInformes: process.env.ZONA_HORARIA_INFORMES ?? 'America/Lima'
 };

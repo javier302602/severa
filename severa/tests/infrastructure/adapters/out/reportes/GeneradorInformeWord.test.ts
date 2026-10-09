@@ -339,3 +339,49 @@ describe('GeneradorInformeWord — interlineado compatible con LibreOffice (bug 
     expect(espaciado).toContain('w:lineRule="auto"');
   });
 });
+
+// Mismos dos bugs de contenido que cubre InformeUniversalRF130.test.ts del
+// lado PDF, verificados en el .docx real.
+describe('GeneradorInformeWord — citas entre secciones y fechas', () => {
+  test('CVSS §12: las citas usan la numeración de la plantilla de 20 secciones', async () => {
+    const datos = await recopilarDatosDeInforme(repositorioFalso(DATASET_CVSS_TIPICO), auditoriaFalsa(), 'Analista de Prueba', 'analista-1');
+
+    const texto = (await textosDeDocx(await new GeneradorInformeWord().generar(datos))).join(' | ');
+
+    expect(texto).toContain('la sección 9 (Estadística descriptiva)');
+    expect(texto).toContain('la sección 11 (Distribuciones)');
+    expect(texto).toContain('la sección 14 (Análisis inferencial)');
+    expect(texto).toContain('la sección 18 (Conclusiones)');
+    expect(texto).not.toMatch(/la sección 5\b/);
+    expect(texto).not.toMatch(/la sección 7\b/);
+    expect(texto).not.toContain('Aplicación práctica');
+  });
+
+  test('CVSS: las limitaciones conocidas ya no nombran a SEVERA (rebrand a SIADE)', async () => {
+    const datos = await recopilarDatosDeInforme(repositorioFalso(DATASET_CVSS_TIPICO), auditoriaFalsa(), 'Analista de Prueba', 'analista-1');
+
+    const texto = (await textosDeDocx(await new GeneradorInformeWord().generar(datos))).join(' | ');
+
+    expect(texto).not.toContain('SEVERA');
+    expect(texto).toContain('SIADE importó cada registro');
+  });
+
+  test('genérico §9: el rango de una columna de fecha día/mes/año es el del dato, en un servidor al oeste de Greenwich', async () => {
+    const zonaOriginal = process.env.TZ;
+    process.env.TZ = 'America/Lima';
+    try {
+      const datos = recopilarDatosDeInformeDataset(
+        ['FechaVenta', 'Monto'],
+        ['10/01/2024', '02/03/2024', '28/06/2024'].map((FechaVenta, indice) => ({ FechaVenta, Monto: 10 * (indice + 1) })),
+        'Analista de Prueba'
+      );
+
+      const textos = await textosDeDocx(await new GeneradorInformeWord().generarDataset(datos));
+
+      expect(textos).toContain('de 2024-01-10 a 2024-06-28');
+      expect(textos.join(' | ')).not.toContain('SEVERA');
+    } finally {
+      process.env.TZ = zonaOriginal;
+    }
+  });
+});

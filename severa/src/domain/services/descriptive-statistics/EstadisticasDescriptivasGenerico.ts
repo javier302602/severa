@@ -1,4 +1,4 @@
-import { TipoColumna, esVacio, esNumerico, inferirTipoColumna } from '../variable-detection/DetectorDeTipoDeColumna';
+import { TipoColumna, esVacio, esNumerico, inferirTipoColumna, aFechaGenerica } from '../variable-detection/DetectorDeTipoDeColumna';
 import {
   calcularMedia,
   calcularMediana,
@@ -63,10 +63,6 @@ function aNumero(valor: unknown): number {
   return typeof valor === 'number' ? valor : Number(String(valor).trim());
 }
 
-function aFecha(valor: unknown): Date {
-  return valor instanceof Date ? valor : new Date(String(valor));
-}
-
 function contarFrecuencias(valores: unknown[]): Map<string, number> {
   const frecuencia = new Map<string, number>();
   valores.forEach((valor) => {
@@ -129,7 +125,7 @@ function resumirCategorica(nombre: string, tipo: 'categorica' | 'texto', valores
 
 function resumirFecha(nombre: string, valores: unknown[]): ResumenColumnaFecha {
   const fechas = valores
-    .map(aFecha)
+    .map(aFechaGenerica)
     .filter((fecha) => !Number.isNaN(fecha.getTime()))
     .sort((a, b) => a.getTime() - b.getTime());
 

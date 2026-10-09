@@ -81,7 +81,7 @@ export const MAPEO_PLANTILLA_UNIVERSAL_RF130: MapeoSeccionRF130[] = [
     nombreRF130: 'Limpieza realizada',
     estado: 'parcial',
     cubiertaPor: ['No se detectó ninguna limpieza necesaria: sin filas duplicadas exactas.'],
-    nota: 'Solo se reporta el CONTEO de filas duplicadas detectadas (filasDuplicadas) — no existe una bitácora de qué limpieza/transformación se aplicó, porque SEVERA no transforma datos, solo diagnostica.'
+    nota: 'Solo se reporta el CONTEO de filas duplicadas detectadas (filasDuplicadas) — no existe una bitácora de qué limpieza/transformación se aplicó, porque SIADE no transforma datos, solo diagnostica.'
   },
   {
     numero: 9,
@@ -162,3 +162,36 @@ export const MAPEO_PLANTILLA_UNIVERSAL_RF130: MapeoSeccionRF130[] = [
     nota: 'El informe genérico solo tiene Anexos, no Referencias (decisión ya documentada en el código: las referencias citadas son específicas de CVSS/NVD).'
   }
 ];
+
+// Cómo se nombra una sección de la plantilla cuando OTRA sección la cita
+// ("...coinciden con las calculadas en la sección 9 (Estadística
+// descriptiva)"). Número y nombre salen del mapeo: si la plantilla se
+// reordena, las citas siguen apuntando a la sección correcta sin tocar la
+// prosa de cada gráfico.
+export function referenciaASeccionRF130(numero: number): string {
+  const entrada = MAPEO_PLANTILLA_UNIVERSAL_RF130.find((candidata) => candidata.numero === numero);
+  if (!entrada) throw new Error(`La plantilla RF-130 no tiene una sección ${numero}`);
+  return `la sección ${entrada.numero} (${entrada.nombreRF130})`;
+}
+
+// Las cuatro secciones que la explicación de los gráficos del informe CVSS
+// cita ("Relación con secciones anteriores"). Bug real: esas citas estaban
+// escritas con la numeración del informe viejo de 12 secciones ("la sección
+// 5", "la sección 7", "Aplicación práctica") y se copiaron tal cual a la
+// plantilla de 20 — donde la sección 5 es "Tipos de variables" y la 7
+// "Valores faltantes", ninguna de las dos con contenido para CVSS, y
+// "Aplicación práctica" ya no existe. El informe mandaba al lector a
+// secciones que no tenían lo que prometía.
+export interface ReferenciasDeSeccionInforme {
+  estadisticaDescriptiva: string;
+  distribuciones: string;
+  indicadoresDePriorizacion: string;
+  comparacionPorAcceso: string;
+}
+
+export const REFERENCIAS_DE_SECCION_RF130: ReferenciasDeSeccionInforme = {
+  estadisticaDescriptiva: referenciaASeccionRF130(9),
+  distribuciones: referenciaASeccionRF130(11),
+  indicadoresDePriorizacion: referenciaASeccionRF130(18),
+  comparacionPorAcceso: referenciaASeccionRF130(14)
+};

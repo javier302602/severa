@@ -147,6 +147,61 @@ export function esFecha(valor: unknown): boolean {
   return false;
 }
 
+// Conversión única de un valor crudo a Date para TODO el pipeline genérico.
+// Bug real: esFecha() (arriba) acepta "15/01/2024" como fecha válida, pero los
+// módulos que después calculan con esa columna convertían con
+// new Date(String(valor)), que interpreta día/mes/año como mes/día/año. El
+// resultado, para una columna en el formato de fecha habitual en Perú:
+//   - días mayores a 12 daban Invalid Date y se descartaban en silencio
+//     (EstadisticasDescriptivasGenerico reportaba menos valores válidos);
+//   - el resto quedaba con día y mes intercambiados (5 de enero -> 1 de mayo),
+//     así que el rango mínimo/máximo informado era falso;
+//   - AnalisisUnivariadoGenerico llamaba toISOString() sobre el Invalid Date y
+//     tiraba RangeError: el análisis de esa columna devolvía error.
+// Los dos formatos que esFecha reconoce se convierten acá con los mismos
+// patrones, por posición, sin pasar por Date.parse.
+//
+// Los strings se interpretan como fecha/hora "de calendario" en UTC: lo que
+// el archivo dice "2024-01-15" es el 15 de enero en cualquier servidor, y
+// toISOString().slice(0, 10) devuelve ese mismo día. new Date('2024-01-15
+// 10:30') en cambio depende de la zona horaria del proceso. Una fecha
+// imposible (31/02/2024) devuelve Invalid Date en vez de "desbordar" al 2 de
+// marzo — el llamador ya filtra los inválidos.
+function fechaUtcEstricta(anio: number, mes: number, dia: number, hora = 0, minuto = 0, segundo = 0): Date {
+  const fecha = new Date(Date.UTC(anio, mes - 1, dia, hora, minuto, segundo));
+  // Date.UTC trata los años 0-99 como 1900-1999.
+  if (anio >= 0 && anio <= 99) fecha.setUTCFullYear(anio);
+  const coincide = fecha.getUTCFullYear() === anio && fecha.getUTCMonth() === mes - 1 && fecha.getUTCDate() === dia;
+  return coincide && hora <= 23 && minuto <= 59 && segundo <= 59 ? fecha : new Date(NaN);
+}
+
+// Año de dos dígitos ("15/01/24"): ventana fija 1970-2069, la misma
+// convención de POSIX strptime (%y) — 00-68 es 20xx, 69-99 es 19xx.
+function expandirAnio(texto: string): number {
+  const anio = Number(texto);
+  if (texto.length !== 2) return anio;
+  return anio <= 68 ? 2000 + anio : 1900 + anio;
+}
+
+export function aFechaGenerica(valor: unknown): Date {
+  if (valor instanceof Date) return valor;
+
+  const texto = String(valor).trim();
+
+  const iso = PATRON_FECHA_ISO.exec(texto);
+  if (iso) {
+    const [hora = 0, minuto = 0, segundo = 0] = iso[4] ? iso[4].slice(1).split(':').map(Number) : [];
+    return fechaUtcEstricta(Number(iso[1]), Number(iso[2]), Number(iso[3]), hora, minuto, segundo);
+  }
+
+  const diaMesAnio = PATRON_FECHA_DIA_MES_ANIO.exec(texto);
+  if (diaMesAnio) {
+    return fechaUtcEstricta(expandirAnio(diaMesAnio[3]), Number(diaMesAnio[2]), Number(diaMesAnio[1]));
+  }
+
+  return new Date(NaN);
+}
+
 export function calzaConTipo(valor: unknown, tipo: TipoColumna): boolean {
   if (tipo === 'numerica') return esNumerico(valor);
   if (tipo === 'fecha') return esFecha(valor);

@@ -123,6 +123,6 @@ describe('GenerarInforme', () => {
 
     await usecase.ejecutar('pdf', 'analista-borrado');
 
-    expect(geradorDeInformes.datosRecibidos[0].generadoPara).toBe('Analista SEVERA');
+    expect(geradorDeInformes.datosRecibidos[0].generadoPara).toBe('Analista SIADE');
   });
 });

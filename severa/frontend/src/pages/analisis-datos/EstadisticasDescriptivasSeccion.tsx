@@ -3,6 +3,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { EstadoVacio } from '../../components/ui/EstadoVacio';
 import { AvisoErrorSeccion } from './AvisoErrorSeccion';
 import type { ResumenColumna } from '../../api/analisisDatosService';
+import { formatearDiaCalendario } from '../../utils/formatearDiaCalendario';
 
 function resumenComoTexto(columna: ResumenColumna): string {
   if (columna.tipo === 'numerica') {
@@ -10,7 +11,7 @@ function resumenComoTexto(columna: ResumenColumna): string {
   }
   if (columna.tipo === 'fecha') {
     return columna.minimo && columna.maximo
-      ? `de ${new Date(columna.minimo).toLocaleDateString()} a ${new Date(columna.maximo).toLocaleDateString()}`
+      ? `de ${formatearDiaCalendario(columna.minimo)} a ${formatearDiaCalendario(columna.maximo)}`
       : 'sin fechas válidas';
   }
   const top = columna.masFrecuente[0];

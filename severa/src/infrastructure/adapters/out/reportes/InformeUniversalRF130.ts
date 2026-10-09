@@ -1,6 +1,6 @@
 import PDFDocument from 'pdfkit';
 import { DatosInforme, DatosInformeDataset } from '../../../../application/ports/out/reportes/GeneradorDeInformes';
-import { MAPEO_PLANTILLA_UNIVERSAL_RF130 } from '../../../../domain/services/reportes/MapeoPlantillaUniversalRF130';
+import { MAPEO_PLANTILLA_UNIVERSAL_RF130, REFERENCIAS_DE_SECCION_RF130 } from '../../../../domain/services/reportes/MapeoPlantillaUniversalRF130';
 import { interpretarComposicionDataset, interpretarCorrelacionMasFuerte, interpretarOutliers } from '../../../../domain/services/InterpretadorDeResultadosGenerico';
 import { detectarVocabularioDataset } from '../../../../domain/services/reportes/VocabularioDeDominioGenerico';
 import { interpretarDispersionCvssDias } from '../../../../domain/services/graphs/InterpretacionDeGraficos';
@@ -25,6 +25,7 @@ import {
   celdaComoTexto,
   dibujarEtiquetaTipoAnalisis
 } from './GeneradorInformePDF';
+import { formatearMomento } from './FormatoDeFechasInforme';
 
 // M-10 Ronda 2, Pasada 2-A (RF-130): orquestador nuevo de la plantilla
 // universal de 20 secciones. NO ESTÁ CONECTADO al puerto público
@@ -91,7 +92,7 @@ function dibujarSeccionPortada(doc: PDFKit.PDFDocument, contexto: ContextoInform
       doc.moveDown(1);
       doc.fontSize(12).fillColor('#334155').font('Times-Bold').text(`Generado por SIADE para ${datos.generadoPara}`, { align: 'center' });
       doc.moveDown(0.5);
-      doc.fontSize(10).fillColor('#64748b').font('Times-Roman').text(`Generado: ${datos.generadoEn.toLocaleString()}`, { align: 'center' });
+      doc.fontSize(10).fillColor('#64748b').font('Times-Roman').text(`Generado: ${formatearMomento(datos.generadoEn)}`, { align: 'center' });
       doc.text(`Total de vulnerabilidades analizadas: ${datos.totalVulnerabilidades}`, { align: 'center' });
       doc.moveDown(2);
       return;
@@ -102,7 +103,7 @@ function dibujarSeccionPortada(doc: PDFKit.PDFDocument, contexto: ContextoInform
       doc.moveDown(1);
       doc.fontSize(12).fillColor('#334155').font('Times-Bold').text(`Generado por SIADE para ${datos.generadoPara}`, { align: 'center' });
       doc.moveDown(0.5);
-      doc.fontSize(10).fillColor('#64748b').font('Times-Roman').text(`Generado: ${datos.generadoEn.toLocaleString()}`, { align: 'center' });
+      doc.fontSize(10).fillColor('#64748b').font('Times-Roman').text(`Generado: ${formatearMomento(datos.generadoEn)}`, { align: 'center' });
       doc.text(`${datos.totalFilas} fila(s) — ${datos.totalColumnas} columna(s)`, { align: 'center' });
       doc.moveDown(2);
       return;
@@ -347,7 +348,7 @@ function dibujarSeccionCalidadDeDatos(doc: PDFKit.PDFDocument, contexto: Context
         parrafo(
           doc,
           `El último cambio de importación registrado en el historial de auditoría fue: "${ultimo.detalle}", el ` +
-            `${ultimo.fecha.toLocaleString()} (analista: ${ultimo.usuario}).`
+            `${formatearMomento(ultimo.fecha)} (analista: ${ultimo.usuario}).`
         );
       } else {
         parrafo(doc, 'No hay ningún registro de auditoría de importación disponible todavía para este dataset.');
@@ -774,7 +775,7 @@ function dibujarSeccionVisualizaciones(doc: PDFKit.PDFDocument, contexto: Contex
   switch (contexto.pipeline) {
     case 'cvss': {
       const datos = contexto.datos;
-      const definiciones = construirDefinicionesGraficos(datos);
+      const definiciones = construirDefinicionesGraficos(datos, REFERENCIAS_DE_SECCION_RF130);
       definiciones.forEach((definicion) => {
         doc.addPage();
         doc.fontSize(12).font('Times-Bold').fillColor('#0f172a').text(`12.${definicion.numero} Gráfico ${definicion.numero}: ${definicion.titulo}`);
