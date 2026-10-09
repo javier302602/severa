@@ -38,6 +38,39 @@ const COLORES_SEVERIDAD: Record<string, string> = {
 };
 
 const ALTO_GRAFICO_POR_DEFECTO = 220;
+
+// Bug real (encontrado al exportar un gráfico suelto a PDF, RF-61, y
+// confirmado en el informe ya publicado): GeometriaDeGraficos.ts devuelve
+// coordenadas relativas al lienzo (x = 0 es el borde izquierdo del gráfico),
+// pero acá se usaban como coordenadas absolutas de la página, mientras que
+// títulos, leyendas y etiquetas de fila sí se colocaban en el margen
+// izquierdo. Con el margen de 72 pt del formato APA, todo lo geométrico
+// quedaba corrido 72 pt a la izquierda del texto: los gráficos invadían el
+// margen y, en los Top 10 (barras horizontales), las barras tapaban por
+// completo los nombres que debían leerse a su izquierda — los gráficos 9 y
+// 10 del informe salían sin una sola etiqueta visible.
+// origenX() es ese desplazamiento que faltaba; cada función lo suma a toda
+// coordenada X que venga de la geometría.
+//
+// En vertical pasaba lo simétrico pero en sentido contrario: a cada Y de la
+// geometría se le RESTABA el margen superior del lienzo (area.y), con lo que
+// el área de trazado empezaba pegada al título, sin el aire que ese margen
+// existe para dejar, y la etiqueta del eje Y caía encima del título. Ahora
+// las Y del lienzo se usan tal cual, desplazadas solo por la posición del
+// cursor (offsetY).
+function origenX(doc: PDFKit.PDFDocument): number {
+  return doc.page.margins.left;
+}
+
+// Segundo efecto del mismo descuido: pdfkit deja el cursor horizontal (doc.x)
+// donde se escribió el último texto, que en un gráfico es una etiqueta en
+// cualquier parte del lienzo. El párrafo siguiente al gráfico arrancaba ahí,
+// sangrado sin motivo. Cada función exportada termina devolviendo el cursor
+// al margen.
+function finalizar(doc: PDFKit.PDFDocument, yFinal: number): number {
+  doc.x = doc.page.margins.left;
+  return yFinal;
+}
 const ESPACIO_MINIMO_ETIQUETAS_BOXPLOT_PDF = 9;
 
 function anchoDisponible(doc: PDFKit.PDFDocument): number {
@@ -62,7 +95,11 @@ function dibujarTitulo(doc: PDFKit.PDFDocument, y: number, titulo: string): numb
 function dibujarEtiquetasEjes(doc: PDFKit.PDFDocument, etiquetaEjeX: string | undefined, etiquetaEjeY: string | undefined, area: { x: number; y: number; ancho: number; alto: number }): void {
   doc.fontSize(7).fillColor(COLOR_TEXTO_SECUNDARIO).font('Helvetica');
   if (etiquetaEjeY) {
-    doc.text(etiquetaEjeY, area.x - 45, area.y - 4, { width: 40, align: 'right' });
+    // Sobre el extremo superior del eje, en una sola línea (igual que en la
+    // versión SVG). Antes iba a la izquierda del eje en una columna de 40 pt:
+    // "Días para parche" se partía en dos renglones y caía sobre la primera
+    // marca numérica.
+    doc.text(etiquetaEjeY, area.x - 6, area.y - 11, { lineBreak: false });
   }
   if (etiquetaEjeX) {
     doc.text(etiquetaEjeX, area.x, area.y + area.alto + 18, { width: area.ancho, align: 'center' });
@@ -130,28 +167,29 @@ export function dibujarBarras(doc: PDFKit.PDFDocument, datos: DatoBarra[], opcio
   const { barras, area, marcasEje } = calcularGeometriaBarras(datos, lienzo);
   const yBase = doc.y + lienzo.alto;
   const offsetY = doc.y;
+  const x0 = origenX(doc);
 
   barras.forEach((barra) => {
     doc
-      .rect(barra.x, offsetY + barra.y - area.y, barra.ancho, barra.alto)
+      .rect(x0 + barra.x, offsetY + barra.y, barra.ancho, barra.alto)
       .fillAndStroke(opciones.colorBarra ?? COLOR_BARRA_PRIMARIA, COLOR_EJE);
     doc
       .fontSize(6)
       .fillColor(COLOR_TEXTO)
       .font('Helvetica')
-      .text(formatearNumero(barra.valor), barra.x, offsetY + barra.y - area.y - 9, { width: barra.ancho, align: 'center' });
+      .text(formatearNumero(barra.valor), x0 + barra.x, offsetY + barra.y - 9, { width: barra.ancho, align: 'center' });
     doc
       .fontSize(6)
       .fillColor(COLOR_TEXTO_SECUNDARIO)
-      .text(barra.etiqueta, barra.x - 5, offsetY + area.alto + 4, { width: barra.ancho + 10, align: 'center' });
+      .text(barra.etiqueta, x0 + barra.x - 5, offsetY + area.y + area.alto + 4, { width: barra.ancho + 10, align: 'center' });
   });
 
-  const areaAbsoluta = { x: area.x, y: offsetY, ancho: area.ancho, alto: area.alto };
-  dibujarEjes(doc, areaAbsoluta, offsetY);
+  const areaAbsoluta = { x: x0 + area.x, y: offsetY + area.y, ancho: area.ancho, alto: area.alto };
+  dibujarEjes(doc, areaAbsoluta, areaAbsoluta.y);
   dibujarMarcasEjeVertical(doc, marcasEje, areaAbsoluta);
   dibujarEtiquetasEjes(doc, opciones.etiquetaEjeX, opciones.etiquetaEjeY, areaAbsoluta);
 
-  return yBase + 30;
+  return finalizar(doc, yBase + 30);
 }
 
 // Barras horizontales — Top N (tipos de vulnerabilidad, software). Antes no
@@ -159,6 +197,10 @@ export function dibujarBarras(doc: PDFKit.PDFDocument, datos: DatoBarra[], opcio
 // bug real que en SvgDibujoDeGraficos.ts, confirmado también en el informe
 // descargable.
 const MARGEN_ABAJO_BARRAS_HORIZONTALES_PDF = 26;
+// Franja izquierda reservada para el nombre de cada barra, y el ancho que el
+// texto puede ocupar dentro de ella (deja 15 pt de aire hasta el eje).
+const MARGEN_IZQUIERDO_BARRAS_HORIZONTALES_PDF = 130;
+const ANCHO_ETIQUETAS_BARRAS_HORIZONTALES_PDF = 115;
 
 export function dibujarBarrasHorizontales(doc: PDFKit.PDFDocument, datos: DatoBarra[], opciones: OpcionesGrafico): number {
   const y0 = dibujarTitulo(doc, doc.y, opciones.titulo);
@@ -166,32 +208,35 @@ export function dibujarBarrasHorizontales(doc: PDFKit.PDFDocument, datos: DatoBa
   const lienzo: Lienzo = {
     ancho: anchoDisponible(doc),
     alto,
-    margen: { arriba: y0 - doc.y + 10, abajo: MARGEN_ABAJO_BARRAS_HORIZONTALES_PDF, izquierda: 130, derecha: 30 }
+    margen: { arriba: y0 - doc.y + 10, abajo: MARGEN_ABAJO_BARRAS_HORIZONTALES_PDF, izquierda: MARGEN_IZQUIERDO_BARRAS_HORIZONTALES_PDF, derecha: 30 }
   };
   const { barras, area, marcasEje } = calcularGeometriaBarrasHorizontales(datos, lienzo);
   const offsetY = doc.y;
+  const x0 = origenX(doc);
 
   barras.forEach((barra) => {
+    // La etiqueta ocupa la franja izquierda del lienzo (su margen de 130),
+    // alineada a la derecha contra el eje; la barra arranca donde termina.
     doc.fontSize(7).fillColor(COLOR_TEXTO).font('Helvetica');
-    doc.text(truncarTexto(doc, barra.etiqueta, 115), doc.page.margins.left, offsetY + barra.y - area.y + barra.alto / 2 - 4, {
-      width: 115,
+    doc.text(truncarTexto(doc, barra.etiqueta, ANCHO_ETIQUETAS_BARRAS_HORIZONTALES_PDF), x0, offsetY + barra.y + barra.alto / 2 - 4, {
+      width: ANCHO_ETIQUETAS_BARRAS_HORIZONTALES_PDF,
       align: 'right'
     });
     doc
-      .rect(barra.x, offsetY + barra.y - area.y, barra.ancho, barra.alto)
+      .rect(x0 + barra.x, offsetY + barra.y, barra.ancho, barra.alto)
       .fillAndStroke(opciones.colorBarra ?? COLOR_BARRA_PRIMARIA, COLOR_EJE);
     doc
       .fontSize(7)
       .fillColor(COLOR_TEXTO)
-      .text(formatearNumero(barra.valor), barra.x + barra.ancho + 4, offsetY + barra.y - area.y + barra.alto / 2 - 4);
+      .text(formatearNumero(barra.valor), x0 + barra.x + barra.ancho + 4, offsetY + barra.y + barra.alto / 2 - 4);
   });
 
-  const areaAbsoluta = { x: area.x, y: offsetY, ancho: area.ancho, alto: area.alto };
-  dibujarEjes(doc, areaAbsoluta, offsetY);
+  const areaAbsoluta = { x: x0 + area.x, y: offsetY + area.y, ancho: area.ancho, alto: area.alto };
+  dibujarEjes(doc, areaAbsoluta, areaAbsoluta.y);
   dibujarMarcasEjeHorizontal(doc, marcasEje, areaAbsoluta);
   dibujarEtiquetasEjes(doc, opciones.etiquetaEjeX, undefined, areaAbsoluta);
 
-  return offsetY + lienzo.alto + 10;
+  return finalizar(doc, offsetY + lienzo.alto + 10);
 }
 
 export function dibujarHistograma(
@@ -211,7 +256,7 @@ export function dibujarHistograma(
     .fillColor(COLOR_LINEA_MEDIA)
     .text(`— Media = ${media.toFixed(2)}`, doc.page.margins.left, yFinal - 24, { continued: false });
   doc.fillColor(COLOR_LINEA_MEDIANA).text(`— Mediana = ${mediana.toFixed(2)}`, doc.page.margins.left, yFinal - 14);
-  return yFinal;
+  return finalizar(doc, yFinal);
 }
 
 export function dibujarBoxplot(doc: PDFKit.PDFDocument, resumen: ResumenCincoNumeros, opciones: OpcionesGrafico): number {
@@ -219,8 +264,8 @@ export function dibujarBoxplot(doc: PDFKit.PDFDocument, resumen: ResumenCincoNum
   const alto = opciones.alto ?? ALTO_GRAFICO_POR_DEFECTO;
   const lienzo: Lienzo = { ancho: anchoDisponible(doc), alto, margen: { arriba: y0 - doc.y + 10, abajo: 30, izquierda: 55, derecha: 20 } };
   const offsetY = doc.y;
-  dibujarUnBoxplot(doc, resumen, lienzo, 0, offsetY, opciones.etiquetaEjeY);
-  return offsetY + lienzo.alto + 10;
+  dibujarUnBoxplot(doc, resumen, lienzo, origenX(doc), offsetY, opciones.etiquetaEjeY);
+  return finalizar(doc, offsetY + lienzo.alto + 10);
 }
 
 // resumen: null (2026-07-19, bug real): un catálogo sin ninguna vulnerabilidad
@@ -242,10 +287,12 @@ export function dibujarBoxplotDoble(
   const lienzo: Lienzo = { ancho: anchoMitad, alto, margen };
   const offsetY = doc.y;
 
-  dibujarLadoDeBoxplotOAviso(doc, grupoA.resumen, lienzo, 0, offsetY, opciones.etiquetaEjeY, grupoA.etiqueta);
-  dibujarLadoDeBoxplotOAviso(doc, grupoB.resumen, lienzo, anchoMitad, offsetY, undefined, grupoB.etiqueta);
+  // offsetX ya es absoluto: margen de la página + mitad que le toca a cada grupo.
+  const x0 = origenX(doc);
+  dibujarLadoDeBoxplotOAviso(doc, grupoA.resumen, lienzo, x0, offsetY, opciones.etiquetaEjeY, grupoA.etiqueta);
+  dibujarLadoDeBoxplotOAviso(doc, grupoB.resumen, lienzo, x0 + anchoMitad, offsetY, undefined, grupoB.etiqueta);
 
-  return offsetY + lienzo.alto + 10;
+  return finalizar(doc, offsetY + lienzo.alto + 10);
 }
 
 function dibujarLadoDeBoxplotOAviso(
@@ -261,7 +308,7 @@ function dibujarLadoDeBoxplotOAviso(
     doc
       .fontSize(9)
       .fillColor(COLOR_TEXTO_SECUNDARIO)
-      .text(`${etiquetaGrupo}: sin datos`, doc.page.margins.left + offsetX, offsetY + lienzo.alto / 2, { width: lienzo.ancho, align: 'center' });
+      .text(`${etiquetaGrupo}: sin datos`, offsetX, offsetY + lienzo.alto / 2, { width: lienzo.ancho, align: 'center' });
     return;
   }
   dibujarUnBoxplot(doc, resumen, lienzo, offsetX, offsetY, etiquetaEjeY, etiquetaGrupo);
@@ -277,9 +324,9 @@ function dibujarUnBoxplot(
   etiquetaGrupo?: string
 ): void {
   const geometria = calcularGeometriaBoxplot(resumen, lienzo);
-  const t = (valor: { x: number; y: number }) => ({ x: valor.x + offsetX, y: valor.y - geometria.area.y + offsetY });
+  const t = (valor: { x: number; y: number }) => ({ x: valor.x + offsetX, y: valor.y + offsetY });
 
-  const caja = { x: geometria.caja.x + offsetX, y: geometria.caja.y - geometria.area.y + offsetY, ancho: geometria.caja.ancho, alto: geometria.caja.alto };
+  const caja = { x: geometria.caja.x + offsetX, y: geometria.caja.y + offsetY, ancho: geometria.caja.ancho, alto: geometria.caja.alto };
   doc.lineWidth(1.5).rect(caja.x, caja.y, caja.ancho, caja.alto).fillAndStroke('#fca5a5', COLOR_EJE);
 
   const mediana1 = t({ x: geometria.lineaMediana.x1, y: geometria.lineaMediana.y1 });
@@ -307,8 +354,8 @@ function dibujarUnBoxplot(
     .lineTo(puntoMedia.x + 4, puntoMedia.y - 4)
     .stroke();
 
-  const areaAbs = { x: geometria.area.x + offsetX, y: offsetY, ancho: geometria.area.ancho, alto: geometria.area.alto };
-  dibujarEjes(doc, areaAbs, offsetY);
+  const areaAbs = { x: geometria.area.x + offsetX, y: offsetY + geometria.area.y, ancho: geometria.area.ancho, alto: geometria.area.alto };
+  dibujarEjes(doc, areaAbs, areaAbs.y);
   dibujarMarcasEjeVertical(doc, geometria.marcasEje, areaAbs);
   if (etiquetaEjeY) dibujarEtiquetasEjes(doc, undefined, etiquetaEjeY, areaAbs);
 
@@ -359,9 +406,11 @@ export function dibujarDispersion(
   const offsetY = doc.y;
   const geometria = calcularGeometriaDispersion(puntos, lienzo);
 
+  const x0 = origenX(doc);
+
   geometria.puntos.forEach((punto) => {
     doc
-      .circle(punto.cx, offsetY + punto.cy - geometria.area.y, 2)
+      .circle(x0 + punto.cx, offsetY + punto.cy, 2)
       .fillAndStroke(COLOR_BARRA_PRIMARIA, COLOR_BARRA_PRIMARIA);
   });
 
@@ -370,13 +419,13 @@ export function dibujarDispersion(
     doc
       .strokeColor(COLOR_LINEA_MEDIA)
       .lineWidth(1.5)
-      .moveTo(x1, offsetY + y1 - geometria.area.y)
-      .lineTo(x2, offsetY + y2 - geometria.area.y)
+      .moveTo(x0 + x1, offsetY + y1)
+      .lineTo(x0 + x2, offsetY + y2)
       .stroke();
   }
 
-  const areaAbs = { x: geometria.area.x, y: offsetY, ancho: geometria.area.ancho, alto: geometria.area.alto };
-  dibujarEjes(doc, areaAbs, offsetY);
+  const areaAbs = { x: x0 + geometria.area.x, y: offsetY + geometria.area.y, ancho: geometria.area.ancho, alto: geometria.area.alto };
+  dibujarEjes(doc, areaAbs, areaAbs.y);
   if (geometria.marcasEjeX && geometria.marcasEjeY) {
     dibujarMarcasEjeHorizontal(doc, geometria.marcasEjeX, areaAbs);
     dibujarMarcasEjeVertical(doc, geometria.marcasEjeY, areaAbs);
@@ -386,7 +435,7 @@ export function dibujarDispersion(
   const yFinal = offsetY + lienzo.alto;
   doc.fontSize(7).fillColor(COLOR_TEXTO_SECUNDARIO).font('Helvetica').text(`Correlación de Pearson = ${correlacion.toFixed(3)}`, doc.page.margins.left, yFinal + 22);
 
-  return yFinal + 34;
+  return finalizar(doc, yFinal + 34);
 }
 
 // Mejora 4 (Análisis de Datos General) — Fase 5. Heatmap de la matriz de
@@ -395,6 +444,7 @@ export function dibujarDispersion(
 // escala en sí (colorDivergenteCorrelacion) vive en GeometriaDeGraficos.ts
 // desde que el renderer SVG también la necesita (informe Word genérico).
 const ANCHO_ETIQUETAS_HEATMAP = 75;
+const ALTO_ETIQUETAS_DE_COLUMNA_HEATMAP = 12;
 const LARGO_MAXIMO_ETIQUETA_HEATMAP = 11;
 
 export function dibujarHeatmap(doc: PDFKit.PDFDocument, matriz: MatrizCorrelacion, opciones: OpcionesGrafico): number {
@@ -403,13 +453,16 @@ export function dibujarHeatmap(doc: PDFKit.PDFDocument, matriz: MatrizCorrelacio
 
   if (n === 0) {
     doc.fontSize(8).fillColor(COLOR_TEXTO_SECUNDARIO).font('Helvetica').text('No hay columnas numéricas elegibles para el heatmap.', doc.page.margins.left, y0);
-    return y0 + 20;
+    return finalizar(doc, y0 + 20);
   }
 
   const alto = opciones.alto ?? Math.min(320, Math.max(150, n * 32));
   const anchoGrilla = Math.min(anchoDisponible(doc) - ANCHO_ETIQUETAS_HEATMAP, alto);
   const lienzo: Lienzo = { ancho: anchoGrilla, alto, margen: { arriba: 0, abajo: 0, izquierda: 0, derecha: 0 } };
-  const offsetY = doc.y;
+  // La grilla empieza un renglón más abajo del título: ese renglón es para
+  // los nombres de columna, que se escriben justo encima de la grilla. Sin
+  // este espacio caían sobre el propio título y quedaban tapados por él.
+  const offsetY = doc.y + ALTO_ETIQUETAS_DE_COLUMNA_HEATMAP;
   const offsetX = doc.page.margins.left + ANCHO_ETIQUETAS_HEATMAP;
 
   const valores = matriz.filas.map((fila) => fila.correlaciones.map((celda) => celda.valor));
@@ -453,7 +506,7 @@ export function dibujarHeatmap(doc: PDFKit.PDFDocument, matriz: MatrizCorrelacio
       );
   });
 
-  return offsetY + geometria.area.alto + 20;
+  return finalizar(doc, offsetY + geometria.area.alto + 20);
 }
 
 export function dibujarPastel(doc: PDFKit.PDFDocument, datos: DatoBarra[], opciones: OpcionesGrafico): number {
@@ -462,7 +515,7 @@ export function dibujarPastel(doc: PDFKit.PDFDocument, datos: DatoBarra[], opcio
   const lienzo: Lienzo = { ancho: anchoDisponible(doc), alto, margen: { arriba: y0 - doc.y + 10, abajo: 10, izquierda: 200, derecha: 20 } };
   const offsetY = doc.y;
   const geometria = calcularGeometriaPastel(datos, lienzo);
-  const centro = { x: geometria.centro.x, y: offsetY + geometria.centro.y - (lienzo.margen!.arriba) };
+  const centro = { x: origenX(doc) + geometria.centro.x, y: offsetY + geometria.centro.y };
 
   geometria.porciones.forEach((porcion) => {
     const color = COLORES_SEVERIDAD[porcion.etiqueta] ?? COLOR_BARRA_PRIMARIA;
@@ -489,5 +542,5 @@ export function dibujarPastel(doc: PDFKit.PDFDocument, datos: DatoBarra[], opcio
     yLeyenda += 14;
   });
 
-  return offsetY + lienzo.alto + 10;
+  return finalizar(doc, offsetY + lienzo.alto + 10);
 }
