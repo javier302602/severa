@@ -13,6 +13,7 @@ import { IdentificadorCVE } from '../../../src/domain/shared/value-objects/Ident
 import { CvssScore } from '../../../src/domain/shared/value-objects/CvssScore';
 import { TipoAccesoValue } from '../../../src/domain/shared/value-objects/TipoAcceso';
 import { UrlNoPermitidaError } from '../../../src/domain/errors/UrlNoPermitidaError';
+import { EscalaDeClasificacionRepositoryEnMemoria } from '../../dobles/EscalaDeClasificacionRepositoryEnMemoria';
 
 function vulnerabilidadRepositoryFalso(): VulnerabilidadRepository {
   return {
@@ -22,7 +23,6 @@ function vulnerabilidadRepositoryFalso(): VulnerabilidadRepository {
     listar: jest.fn().mockResolvedValue([]),
     buscarPorCve: jest.fn().mockResolvedValue(null),
     filtrarPorRangoCvss: jest.fn().mockResolvedValue([]),
-    filtrarPorSeveridad: jest.fn().mockResolvedValue([]),
     filtrarPorNivelDeRiesgo: jest.fn().mockResolvedValue([]),
     filtrarPorRango: jest.fn(),
     filtrarPorCategoria: jest.fn(),
@@ -97,10 +97,9 @@ describe('ImportarDatasetDesdeUrl', () => {
     const usecase = new ImportarDatasetDesdeUrl(
       descargadorDeArchivos,
       lectorExcel,
-      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso(), analistaRepositoryFalso()),
+      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso(), analistaRepositoryFalso(), new EscalaDeClasificacionRepositoryEnMemoria()),
       sincronizarConApiNvdUseCase,
-      vulnerabilidadRepository,
-      analistaRepositoryFalso()
+      vulnerabilidadRepository
     );
 
     await expect(usecase.ejecutar('http://storage.googleapis.com/bucket/dataset.csv', 'analista-1')).rejects.toThrow(
@@ -120,10 +119,9 @@ describe('ImportarDatasetDesdeUrl', () => {
     const usecase = new ImportarDatasetDesdeUrl(
       descargadorDeArchivos,
       lectorExcel,
-      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso(), analistaRepositoryFalso()),
+      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso(), analistaRepositoryFalso(), new EscalaDeClasificacionRepositoryEnMemoria()),
       sincronizarConApiNvdUseCase,
-      vulnerabilidadRepository,
-      analistaRepositoryFalso()
+      vulnerabilidadRepository
     );
 
     const urlPegada = 'https://services.nvd.nist.gov/rest/json/cves/2.0?pubStartDate=2024-01-01T00:00:00.000&pubEndDate=2024-04-30T00:00:00.000';
@@ -156,10 +154,9 @@ describe('ImportarDatasetDesdeUrl', () => {
     const usecase = new ImportarDatasetDesdeUrl(
       descargadorDeArchivos,
       lectorExcel,
-      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaRepository, servicioDeNotificacionesFalso(), analistaRepositoryFalso()),
+      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaRepository, servicioDeNotificacionesFalso(), analistaRepositoryFalso(), new EscalaDeClasificacionRepositoryEnMemoria()),
       sincronizarConApiNvdUseCase,
-      vulnerabilidadRepository,
-      analistaRepositoryFalso()
+      vulnerabilidadRepository
     );
 
     const resultado = await usecase.ejecutar('https://docs.google.com/spreadsheets/d/ID123/edit#gid=0', 'analista-1');
@@ -199,10 +196,9 @@ describe('ImportarDatasetDesdeUrl', () => {
     const usecase = new ImportarDatasetDesdeUrl(
       descargadorDeArchivos,
       lectorExcel,
-      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso(), analistaRepositoryFalso()),
+      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso(), analistaRepositoryFalso(), new EscalaDeClasificacionRepositoryEnMemoria()),
       sincronizarConApiNvdUseCase,
-      vulnerabilidadRepository,
-      analistaRepositoryFalso()
+      vulnerabilidadRepository
     );
 
     await usecase.ejecutar(urlFirmada, 'analista-1');
@@ -235,10 +231,9 @@ describe('ImportarDatasetDesdeUrl', () => {
     const usecase = new ImportarDatasetDesdeUrl(
       descargadorDeArchivos,
       lectorExcel,
-      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso(), analistaRepositoryFalso()),
+      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso(), analistaRepositoryFalso(), new EscalaDeClasificacionRepositoryEnMemoria()),
       { ejecutar: jest.fn() },
-      vulnerabilidadRepository,
-      analistaRepositoryFalso()
+      vulnerabilidadRepository
     );
 
     await usecase.ejecutar('https://ejemplo.example.com/dataset.csv', 'analista-1', mapeo);
@@ -264,10 +259,9 @@ describe('ImportarDatasetDesdeUrl', () => {
     const usecase = new ImportarDatasetDesdeUrl(
       descargadorDeArchivos,
       lectorExcel,
-      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso(), analistaRepositoryFalso()),
+      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso(), analistaRepositoryFalso(), new EscalaDeClasificacionRepositoryEnMemoria()),
       { ejecutar: jest.fn() },
-      vulnerabilidadRepository,
-      analistaRepositoryFalso()
+      vulnerabilidadRepository
     );
 
     await usecase.ejecutar('https://ejemplo.example.com/dataset.xlsx', 'analista-1', mapeo);
@@ -303,10 +297,9 @@ describe('ImportarDatasetDesdeUrl', () => {
     const usecase = new ImportarDatasetDesdeUrl(
       descargadorDeArchivos,
       lectorExcel,
-      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaRepository, servicioDeNotificaciones, analistaRepositoryFalso()),
+      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaRepository, servicioDeNotificaciones, analistaRepositoryFalso(), new EscalaDeClasificacionRepositoryEnMemoria()),
       sincronizarConApiNvdUseCase,
-      vulnerabilidadRepository,
-      analistaRepositoryFalso()
+      vulnerabilidadRepository
     );
 
     const resultado = await usecase.ejecutar(urlFirmada, 'analista-1');
@@ -331,7 +324,8 @@ describe('ImportarDatasetDesdeUrl', () => {
     expect(servicioDeNotificaciones.notificarImportacionCompletada).toHaveBeenCalledWith('analista-1', {
       importados: 2,
       rechazados: 1,
-      criticas: 1
+      criticas: 1,
+      criterioDeCriticas: 'según el corte de Crítico de tu escala: CVSS desde 9.0'
     });
 
     // Auditoría: host+path sí, query string (firma) nunca.
@@ -364,10 +358,9 @@ describe('ImportarDatasetDesdeUrl', () => {
     const usecase = new ImportarDatasetDesdeUrl(
       descargadorDeArchivos,
       lectorExcel,
-      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso(), analistaRepositoryFalso()),
+      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificacionesFalso(), analistaRepositoryFalso(), new EscalaDeClasificacionRepositoryEnMemoria()),
       { ejecutar: jest.fn() },
-      vulnerabilidadRepository,
-      analistaRepositoryFalso()
+      vulnerabilidadRepository
     );
 
     const resultado = await usecase.ejecutar('https://ejemplo.example.com/dataset-grande.csv', 'analista-1');
@@ -407,10 +400,9 @@ describe('ImportarDatasetDesdeUrl', () => {
     const usecase = new ImportarDatasetDesdeUrl(
       descargadorDeArchivos,
       lectorExcel,
-      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificaciones, analistaRepository),
+      new ImportarDatasetConAuditoria(new ImportarDataset(vulnerabilidadRepository), auditoriaFalsa(), servicioDeNotificaciones, analistaRepository, new EscalaDeClasificacionRepositoryEnMemoria()),
       { ejecutar: jest.fn() },
-      vulnerabilidadRepository,
-      analistaRepository
+      vulnerabilidadRepository
     );
 
     await usecase.ejecutar('https://ejemplo.example.com/dataset.csv', 'analista-1');
@@ -423,7 +415,8 @@ describe('ImportarDatasetDesdeUrl', () => {
     expect(servicioDeNotificaciones.notificarImportacionCompletada).toHaveBeenCalledWith('analista-1', {
       importados: 50,
       rechazados: 0,
-      criticas: 50
+      criticas: 50,
+      criterioDeCriticas: 'según tu umbral de alerta: CVSS desde 2.0'
     });
   });
 });

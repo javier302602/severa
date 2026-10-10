@@ -7,6 +7,8 @@ import { Vulnerabilidad } from '../../../../src/domain/entities/Vulnerabilidad';
 import { IdentificadorCVE } from '../../../../src/domain/shared/value-objects/IdentificadorCVE';
 import { CvssScore } from '../../../../src/domain/shared/value-objects/CvssScore';
 import { TipoAccesoValue } from '../../../../src/domain/shared/value-objects/TipoAcceso';
+import { EscalaDeClasificacionRepositoryEnMemoria } from '../../../dobles/EscalaDeClasificacionRepositoryEnMemoria';
+import { EscalaDeClasificacion } from '../../../../src/domain/shared/value-objects/EscalaDeClasificacion';
 
 function auditoriaFalsa(): AuditoriaRepository {
   return {
@@ -60,7 +62,8 @@ describe('ImportarDatasetConAuditoria', () => {
       usecaseFalso({ importados: 1, rechazados: 0, errores: [], excelDescartadosBase64: null }),
       auditoriaRepository,
       servicioDeNotificaciones,
-      analistaRepositoryFalso()
+      analistaRepositoryFalso(),
+      new EscalaDeClasificacionRepositoryEnMemoria()
     );
 
     await decorator.ejecutar(resultado, 'analista-7');
@@ -68,11 +71,12 @@ describe('ImportarDatasetConAuditoria', () => {
     expect(servicioDeNotificaciones.notificarImportacionCompletada).toHaveBeenCalledWith('analista-7', {
       importados: 1,
       rechazados: 0,
-      criticas: 1
+      criticas: 1,
+      criterioDeCriticas: 'según el corte de Crítico de tu escala: CVSS desde 9.0'
     });
   });
 
-  test('CVSS menor a 9.0: la notificación de resumen queda con criticas=0', async () => {
+  test('CVSS menor a 9.0 (corte de Crítico de la escala CVSS): la notificación de resumen queda con criticas=0', async () => {
     const noCritica = new Vulnerabilidad('2', new IdentificadorCVE('CVE-2021-99999'), new CvssScore(8.9), 'Nginx', new TipoAccesoValue('No'));
     const resultado = {
       importables: [{ vulnerabilidad: noCritica, fuente: 'excel' }],
@@ -83,7 +87,8 @@ describe('ImportarDatasetConAuditoria', () => {
       usecaseFalso({ importados: 1, rechazados: 0, errores: [], excelDescartadosBase64: null }),
       auditoriaFalsa(),
       servicioDeNotificaciones,
-      analistaRepositoryFalso()
+      analistaRepositoryFalso(),
+      new EscalaDeClasificacionRepositoryEnMemoria()
     );
 
     await decorator.ejecutar(resultado, 'analista-7');
@@ -91,7 +96,8 @@ describe('ImportarDatasetConAuditoria', () => {
     expect(servicioDeNotificaciones.notificarImportacionCompletada).toHaveBeenCalledWith('analista-7', {
       importados: 1,
       rechazados: 0,
-      criticas: 0
+      criticas: 0,
+      criterioDeCriticas: 'según el corte de Crítico de tu escala: CVSS desde 9.0'
     });
   });
 
@@ -116,7 +122,8 @@ describe('ImportarDatasetConAuditoria', () => {
       usecaseFalso({ importados: 3, rechazados: 0, errores: [], excelDescartadosBase64: null }),
       auditoriaFalsa(),
       servicioDeNotificaciones,
-      analistaRepositoryFalso()
+      analistaRepositoryFalso(),
+      new EscalaDeClasificacionRepositoryEnMemoria()
     );
 
     await decorator.ejecutar(resultado, 'analista-7');
@@ -125,7 +132,8 @@ describe('ImportarDatasetConAuditoria', () => {
     expect(servicioDeNotificaciones.notificarImportacionCompletada).toHaveBeenCalledWith('analista-7', {
       importados: 3,
       rechazados: 0,
-      criticas: 2
+      criticas: 2,
+      criterioDeCriticas: 'según el corte de Crítico de tu escala: CVSS desde 9.0'
     });
   });
 
@@ -136,7 +144,8 @@ describe('ImportarDatasetConAuditoria', () => {
       usecaseFalso({ importados: 0, rechazados: 0, errores: [], excelDescartadosBase64: null }),
       auditoriaRepository,
       servicioDeNotificaciones,
-      analistaRepositoryFalso()
+      analistaRepositoryFalso(),
+      new EscalaDeClasificacionRepositoryEnMemoria()
     );
 
     await decorator.ejecutar({ importables: [], rechazadas: [] }, 'analista-7');
@@ -147,7 +156,8 @@ describe('ImportarDatasetConAuditoria', () => {
     expect(servicioDeNotificaciones.notificarImportacionCompletada).toHaveBeenCalledWith('analista-7', {
       importados: 0,
       rechazados: 0,
-      criticas: 0
+      criticas: 0,
+      criterioDeCriticas: 'según el corte de Crítico de tu escala: CVSS desde 9.0'
     });
   });
 
@@ -159,7 +169,8 @@ describe('ImportarDatasetConAuditoria', () => {
       usecaseFalso({ importados: 2, rechazados: 1, errores: [], excelDescartadosBase64: null }),
       auditoriaRepository,
       servicioDeNotificacionesFalso(),
-      analistaRepositoryFalso()
+      analistaRepositoryFalso(),
+      new EscalaDeClasificacionRepositoryEnMemoria()
     );
 
     await decorator.ejecutar({ importables: [], rechazadas: [] }, 'analista-7', 'dataset-julio.xlsx');
@@ -175,7 +186,8 @@ describe('ImportarDatasetConAuditoria', () => {
       usecaseFalso({ importados: 2, rechazados: 1, errores: [], excelDescartadosBase64: null }),
       auditoriaRepository,
       servicioDeNotificacionesFalso(),
-      analistaRepositoryFalso()
+      analistaRepositoryFalso(),
+      new EscalaDeClasificacionRepositoryEnMemoria()
     );
 
     await decorator.ejecutar({ importables: [], rechazadas: [] }, 'analista-7');
@@ -208,7 +220,8 @@ describe('ImportarDatasetConAuditoria', () => {
       usecaseFalso({ importados: 1, rechazados: 0, errores: [], excelDescartadosBase64: null }),
       auditoriaFalsa(),
       servicioDeNotificaciones,
-      analistaRepository
+      analistaRepository,
+      new EscalaDeClasificacionRepositoryEnMemoria()
     );
 
     await decorator.ejecutar(resultado, 'analista-7');
@@ -218,7 +231,62 @@ describe('ImportarDatasetConAuditoria', () => {
     expect(servicioDeNotificaciones.notificarImportacionCompletada).toHaveBeenCalledWith('analista-7', {
       importados: 1,
       rechazados: 0,
-      criticas: 1
+      criticas: 1,
+      criterioDeCriticas: 'según tu umbral de alerta: días para parche desde 30'
+    });
+  });
+
+  // RF-99 + RF-28/RF-69: sin umbral propio, "crítica" es el corte de Crítico
+  // de la escala del analista; con umbral propio, ese. La notificación dice
+  // cuál se usó.
+  describe('regla de críticas con la escala del analista', () => {
+    const ochoSiete = new Vulnerabilidad('5', new IdentificadorCVE('CVE-2021-08700'), new CvssScore(8.7), 'Router', new TipoAccesoValue('Sí'));
+    const resultado = { importables: [{ vulnerabilidad: ochoSiete, fuente: 'excel' }], rechazadas: [] };
+
+    test('sin umbral propio, con "Crítico desde 8.5" un 8.7 cuenta como crítica, y la notificación lo dice', async () => {
+      const escalas = new EscalaDeClasificacionRepositoryEnMemoria();
+      await escalas.guardar('analista-7', EscalaDeClasificacion.personalizada({ moderado: 4, alto: 7, critico: 8.5 }));
+      const servicioDeNotificaciones = servicioDeNotificacionesFalso();
+      const decorator = new ImportarDatasetConAuditoria(
+        usecaseFalso({ importados: 1, rechazados: 0, errores: [], excelDescartadosBase64: null }),
+        auditoriaFalsa(),
+        servicioDeNotificaciones,
+        analistaRepositoryFalso(),
+        escalas
+      );
+
+      await decorator.ejecutar(resultado, 'analista-7');
+
+      expect(servicioDeNotificaciones.notificarImportacionCompletada).toHaveBeenCalledWith('analista-7', {
+        importados: 1,
+        rechazados: 0,
+        criticas: 1,
+        criterioDeCriticas: 'según el corte de Crítico de tu escala: CVSS desde 8.5'
+      });
+    });
+
+    test('con umbral propio se respeta aunque la escala diga otra cosa, y la notificación lo dice', async () => {
+      const escalas = new EscalaDeClasificacionRepositoryEnMemoria();
+      await escalas.guardar('analista-7', EscalaDeClasificacion.personalizada({ moderado: 4, alto: 7, critico: 8.5 }));
+      const analistas = analistaRepositoryFalso();
+      (analistas.obtenerUmbralCritico as jest.Mock).mockResolvedValue({ variable: 'cvssScore', valor: 9.5 });
+      const servicioDeNotificaciones = servicioDeNotificacionesFalso();
+      const decorator = new ImportarDatasetConAuditoria(
+        usecaseFalso({ importados: 1, rechazados: 0, errores: [], excelDescartadosBase64: null }),
+        auditoriaFalsa(),
+        servicioDeNotificaciones,
+        analistas,
+        escalas
+      );
+
+      await decorator.ejecutar(resultado, 'analista-7');
+
+      expect(servicioDeNotificaciones.notificarImportacionCompletada).toHaveBeenCalledWith('analista-7', {
+        importados: 1,
+        rechazados: 0,
+        criticas: 0,
+        criterioDeCriticas: 'según tu umbral de alerta: CVSS desde 9.5'
+      });
     });
   });
 });

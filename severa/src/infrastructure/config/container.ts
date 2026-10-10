@@ -186,7 +186,8 @@ const importarDatasetConAuditoria = new ImportarDatasetConAuditoria(
   new ImportarDataset(vulnerabilidadRepository),
   auditoriaRepository,
   servicioDeNotificaciones,
-  analistaRepository
+  analistaRepository,
+  escalaDeClasificacionRepository
 );
 // Hoisteado (en vez de construirse inline dentro de `container`) porque
 // `importarDatasetDesdeUrlUseCase` también lo necesita, para el caso de un
@@ -315,8 +316,7 @@ export const container = {
     lectorExcelDataset,
     importarDatasetConAuditoria,
     sincronizarConApiNvdUseCase,
-    vulnerabilidadRepository,
-    analistaRepository
+    vulnerabilidadRepository
   ),
   // RF-24: primera ruta HTTP para exportar el dataset validado (GET /dataset/exportar).
   exportarDatasetValidadoUseCase: new ExportarDatasetValidado(vulnerabilidadRepository, escalaDeClasificacionRepository, exportadorDeCatalogoAgrupado),
@@ -379,9 +379,9 @@ export const container = {
     'ComparacionPorCategorias',
     ([analistaId]) => analistaId
   ),
-  clasificarRiesgoUseCase: new ClasificarRiesgo(vulnerabilidadRepository),
+  clasificarRiesgoUseCase: new ClasificarRiesgo(vulnerabilidadRepository, escalaDeClasificacionRepository),
   generarRankingUrgenciaUseCase: conHistorialDelCatalogo(
-    new GenerarRankingUrgencia(vulnerabilidadRepository, emisorDeAlertasDePlazo),
+    new GenerarRankingUrgencia(vulnerabilidadRepository, emisorDeAlertasDePlazo, escalaDeClasificacionRepository),
     historialDeAnalisis,
     'RankingDeUrgencia',
     ([analistaId]) => analistaId
@@ -571,7 +571,8 @@ export const container = {
   notificarPlazosProximosAVencerUseCase: new NotificarPlazosProximosAVencer(
     analistaRepository,
     vulnerabilidadRepository,
-    emisorDeAlertasDePlazo
+    emisorDeAlertasDePlazo,
+    escalaDeClasificacionRepository
   ),
   // RF-100 (M-13, retoma): expuesto para que server.ts registre la tarea
   // cron de plazos próximos a vencer al arrancar — antes era una variable

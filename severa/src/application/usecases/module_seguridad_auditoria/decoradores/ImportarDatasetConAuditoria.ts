@@ -3,7 +3,9 @@ import { ImportarDatasetUseCase, ResumenImportacion } from '../../../ports/in/mo
 import { AuditoriaRepository } from '../../../ports/out/persistencia/repositorios/AuditoriaRepository';
 import { AnalistaRepository } from '../../../ports/out/persistencia/repositorios/AnalistaRepository';
 import { ServicioDeNotificaciones } from '../../../ports/out/notificaciones/ServicioDeNotificaciones';
-import { esVulnerabilidadCritica } from '../../../../domain/services/DetectorDeEventosNotificables';
+import { CriterioDeCriticas, criterioDeCriticas, esVulnerabilidadCritica } from '../../../../domain/services/DetectorDeEventosNotificables';
+import { EscalaDeClasificacionRepository } from '../../../ports/out/persistencia/repositorios/EscalaDeClasificacionRepository';
+import { escalaVigente } from '../../module_priorizacion_clasificacion/EscalaDeClasificacion';
 
 // RF-94: registra quién modificó el dataset y cuándo. No implementa
 // ImportarDatasetUseCase porque necesita el analistaId como parámetro extra
@@ -20,8 +22,18 @@ export class ImportarDatasetConAuditoria {
     // RF-99 (M-13, retoma): UNA sola consulta por importación (no por fila)
     // para resolver el umbral crítico configurado por el analista — ver el
     // uso más abajo, antes del .filter().
-    private readonly analistaRepository: AnalistaRepository
+    private readonly analistaRepository: AnalistaRepository,
+    private readonly escalaRepository: EscalaDeClasificacionRepository
   ) {}
+
+  // RF-99 + RF-28/RF-69: qué cuenta como crítica para este analista (el corte
+  // de Crítico de su escala, o su umbral propio). Lo usan las dos formas de
+  // importar, para que la regla sea la misma.
+  async criterioDeCriticas(analistaId: string): Promise<CriterioDeCriticas> {
+    const umbralPropio = await this.analistaRepository.obtenerUmbralCritico(analistaId);
+    const { escala } = await escalaVigente(this.escalaRepository, analistaId);
+    return criterioDeCriticas(umbralPropio, escala);
+  }
 
   async ejecutar(
     resultado: { importables: FilaImportable[]; rechazadas: FilaRechazada[]; errores?: string[] } | undefined,
@@ -62,12 +74,13 @@ export class ImportarDatasetConAuditoria {
     // con el conteo de críticas incluido. Se revisa `resultado.importables`
     // (lo que efectivamente se guardó), no el resumen, porque el resumen
     // solo trae conteos totales.
-    const umbral = (await this.analistaRepository.obtenerUmbralCritico(analistaId)) ?? undefined;
-    const cantidadCriticas = (resultado?.importables ?? []).filter((item) => esVulnerabilidadCritica(item.vulnerabilidad, umbral)).length;
+    const criterio = await this.criterioDeCriticas(analistaId);
+    const cantidadCriticas = (resultado?.importables ?? []).filter((item) => esVulnerabilidadCritica(item.vulnerabilidad, criterio.umbral)).length;
     await this.servicioDeNotificaciones.notificarImportacionCompletada(analistaId, {
       importados: resumen.importados,
       rechazados: resumen.rechazados,
-      criticas: cantidadCriticas
+      criticas: cantidadCriticas,
+      criterioDeCriticas: criterio.descripcion
     });
 
     return resumen;
@@ -80,13 +93,20 @@ export class ImportarDatasetConAuditoria {
   // auditoría y la MISMA notificación de resumen. `criticas` lo cuenta el
   // propio streaming sobre la marcha (ImportarDatasetDesdeUrl.ts), porque acá
   // ya no queda ningún array completo de importables para filtrar.
-  async registrarImportacionPorLink(resumen: ResumenImportacion, analistaId: string, origenLink: string, criticas: number): Promise<void> {
+  async registrarImportacionPorLink(
+    resumen: ResumenImportacion,
+    analistaId: string,
+    origenLink: string,
+    criticas: number,
+    criterio: CriterioDeCriticas
+  ): Promise<void> {
     const detalle = `${resumen.importados} importados, ${resumen.rechazados} rechazados (origen: ${origenLink})`;
     await this.auditoriaRepository.registrar({ usuario: analistaId, accion: 'ImportarDataset', detalle });
     await this.servicioDeNotificaciones.notificarImportacionCompletada(analistaId, {
       importados: resumen.importados,
       rechazados: resumen.rechazados,
-      criticas
+      criticas,
+      criterioDeCriticas: criterio.descripcion
     });
   }
 }

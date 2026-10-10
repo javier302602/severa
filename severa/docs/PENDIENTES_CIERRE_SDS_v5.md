@@ -5,19 +5,17 @@ detectó y todavía no se resolvió; cada entrada dice en qué paso del plan se
 atiende. Al cerrar una, se borra de este archivo y el commit que la resuelve
 lo dice.
 
-## Paso 2 — Escala de clasificación (tanda d)
+## Paso 2 — Escala de clasificación (tanda f)
 
-- **El CVSS se clasifica al importar con un valor distinto del que queda
-  guardado.** Encontrado por Angel el 2026-10-10. `LectorExcelDataset` (y la
-  sincronización con NVD) crea el `CvssScore` con el número crudo del archivo,
-  pero `cvss_score` es `NUMERIC(3,1)` y PostgreSQL lo redondea: un 8.95 queda
-  guardado como 9.0 (Crítico en el catálogo), pero en memoria, durante la
-  importación, sigue siendo 8.95, así que `esVulnerabilidadCritica` no lo
-  detecta y el resumen de importación no lo cuenta. Hay que redondear a un
-  decimal al leer (archivo y NVD) con la misma regla que PostgreSQL (mitad
-  hacia arriba, sobre el valor decimal y no sobre el binario), con un test de
-  integración que compare lo que clasifica el dominio al importar con lo que
-  queda guardado para 3.95, 6.95 y 8.95.
+- **Una consulta del ranking con plazos de prueba gasta para siempre la alerta
+  de plazo vencido.** Encontrado por Angel el 2026-10-10. `GenerarRankingUrgencia`
+  emite alertas de plazo vencido (RF-76) con los plazos que llegan por
+  parámetro en la petición, y esas alertas quedan en `alertas_emitidas`: una
+  consulta con plazos cortos marca como avisadas vulnerabilidades que todavía
+  no vencieron, y cuando vence el plazo real ya no se avisa. Cuando los plazos
+  queden guardados (tanda f), solo la configuración guardada emite alertas; un
+  plazo pasado por parámetro, si se conserva, es solo de consulta y no emite ni
+  registra nada.
 
 ## Paso 4 — Trazabilidad (RF que existen en el backend pero no en la interfaz)
 
@@ -58,6 +56,13 @@ lo dice.
 - **Al cerrar sesión no se vacía la caché de consultas del frontend**
   (dos personas en el mismo navegador). Incluye ahora la lista de plantillas
   (`['plantillas-analisis']`).
+
+- **Un CSV con tildes se lee como latin-1 en la importación de archivo.**
+  Encontrado el 2026-10-10 escribiendo el test del redondeo del CVSS:
+  `LectorExcelDataset.leerArchivo` sobre un CSV UTF-8 sin BOM lee "Sí" como
+  "SÃ­" y rechaza la fila ("Tipo de acceso inválido"). Revisar con un CSV real
+  exportado de Excel (con y sin BOM) y con la lectura en streaming, que usa
+  otro camino (csv-parse).
 
 ## Entorno de pruebas
 

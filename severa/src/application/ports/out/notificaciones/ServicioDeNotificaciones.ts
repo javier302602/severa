@@ -40,9 +40,11 @@ export interface ServicioDeNotificaciones {
   // disparaba N notificarVulnerabilidadCritica seguidas). Reemplaza esas N
   // llamadas por UNA sola al terminar la importación completa (archivo,
   // link o streaming), con el conteo de críticas incluido en el mensaje.
+  // `criterioDeCriticas`: con qué regla se contaron las críticas (RF-99 +
+  // RF-28/RF-69: el corte de Crítico de la escala, o el umbral propio).
   notificarImportacionCompletada(
     analistaId: string,
-    resumen: { importados: number; rechazados: number; criticas: number }
+    resumen: { importados: number; rechazados: number; criticas: number; criterioDeCriticas: string }
   ): Promise<void>;
   // RF-101: informe recién generado.
   notificarInformeListo(analistaId: string, formato: FormatoDeInforme): Promise<void>;

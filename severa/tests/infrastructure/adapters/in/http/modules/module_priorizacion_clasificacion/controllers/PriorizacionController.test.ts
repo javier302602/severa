@@ -13,6 +13,7 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => {
   const { CvssScore } = require('../../../../../../../../src/domain/shared/value-objects/CvssScore');
   const { TipoAccesoValue } = require('../../../../../../../../src/domain/shared/value-objects/TipoAcceso');
   const { EstadoRemediacionValue } = require('../../../../../../../../src/domain/shared/value-objects/EstadoRemediacion');
+  const { EscalaDeClasificacion } = require('../../../../../../../../src/domain/shared/value-objects/EscalaDeClasificacion');
 
   const FECHA_CARGA_MOCK = new Date('2024-01-15T00:00:00Z');
   // CVSS 7.5 = 'Alto' de verdad (no solo la etiqueta del mock): evaluarRelacionPlazoReal
@@ -29,10 +30,13 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => {
   return {
     container: {
       generarRankingUrgenciaUseCase: {
-        ejecutar: jest.fn().mockResolvedValue([
-          { posicion: 1, vulnerabilidad: critica, nivelDeRiesgo: 'Alto' },
-          { posicion: 2, vulnerabilidad: moderada, nivelDeRiesgo: 'Moderado' }
-        ])
+        ejecutar: jest.fn().mockResolvedValue({
+          escala: { escala: EscalaDeClasificacion.CVSS, personalizada: false },
+          entradas: [
+            { posicion: 1, vulnerabilidad: critica, nivelDeRiesgo: 'Alto' },
+            { posicion: 2, vulnerabilidad: moderada, nivelDeRiesgo: 'Moderado' }
+          ]
+        })
       },
       marcarEnProcesoDeRemediacionUseCase: {
         ejecutar: jest.fn(async (cve: string, analistaId: string) => {
@@ -92,6 +96,8 @@ describe('GET /priorizacion/ranking — RF-70/71/72/73/76', () => {
       cve: 'CVE-2021-44228',
       cvssScore: 7.5,
       nivelDeRiesgo: 'Alto',
+      // RF-71: el plazo de su nivel.
+      plazoRecomendado: 30,
       diasParaParche: 5,
       estado: 'Pendiente'
     });
@@ -113,11 +119,29 @@ describe('GET /priorizacion/ranking — RF-70/71/72/73/76', () => {
     expect(res.body[1].relacionPlazoReal.aplicable).toBe(true);
   });
 
-  test('con severidad, delega el parámetro al caso de uso', async () => {
-    const res = await conToken('analista-1')(conHttps(request(app).get('/priorizacion/ranking').query({ severidad: 'Alta' })));
+  test('el nivel se acepta como `nivel` y, como antes, como `severidad` (también con los nombres viejos)', async () => {
+    const conSeveridad = await conToken('analista-1')(conHttps(request(app).get('/priorizacion/ranking').query({ severidad: 'Alta' })));
+    expect(conSeveridad.status).toBe(200);
+    expect(container.generarRankingUrgenciaUseCase.ejecutar).toHaveBeenLastCalledWith('analista-1', undefined, 'Alta', expect.anything());
 
-    expect(res.status).toBe(200);
-    expect(container.generarRankingUrgenciaUseCase.ejecutar).toHaveBeenCalledWith('analista-1', undefined, 'Alta', expect.anything());
+    const conNivel = await conToken('analista-1')(conHttps(request(app).get('/priorizacion/ranking').query({ nivel: 'Crítico' })));
+    expect(conNivel.status).toBe(200);
+    expect(container.generarRankingUrgenciaUseCase.ejecutar).toHaveBeenLastCalledWith('analista-1', undefined, 'Crítico', expect.anything());
+  });
+
+  test('RF-28 / RF-69: el plazo y la relación con el plazo real salen de la escala que devuelve el caso de uso', async () => {
+    const { EscalaDeClasificacion } = jest.requireActual('../../../../../../../../src/domain/shared/value-objects/EscalaDeClasificacion');
+    const ejecutar = container.generarRankingUrgenciaUseCase.ejecutar as jest.Mock;
+    const original = await ejecutar.getMockImplementation()?.() ?? (await ejecutar());
+    ejecutar.mockResolvedValueOnce({
+      escala: { escala: EscalaDeClasificacion.personalizada({ moderado: 4, alto: 7, critico: 7.5 }), personalizada: true },
+      entradas: [{ ...original.entradas[0], nivelDeRiesgo: 'Crítico' }]
+    });
+
+    const res = await conToken('analista-1')(conHttps(request(app).get('/priorizacion/ranking')));
+
+    expect(res.body[0]).toMatchObject({ nivelDeRiesgo: 'Crítico', plazoRecomendado: 7 });
+    expect(res.body[0].relacionPlazoReal).toMatchObject({ aplicable: true, plazoRecomendado: 7 });
   });
 
   test('RF-71: plazoCritico/plazoAlto/plazoModerado/plazoBajo arman plazosPersonalizados', async () => {

@@ -1,5 +1,4 @@
-import { CvssScore } from '../shared/value-objects/CvssScore';
-import { clasificar } from './classification/ClasificadorDeRiesgo';
+import { EscalaDeClasificacion } from '../shared/value-objects/EscalaDeClasificacion';
 import { ComparacionGrupos, formatearEstadistico } from './inferential-statistics/ComparadorDeCategorias';
 import { EntradaRanking, estimarPlazoRecomendado } from './classification/MotorDePriorizacion';
 
@@ -20,19 +19,22 @@ export function generarInterpretacion(
   totalVulnerabilidades: number,
   resumen: ResumenEstadisticoCvss,
   comparacionAccesoRemotoLocal: ComparacionGrupos,
-  rankingUrgencia: EntradaRanking[]
+  rankingUrgencia: EntradaRanking[],
+  escala: EscalaDeClasificacion
 ): string[] {
   return [
-    interpretarSeveridadPromedio(totalVulnerabilidades, resumen),
+    interpretarSeveridadPromedio(totalVulnerabilidades, resumen, escala),
     interpretarDispersion(resumen.coeficienteVariacion),
     interpretarComparacionAcceso(comparacionAccesoRemotoLocal),
     interpretarRanking(rankingUrgencia)
   ];
 }
 
-export function interpretarSeveridadPromedio(totalVulnerabilidades: number, resumen: ResumenEstadisticoCvss): string {
-  const nivelPromedio = clasificar(new CvssScore(resumen.media)).valor;
-  return `La severidad promedio (CVSS) de las ${totalVulnerabilidades} vulnerabilidades analizadas es de ${resumen.media.toFixed(2)}, ` +
+// RF-28 / RF-69: el nivel que corresponde al CVSS promedio, según la escala
+// del analista (la nombra la sección de metodología del informe).
+export function interpretarSeveridadPromedio(totalVulnerabilidades: number, resumen: ResumenEstadisticoCvss, escala: EscalaDeClasificacion): string {
+  const nivelPromedio = escala.clasificar(resumen.media);
+  return `El CVSS promedio de las ${totalVulnerabilidades} vulnerabilidades analizadas es de ${resumen.media.toFixed(2)}, ` +
     `lo cual corresponde a un nivel de riesgo ${nivelPromedio}. La mediana es de ${resumen.mediana.toFixed(2)}.`;
 }
 

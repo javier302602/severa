@@ -78,7 +78,8 @@ export function parsearRespuestaNvd(json: unknown): { importables: FilaImportabl
       }
 
       const cve = new IdentificadorCVE(cveId);
-      const cvssScore = new CvssScore(metrica.cvssData.baseScore);
+      // Mismo redondeo que el archivo y que la base (NUMERIC(3,1)).
+      const cvssScore = CvssScore.redondeado(metrica.cvssData.baseScore);
       const tipoAcceso = new TipoAccesoValue(esAccesoRemoto(metrica.cvssData) ? 'Remoto' : 'Local');
       const descripcion = descripcionEnIngles(item.cve.descriptions);
       const tipoVulnerabilidad = cweDePrimeraDebilidad(item.cve.weaknesses);

@@ -236,13 +236,13 @@ describe('Multi-tenancy: aislamiento de datos por analista (Paso 5) — integrac
   // ------------------------------------------------------------------
   describe('Priorización (GenerarRankingUrgencia)', () => {
     test('el ranking de B nunca incluye CVEs exclusivos de A, y viceversa', async () => {
-      const usecase = new GenerarRankingUrgencia(vulnerabilidadRepository, emisorDeAlertasDePrueba(servicioDeNotificacionesFalso()));
+      const usecase = new GenerarRankingUrgencia(vulnerabilidadRepository, emisorDeAlertasDePrueba(servicioDeNotificacionesFalso()), new PostgresEscalaDeClasificacionRepository(pool));
 
       const rankingA = await usecase.ejecutar(ANALISTA_A);
       const rankingB = await usecase.ejecutar(ANALISTA_B);
 
-      const cvesA = rankingA.map((entrada) => entrada.vulnerabilidad.cve.valor);
-      const cvesB = rankingB.map((entrada) => entrada.vulnerabilidad.cve.valor);
+      const cvesA = rankingA.entradas.map((entrada) => entrada.vulnerabilidad.cve.valor);
+      const cvesB = rankingB.entradas.map((entrada) => entrada.vulnerabilidad.cve.valor);
 
       expect(cvesA).toEqual(expect.arrayContaining([CVE_SOLO_A_1, CVE_SOLO_A_2]));
       expect(cvesA).not.toContain(CVE_SOLO_B_1);

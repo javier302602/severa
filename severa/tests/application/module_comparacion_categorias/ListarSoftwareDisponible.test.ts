@@ -9,7 +9,6 @@ function repositorioFalso(listarSoftwareDisponible: jest.Mock): VulnerabilidadRe
     listar: jest.fn(),
     buscarPorCve: jest.fn(),
     filtrarPorRangoCvss: jest.fn(),
-    filtrarPorSeveridad: jest.fn(),
     filtrarPorNivelDeRiesgo: jest.fn().mockResolvedValue([]),
     filtrarPorRango: jest.fn(),
     filtrarPorCategoria: jest.fn(),

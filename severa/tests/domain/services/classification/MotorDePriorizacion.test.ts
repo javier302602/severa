@@ -4,6 +4,10 @@ import { IdentificadorCVE } from '../../../../src/domain/shared/value-objects/Id
 import { CvssScore } from '../../../../src/domain/shared/value-objects/CvssScore';
 import { TipoAccesoValue } from '../../../../src/domain/shared/value-objects/TipoAcceso';
 import { EstadoRemediacionValue } from '../../../../src/domain/shared/value-objects/EstadoRemediacion';
+import { EscalaDeClasificacion } from '../../../../src/domain/shared/value-objects/EscalaDeClasificacion';
+
+const CVSS = EscalaDeClasificacion.CVSS;
+const CRITICO_DESDE_8_5 = EscalaDeClasificacion.personalizada({ moderado: 4, alto: 7, critico: 8.5 });
 
 describe('MotorDePriorizacion', () => {
   // RF-73 (auditoría M-09, frente B): generarRanking pasó de un sort
@@ -31,7 +35,7 @@ describe('MotorDePriorizacion', () => {
     const nginx = new Vulnerabilidad('6', new IdentificadorCVE('CVE-2021-20021'), new CvssScore(5.5), 'Nginx', new TipoAccesoValue('No'), 45); // Moderado
 
     // Orden de entrada deliberadamente mezclado para probar que el sort ordena.
-    const ranking = generarRanking([nginx, printNightmare, log4jSegundo, logShell, heartbleed, openSsl]);
+    const ranking = generarRanking([nginx, printNightmare, log4jSegundo, logShell, heartbleed, openSsl], CVSS);
 
     expect(ranking.map((entrada) => entrada.vulnerabilidad.cve.valor)).toEqual([
       'CVE-2021-44228', // Crítico, CVSS 10.0
@@ -51,7 +55,7 @@ describe('MotorDePriorizacion', () => {
     const menosDias = new Vulnerabilidad('1', new IdentificadorCVE('CVE-2023-00001'), new CvssScore(8.0), 'Software A', undefined, 4);
     const masDias = new Vulnerabilidad('2', new IdentificadorCVE('CVE-2023-00002'), new CvssScore(8.0), 'Software B', undefined, 40);
 
-    const ranking = generarRanking([menosDias, masDias]);
+    const ranking = generarRanking([menosDias, masDias], CVSS);
 
     expect(ranking.map((entrada) => entrada.vulnerabilidad.cve.valor)).toEqual([
       'CVE-2023-00002',
@@ -74,9 +78,9 @@ describe('MotorDePriorizacion', () => {
     );
 
     // Plazo de Crítico = 7 días. A los 8 días, excedido.
-    expect(estaPlazoExcedido(critica, new Date('2026-01-09T00:00:00Z'))).toBe(true);
+    expect(estaPlazoExcedido(critica, CVSS, new Date('2026-01-09T00:00:00Z'))).toBe(true);
     // A los 6 días, todavía dentro del plazo.
-    expect(estaPlazoExcedido(critica, new Date('2026-01-07T00:00:00Z'))).toBe(false);
+    expect(estaPlazoExcedido(critica, CVSS, new Date('2026-01-07T00:00:00Z'))).toBe(false);
   });
 
   test('no dispara alerta si la vulnerabilidad ya fue remediada, aunque haya pasado el plazo', () => {
@@ -88,7 +92,7 @@ describe('MotorDePriorizacion', () => {
       fechaCarga
     );
 
-    expect(estaPlazoExcedido(remediada, new Date('2026-06-01T00:00:00Z'))).toBe(false);
+    expect(estaPlazoExcedido(remediada, CVSS, new Date('2026-06-01T00:00:00Z'))).toBe(false);
   });
 
   // RF-73: pondera de verdad criterio+dispersión+urgencia con pesos
@@ -104,12 +108,12 @@ describe('MotorDePriorizacion', () => {
     const menosCvssMasDias = new Vulnerabilidad('2', new IdentificadorCVE('CVE-2014-0160'), new CvssScore(7.5), 'OpenSSL', undefined, 20);
 
     test('con los pesos default (criterio > urgencia), gana el de mayor CVSS', () => {
-      const ranking = generarRanking([menosCvssMasDias, masCvssMenosDias]);
+      const ranking = generarRanking([menosCvssMasDias, masCvssMenosDias], CVSS);
       expect(ranking.map((entrada) => entrada.vulnerabilidad.cve.valor)).toEqual(['CVE-2021-34527', 'CVE-2014-0160']);
     });
 
     test('invirtiendo los pesos (urgencia > criterio), gana el que lleva más días esperando', () => {
-      const ranking = generarRanking([menosCvssMasDias, masCvssMenosDias], { pesoCriterio: 0.3, pesoUrgencia: 0.7 });
+      const ranking = generarRanking([menosCvssMasDias, masCvssMenosDias], CVSS, { pesoCriterio: 0.3, pesoUrgencia: 0.7 });
       expect(ranking.map((entrada) => entrada.vulnerabilidad.cve.valor)).toEqual(['CVE-2014-0160', 'CVE-2021-34527']);
     });
 
@@ -117,21 +121,21 @@ describe('MotorDePriorizacion', () => {
       const critica = new Vulnerabilidad('1', new IdentificadorCVE('CVE-2021-00001'), new CvssScore(9.0), 'Software A', undefined, 1);
       const alta = new Vulnerabilidad('2', new IdentificadorCVE('CVE-2021-00002'), new CvssScore(7.0), 'Software B', undefined, 999);
 
-      const ranking = generarRanking([alta, critica], { pesoCriterio: 0, pesoUrgencia: 1 });
+      const ranking = generarRanking([alta, critica], CVSS, { pesoCriterio: 0, pesoUrgencia: 1 });
 
       expect(ranking.map((entrada) => entrada.vulnerabilidad.cve.valor)).toEqual(['CVE-2021-00001', 'CVE-2021-00002']);
     });
 
     test('un bucket con un solo elemento no lanza (z-score no definido con <2 valores)', () => {
       const unicaCritica = new Vulnerabilidad('1', new IdentificadorCVE('CVE-2021-00001'), new CvssScore(9.5), 'Software A');
-      expect(() => generarRanking([unicaCritica])).not.toThrow();
+      expect(() => generarRanking([unicaCritica], CVSS)).not.toThrow();
     });
 
     test('CVSS y días idénticos dentro de un bucket (desviación 0) no lanza y desempata de forma estable', () => {
       const a = new Vulnerabilidad('1', new IdentificadorCVE('CVE-2021-00001'), new CvssScore(9.5), 'Software A', undefined, 10);
       const b = new Vulnerabilidad('2', new IdentificadorCVE('CVE-2021-00002'), new CvssScore(9.5), 'Software B', undefined, 10);
 
-      expect(() => generarRanking([a, b])).not.toThrow();
+      expect(() => generarRanking([a, b], CVSS)).not.toThrow();
     });
   });
 
@@ -155,9 +159,9 @@ describe('MotorDePriorizacion', () => {
       const fechaActual = new Date('2026-01-03T00:00:00Z'); // 2 días transcurridos
 
       // Con el plazo default de Crítico (7 días), a los 2 días NO está excedida.
-      expect(estaPlazoExcedido(critica, fechaActual)).toBe(false);
+      expect(estaPlazoExcedido(critica, CVSS, fechaActual)).toBe(false);
       // Con un plazo personalizado más estricto (1 día para Crítico), SÍ está excedida.
-      expect(estaPlazoExcedido(critica, fechaActual, { Crítico: 1, Alto: 30, Moderado: 90, Bajo: 180 })).toBe(true);
+      expect(estaPlazoExcedido(critica, CVSS, fechaActual, { Crítico: 1, Alto: 30, Moderado: 90, Bajo: 180 })).toBe(true);
     });
   });
 
@@ -166,7 +170,7 @@ describe('MotorDePriorizacion', () => {
     test('marca "no aplicable" cuando la vulnerabilidad no registra diasParaParche', () => {
       const sinDias = new Vulnerabilidad('1', new IdentificadorCVE('CVE-2021-00001'), new CvssScore(9.0), 'Software A');
 
-      const resultado = evaluarRelacionPlazoReal(sinDias);
+      const resultado = evaluarRelacionPlazoReal(sinDias, CVSS);
 
       expect(resultado.aplicable).toBe(false);
       if (!resultado.aplicable) {
@@ -178,7 +182,7 @@ describe('MotorDePriorizacion', () => {
       // Crítico: plazo recomendado 7 días.
       const vulnerabilidad = new Vulnerabilidad('1', new IdentificadorCVE('CVE-2021-00001'), new CvssScore(9.5), 'Software A', undefined, 5);
 
-      const resultado = evaluarRelacionPlazoReal(vulnerabilidad);
+      const resultado = evaluarRelacionPlazoReal(vulnerabilidad, CVSS);
 
       expect(resultado).toEqual({ aplicable: true, plazoRecomendado: 7, diasReales: 5, diferenciaDias: -2, cumplioPlazo: true });
     });
@@ -186,7 +190,7 @@ describe('MotorDePriorizacion', () => {
     test('cuando diasReales > plazoRecomendado, cumplioPlazo es false y diferenciaDias es positiva', () => {
       const vulnerabilidad = new Vulnerabilidad('1', new IdentificadorCVE('CVE-2021-00001'), new CvssScore(9.5), 'Software A', undefined, 10);
 
-      const resultado = evaluarRelacionPlazoReal(vulnerabilidad);
+      const resultado = evaluarRelacionPlazoReal(vulnerabilidad, CVSS);
 
       expect(resultado).toEqual({ aplicable: true, plazoRecomendado: 7, diasReales: 10, diferenciaDias: 3, cumplioPlazo: false });
     });
@@ -194,7 +198,7 @@ describe('MotorDePriorizacion', () => {
     test('respeta plazosPersonalizados en vez del default', () => {
       const vulnerabilidad = new Vulnerabilidad('1', new IdentificadorCVE('CVE-2021-00001'), new CvssScore(9.5), 'Software A', undefined, 5);
 
-      const resultado = evaluarRelacionPlazoReal(vulnerabilidad, { Crítico: 3, Alto: 30, Moderado: 90, Bajo: 180 });
+      const resultado = evaluarRelacionPlazoReal(vulnerabilidad, CVSS, { Crítico: 3, Alto: 30, Moderado: 90, Bajo: 180 });
 
       expect(resultado).toEqual({ aplicable: true, plazoRecomendado: 3, diasReales: 5, diferenciaDias: 2, cumplioPlazo: false });
     });
@@ -213,16 +217,16 @@ describe('MotorDePriorizacion', () => {
 
     test('dentro de las 48hs previas al vencimiento: true', () => {
       // Vence el 08 a las 00:00. El 07 a las 00:00 faltan exactamente 24hs.
-      expect(estaPlazoProximoAVencer(critica, new Date('2026-01-07T00:00:00Z'))).toBe(true);
+      expect(estaPlazoProximoAVencer(critica, CVSS, new Date('2026-01-07T00:00:00Z'))).toBe(true);
     });
 
     test('más de 48hs antes del vencimiento: false', () => {
       // El 05 a las 00:00 faltan 3 días — fuera de la ventana de 48hs.
-      expect(estaPlazoProximoAVencer(critica, new Date('2026-01-05T00:00:00Z'))).toBe(false);
+      expect(estaPlazoProximoAVencer(critica, CVSS, new Date('2026-01-05T00:00:00Z'))).toBe(false);
     });
 
     test('ya vencido (no solo "próximo"): false — ese caso lo cubre estaPlazoExcedido, no este', () => {
-      expect(estaPlazoProximoAVencer(critica, new Date('2026-01-09T00:00:00Z'))).toBe(false);
+      expect(estaPlazoProximoAVencer(critica, CVSS, new Date('2026-01-09T00:00:00Z'))).toBe(false);
     });
 
     test('remediada: siempre false, aunque esté dentro de la ventana', () => {
@@ -233,22 +237,60 @@ describe('MotorDePriorizacion', () => {
         fechaCarga
       );
 
-      expect(estaPlazoProximoAVencer(remediada, new Date('2026-01-07T00:00:00Z'))).toBe(false);
+      expect(estaPlazoProximoAVencer(remediada, CVSS, new Date('2026-01-07T00:00:00Z'))).toBe(false);
     });
 
     test('respeta un horasDeAntelacion distinto de 48 (default)', () => {
       // A 3 días del vencimiento (05 a las 00:00): fuera de 48hs, pero
       // dentro de una ventana de 96hs.
-      expect(estaPlazoProximoAVencer(critica, new Date('2026-01-05T00:00:00Z'), 96)).toBe(true);
+      expect(estaPlazoProximoAVencer(critica, CVSS, new Date('2026-01-05T00:00:00Z'), 96)).toBe(true);
     });
 
     test('respeta plazosPersonalizados, igual que estaPlazoExcedido', () => {
       const fechaActual = new Date('2026-01-01T12:00:00Z'); // 12hs transcurridas
       // Con plazo default de Crítico (7 días), a las 12hs no está ni cerca de vencer.
-      expect(estaPlazoProximoAVencer(critica, fechaActual)).toBe(false);
+      expect(estaPlazoProximoAVencer(critica, CVSS, fechaActual)).toBe(false);
       // Con un plazo personalizado de 1 día (vence a las 24hs), a las 12hs
       // faltan 12hs — dentro de la ventana de 48hs.
-      expect(estaPlazoProximoAVencer(critica, fechaActual, 48, { Crítico: 1, Alto: 30, Moderado: 90, Bajo: 180 })).toBe(true);
+      expect(estaPlazoProximoAVencer(critica, CVSS, fechaActual, 48, { Crítico: 1, Alto: 30, Moderado: 90, Bajo: 180 })).toBe(true);
+    });
+  });
+
+  describe('RF-28 / RF-69 (Modo B): niveles, grupos y plazos con la escala del analista', () => {
+    const cargada = new Date('2026-01-01T00:00:00Z');
+    const ochoSiete = new Vulnerabilidad('87', new IdentificadorCVE('CVE-2026-08700'), new CvssScore(8.7), 'Router', new TipoAccesoValue('Sí'), 5, 'Router', 'RCE', undefined, cargada);
+
+    test('un 8.7 tiene plazo de 30 días con CVSS (Alto) y de 7 con "Crítico desde 8.5"', () => {
+      expect(estimarPlazoRecomendado(CVSS.clasificar(8.7))).toBe(30);
+      expect(estimarPlazoRecomendado(CRITICO_DESDE_8_5.clasificar(8.7))).toBe(7);
+      // A los 10 días: con CVSS todavía no venció; con la escala propia, sí.
+      const diezDiasDespues = new Date('2026-01-11T00:00:00Z');
+      expect(estaPlazoExcedido(ochoSiete, CVSS, diezDiasDespues)).toBe(false);
+      expect(estaPlazoExcedido(ochoSiete, CRITICO_DESDE_8_5, diezDiasDespues)).toBe(true);
+    });
+
+    test('el plazo próximo a vencer y la relación con el plazo real también usan la escala', () => {
+      // Con la escala propia vence el día 8: el 6 está dentro de las 48 horas previas.
+      expect(estaPlazoProximoAVencer(ochoSiete, CRITICO_DESDE_8_5, new Date('2026-01-06T12:00:00Z'))).toBe(true);
+      expect(estaPlazoProximoAVencer(ochoSiete, CVSS, new Date('2026-01-06T12:00:00Z'))).toBe(false);
+      expect(evaluarRelacionPlazoReal(ochoSiete, CRITICO_DESDE_8_5)).toMatchObject({ aplicable: true, plazoRecomendado: 7 });
+      expect(evaluarRelacionPlazoReal(ochoSiete, CVSS)).toMatchObject({ aplicable: true, plazoRecomendado: 30 });
+    });
+
+    test('el ranking pone al 8.7 en el grupo Crítico (por encima de un 8.9 que con esa escala también es Crítico pero con menos días)', () => {
+      const nueveCinco = new Vulnerabilidad('95', new IdentificadorCVE('CVE-2026-09500'), new CvssScore(9.5), 'A', new TipoAccesoValue('Sí'), 1);
+      const sieteCinco = new Vulnerabilidad('75', new IdentificadorCVE('CVE-2026-07500'), new CvssScore(7.5), 'B', new TipoAccesoValue('Sí'), 1);
+
+      const conCvss = generarRanking([sieteCinco, ochoSiete, nueveCinco], CVSS);
+      const conPropia = generarRanking([sieteCinco, ochoSiete, nueveCinco], CRITICO_DESDE_8_5);
+
+      expect(conCvss.map((e) => [e.vulnerabilidad.cve.valor, e.nivelDeRiesgo])).toEqual([
+        ['CVE-2026-09500', 'Crítico'],
+        ['CVE-2026-08700', 'Alto'],
+        ['CVE-2026-07500', 'Alto']
+      ]);
+      expect(conPropia.map((e) => e.nivelDeRiesgo)).toEqual(['Crítico', 'Crítico', 'Alto']);
+      expect(conPropia[2].vulnerabilidad.cve.valor).toBe('CVE-2026-07500');
     });
   });
 });

@@ -2,6 +2,8 @@ import { NotificarPlazosProximosAVencerUseCase } from '../../ports/in/module_not
 import { AnalistaRepository } from '../../ports/out/persistencia/repositorios/AnalistaRepository';
 import { VulnerabilidadRepository } from '../../ports/out/persistencia/repositorios/VulnerabilidadRepository';
 import { EmisorDeAlertasDePlazo } from './EmisorDeAlertasDePlazo';
+import { EscalaDeClasificacionRepository } from '../../ports/out/persistencia/repositorios/EscalaDeClasificacionRepository';
+import { escalaVigente } from '../module_priorizacion_clasificacion/EscalaDeClasificacion';
 import { estaPlazoProximoAVencer } from '../../../domain/services/classification/MotorDePriorizacion';
 
 // RF-100 (M-13, retoma): disparado por el cron diario registrado en
@@ -14,7 +16,8 @@ export class NotificarPlazosProximosAVencer implements NotificarPlazosProximosAV
   constructor(
     private readonly analistaRepository: AnalistaRepository,
     private readonly vulnerabilidadRepository: VulnerabilidadRepository,
-    private readonly emisorDeAlertasDePlazo: EmisorDeAlertasDePlazo
+    private readonly emisorDeAlertasDePlazo: EmisorDeAlertasDePlazo,
+    private readonly escalaRepository: EscalaDeClasificacionRepository
   ) {}
 
   async ejecutar(): Promise<void> {
@@ -22,8 +25,12 @@ export class NotificarPlazosProximosAVencer implements NotificarPlazosProximosAV
     const fallos: string[] = [];
 
     for (const analista of analistas) {
+      // RF-28 / RF-69: el plazo de cada vulnerabilidad depende de su nivel según
+      // la escala de ESTE analista. Se lee una sola vez por analista, no una por
+      // vulnerabilidad.
+      const { escala } = await escalaVigente(this.escalaRepository, analista.id);
       const vulnerabilidades = await this.vulnerabilidadRepository.listar(analista.id);
-      const proximasAVencer = vulnerabilidades.filter((vulnerabilidad) => estaPlazoProximoAVencer(vulnerabilidad));
+      const proximasAVencer = vulnerabilidades.filter((vulnerabilidad) => estaPlazoProximoAVencer(vulnerabilidad, escala));
 
       // Una vulnerabilidad pasa dos días dentro de la ventana de 48 horas y
       // esta tarea corre todos los días: el emisor evita el segundo aviso.

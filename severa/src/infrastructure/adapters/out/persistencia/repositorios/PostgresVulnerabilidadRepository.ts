@@ -162,14 +162,6 @@ export class PostgresVulnerabilidadRepository implements VulnerabilidadRepositor
     return result.rows.map((row) => this.mapRow(row));
   }
 
-  async filtrarPorSeveridad(severidad: string, analistaId: string): Promise<Vulnerabilidad[]> {
-    const result = await this.pool.query(
-      'SELECT * FROM vulnerabilidades WHERE severidad ILIKE $1 AND analista_id = $2 ORDER BY cvss_score DESC',
-      [severidad, analistaId]
-    );
-    return result.rows.map((row) => this.mapRow(row));
-  }
-
   async listarPorTipoAcceso(tipoAcceso: 'Remoto' | 'Local', analistaId: string): Promise<Vulnerabilidad[]> {
     const result = await this.pool.query(
       'SELECT * FROM vulnerabilidades WHERE acceso_remoto = $1 AND analista_id = $2 ORDER BY cvss_score DESC',

@@ -1,7 +1,12 @@
 import express from 'express';
 import { container } from '../../../../../../config/container';
 import { TransicionDeEstadoInvalidaError } from '../../../../../../../domain/errors/TransicionDeEstadoInvalidaError';
-import { PLAZOS_RECOMENDADOS_EN_DIAS, PlazosPersonalizados, evaluarRelacionPlazoReal } from '../../../../../../../domain/services/classification/MotorDePriorizacion';
+import {
+  PLAZOS_RECOMENDADOS_EN_DIAS,
+  PlazosPersonalizados,
+  estimarPlazoRecomendado,
+  evaluarRelacionPlazoReal
+} from '../../../../../../../domain/services/classification/MotorDePriorizacion';
 
 // Rutas con prefijos distintos (/priorizacion y /vulnerabilidades), montadas
 // sin prefijo adicional en server.ts.
@@ -52,11 +57,13 @@ function parsearPeso(valor: unknown, nombreParametro: string): { peso?: number; 
 }
 
 priorizacionRouter.get('/priorizacion/ranking', async (req, res) => {
-  // severidad (2026-07-19, "carga por etapas"): opcional — el frontend pide
-  // una severidad por vez (Crítica/Alta/Media/Baja) en vez de todo el
-  // catálogo de una sola llamada. Sin el query param, se comporta como
-  // siempre (ranking completo) — no rompe a nadie que ya lo use así.
-  const severidad = typeof req.query.severidad === 'string' ? req.query.severidad : undefined;
+  // nivel ("carga por etapas", 2026-07-19): opcional — el frontend pide un
+  // nivel de riesgo por vez en vez de todo el catálogo de una sola llamada.
+  // RF-28 / RF-69: se acepta como `nivel` y, como antes, como `severidad`
+  // (también con los nombres viejos: Crítica, Alta, Media, Baja). Sin el
+  // parámetro, el ranking es completo.
+  const nivelCrudo = req.query.nivel ?? req.query.severidad;
+  const nivel = typeof nivelCrudo === 'string' ? nivelCrudo : undefined;
 
   const { plazos: plazosPersonalizados, error: errorPlazos } = parsearPlazosPersonalizados(req.query);
   if (errorPlazos) {
@@ -77,23 +84,27 @@ priorizacionRouter.get('/priorizacion/ranking', async (req, res) => {
   // RF-76: se pasa el analista autenticado para que, si esta llamada dispara
   // una alerta de plazo excedido, quede asociada a su centro de
   // notificaciones y no solo a consola.
-  const ranking = await container.generarRankingUrgenciaUseCase.ejecutar(req.analistaAutenticado!.id, undefined, severidad, {
+  const { escala, entradas } = await container.generarRankingUrgenciaUseCase.ejecutar(req.analistaAutenticado!.id, undefined, nivel, {
     plazosPersonalizados,
     pesoCriterio,
     pesoUrgencia
   });
+  // RF-28 / RF-69: el nivel y el plazo de cada entrada salen de la escala
+  // vigente del analista (la pantalla la nombra con el rótulo de escala).
   res.json(
-    ranking.map((entrada) => ({
+    entradas.map((entrada) => ({
       posicion: entrada.posicion,
       cve: entrada.vulnerabilidad.cve.valor,
       cvssScore: entrada.vulnerabilidad.cvssScore.valor,
       nivelDeRiesgo: entrada.nivelDeRiesgo,
+      // RF-71: el plazo recomendado para su nivel.
+      plazoRecomendado: estimarPlazoRecomendado(entrada.nivelDeRiesgo, plazosPersonalizados),
       diasParaParche: entrada.vulnerabilidad.diasParaParche ?? null,
       estado: entrada.vulnerabilidad.estadoRemediacion.valor,
       // RF-72: relación entre el plazo recomendado y el tiempo real de
       // atención — "no aplicable" cuando la vulnerabilidad no registra
       // diasParaParche, en vez de forzar un cálculo con un valor inventado.
-      relacionPlazoReal: evaluarRelacionPlazoReal(entrada.vulnerabilidad, plazosPersonalizados)
+      relacionPlazoReal: evaluarRelacionPlazoReal(entrada.vulnerabilidad, escala.escala, plazosPersonalizados)
     }))
   );
 });

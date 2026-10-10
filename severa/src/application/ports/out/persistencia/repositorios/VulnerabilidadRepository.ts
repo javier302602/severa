@@ -44,14 +44,11 @@ export interface VulnerabilidadRepository {
   listar(analistaId: string): Promise<Vulnerabilidad[]>;
   buscarPorCve(cve: string, analistaId: string): Promise<Vulnerabilidad | null>;
   filtrarPorRangoCvss(cvssMin: number, cvssMax: number, analistaId: string): Promise<Vulnerabilidad[]>;
-  filtrarPorSeveridad(severidad: string, analistaId: string): Promise<Vulnerabilidad[]>;
-  // M-04 (retoma, RF-27/RF-28), Modo A: generalización de las dos de arriba
-  // sobre un conjunto fijo y tipado de variables (ver VariablesVulnerabilidad.ts)
-  // — filtrarPorRangoCvss/filtrarPorSeveridad NO se eliminan ni se tocan:
-  // GenerarRankingUrgencia.ts sigue usando filtrarPorSeveridad para su propia
-  // optimización (evitar listar() el catálogo completo), fuera del alcance
-  // de esta retoma. Los nuevos métodos son los que consumen los casos de uso
-  // de M-04 de ahora en más.
+  // M-04 (retoma, RF-27/RF-28), Modo A: generalización de la de arriba sobre
+  // un conjunto fijo y tipado de variables (ver VariablesVulnerabilidad.ts).
+  // RF-28 / RF-69 (Modo B): ya no hay filtro contra la columna `severidad`; el
+  // nivel de riesgo se filtra con filtrarPorNivelDeRiesgo, por rango de CVSS
+  // según la escala del analista.
   filtrarPorRango(variable: VariableNumericaVulnerabilidad, minimo: number, maximo: number, analistaId: string): Promise<Vulnerabilidad[]>;
   // 'severidad' no se filtra contra la columna: el nivel de riesgo depende de
   // la escala del analista (RF-28/RF-69) y se filtra con filtrarPorNivelDeRiesgo.

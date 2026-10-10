@@ -2,12 +2,12 @@ import {
   generarInterpretacion,
   interpretarDispersion,
   interpretarComparacionAcceso,
-  interpretarRanking
-} from '../../../src/domain/services/InterpretadorDeResultados';
+  interpretarRanking, interpretarSeveridadPromedio } from '../../../src/domain/services/InterpretadorDeResultados';
 import { EntradaRanking } from '../../../src/domain/services/classification/MotorDePriorizacion';
 import { Vulnerabilidad } from '../../../src/domain/entities/Vulnerabilidad';
 import { IdentificadorCVE } from '../../../src/domain/shared/value-objects/IdentificadorCVE';
 import { CvssScore } from '../../../src/domain/shared/value-objects/CvssScore';
+import { EscalaDeClasificacion } from '../../../src/domain/shared/value-objects/EscalaDeClasificacion';
 
 function entradaRanking(posicion: number, cvss: number, nivelDeRiesgo: EntradaRanking['nivelDeRiesgo']): EntradaRanking {
   return {
@@ -34,10 +34,10 @@ describe('InterpretadorDeResultados', () => {
       entradaRanking(3, 7.8, 'Alto')
     ];
 
-    const parrafos = generarInterpretacion(6, resumen, comparacion, ranking);
+    const parrafos = generarInterpretacion(6, resumen, comparacion, ranking, EscalaDeClasificacion.CVSS);
 
     expect(parrafos).toEqual([
-      'La severidad promedio (CVSS) de las 6 vulnerabilidades analizadas es de 7.50, lo cual corresponde a un nivel de riesgo Alto. La mediana es de 7.80.',
+      'El CVSS promedio de las 6 vulnerabilidades analizadas es de 7.50, lo cual corresponde a un nivel de riesgo Alto. La mediana es de 7.80.',
       'El coeficiente de variación es de 28.00%, lo que indica dispersión moderada en la severidad de las vulnerabilidades.',
       'Las vulnerabilidades de acceso remoto presentan, en promedio, una severidad 1.25 puntos mayor (remoto: 8.90, local: 7.65), lo que sugiere priorizar la remediación de accesos remotos.',
       'Se identificaron 2 vulnerabilidad(es) de riesgo Crítico, que según el plazo recomendado deben remediarse en un máximo de 7 días.'
@@ -73,5 +73,13 @@ describe('InterpretadorDeResultados', () => {
   test('interpretarRanking indica que no hay críticas cuando no las hay', () => {
     const ranking = [entradaRanking(1, 5.5, 'Moderado')];
     expect(interpretarRanking(ranking)).toBe('No se identificaron vulnerabilidades de riesgo Crítico en el conjunto analizado.');
+  });
+
+  test('RF-28 / RF-69: el nivel del CVSS promedio sale de la escala recibida', () => {
+    const resumen = { media: 8.6, mediana: 8.6, coeficienteVariacion: 5 };
+    expect(interpretarSeveridadPromedio(3, resumen, EscalaDeClasificacion.CVSS)).toContain('nivel de riesgo Alto');
+    expect(interpretarSeveridadPromedio(3, resumen, EscalaDeClasificacion.personalizada({ moderado: 4, alto: 7, critico: 8.5 }))).toContain(
+      'nivel de riesgo Crítico'
+    );
   });
 });

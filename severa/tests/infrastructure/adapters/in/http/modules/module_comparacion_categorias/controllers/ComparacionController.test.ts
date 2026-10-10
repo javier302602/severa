@@ -37,7 +37,6 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => {
     listar: jest.fn(async (analistaId: string) => catalogoPorAnalista[analistaId] ?? []),
     buscarPorCve: jest.fn(),
     filtrarPorRangoCvss: jest.fn(),
-    filtrarPorSeveridad: jest.fn(),
     filtrarPorNivelDeRiesgo: jest.fn().mockResolvedValue([]),
     filtrarPorRango: jest.fn(),
     filtrarPorCategoria: jest.fn(),

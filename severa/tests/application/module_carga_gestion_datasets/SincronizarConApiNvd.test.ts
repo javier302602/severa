@@ -10,6 +10,7 @@ import { Vulnerabilidad } from '../../../src/domain/entities/Vulnerabilidad';
 import { IdentificadorCVE } from '../../../src/domain/shared/value-objects/IdentificadorCVE';
 import { CvssScore } from '../../../src/domain/shared/value-objects/CvssScore';
 import { TipoAccesoValue } from '../../../src/domain/shared/value-objects/TipoAcceso';
+import { EscalaDeClasificacionRepositoryEnMemoria } from '../../dobles/EscalaDeClasificacionRepositoryEnMemoria';
 
 function vulnerabilidadRepositoryFalso(): VulnerabilidadRepository {
   return {
@@ -19,7 +20,6 @@ function vulnerabilidadRepositoryFalso(): VulnerabilidadRepository {
     listar: jest.fn().mockResolvedValue([]),
     buscarPorCve: jest.fn().mockResolvedValue(null),
     filtrarPorRangoCvss: jest.fn().mockResolvedValue([]),
-    filtrarPorSeveridad: jest.fn().mockResolvedValue([]),
     filtrarPorNivelDeRiesgo: jest.fn().mockResolvedValue([]),
     filtrarPorRango: jest.fn(),
     filtrarPorCategoria: jest.fn(),
@@ -96,7 +96,8 @@ describe('SincronizarConApiNvd', () => {
       new ImportarDataset(vulnerabilidadRepository),
       auditoriaRepository,
       servicioDeNotificaciones,
-      analistaRepositoryFalso()
+      analistaRepositoryFalso(),
+      new EscalaDeClasificacionRepositoryEnMemoria()
     );
 
     const usecase = new SincronizarConApiNvd(nvdApiClient, importarDatasetUseCase, servicioDeNotificaciones);
@@ -133,7 +134,8 @@ describe('SincronizarConApiNvd', () => {
       new ImportarDataset(vulnerabilidadRepository),
       auditoriaRepository,
       servicioDeNotificaciones,
-      analistaRepositoryFalso()
+      analistaRepositoryFalso(),
+      new EscalaDeClasificacionRepositoryEnMemoria()
     );
 
     const usecase = new SincronizarConApiNvd(nvdApiClient, importarDatasetUseCase, servicioDeNotificaciones);
@@ -165,7 +167,8 @@ describe('SincronizarConApiNvd', () => {
       new ImportarDataset(vulnerabilidadRepository),
       auditoriaRepository,
       servicioDeNotificaciones,
-      analistaRepositoryFalso()
+      analistaRepositoryFalso(),
+      new EscalaDeClasificacionRepositoryEnMemoria()
     );
 
     const usecase = new SincronizarConApiNvd(nvdApiClient, importarDatasetUseCase, servicioDeNotificaciones);
@@ -180,7 +183,8 @@ describe('SincronizarConApiNvd', () => {
     expect(servicioDeNotificaciones.notificarImportacionCompletada).toHaveBeenCalledWith('analista-9', {
       importados: 1,
       rechazados: 0,
-      criticas: 1
+      criticas: 1,
+      criterioDeCriticas: 'según el corte de Crítico de tu escala: CVSS desde 9.0'
     });
     expect(servicioDeNotificaciones.notificarActualizacionDisponible).toHaveBeenCalledWith(
       'analista-9',

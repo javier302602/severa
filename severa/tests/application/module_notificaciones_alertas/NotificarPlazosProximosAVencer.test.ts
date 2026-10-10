@@ -10,6 +10,8 @@ import { CvssScore } from '../../../src/domain/shared/value-objects/CvssScore';
 import { TipoAccesoValue } from '../../../src/domain/shared/value-objects/TipoAcceso';
 import { EmisorDeAlertasDePlazo } from '../../../src/application/usecases/module_notificaciones_alertas/EmisorDeAlertasDePlazo';
 import { RegistroDeAlertasEmitidasEnMemoria, emisorDeAlertasDePrueba } from '../../dobles/RegistroDeAlertasEmitidasEnMemoria';
+import { EscalaDeClasificacionRepositoryEnMemoria } from '../../dobles/EscalaDeClasificacionRepositoryEnMemoria';
+import { EscalaDeClasificacion } from '../../../src/domain/shared/value-objects/EscalaDeClasificacion';
 
 function analistaRepositoryFalso(analistas: Analista[]): AnalistaRepository {
   return {
@@ -31,7 +33,6 @@ function vulnerabilidadRepositoryFalso(porAnalista: Record<string, Vulnerabilida
     listar: jest.fn(async (analistaId: string) => porAnalista[analistaId] ?? []),
     buscarPorCve: jest.fn().mockResolvedValue(null),
     filtrarPorRangoCvss: jest.fn().mockResolvedValue([]),
-    filtrarPorSeveridad: jest.fn().mockResolvedValue([]),
     filtrarPorNivelDeRiesgo: jest.fn().mockResolvedValue([]),
     filtrarPorRango: jest.fn(),
     filtrarPorCategoria: jest.fn(),
@@ -83,7 +84,8 @@ describe('NotificarPlazosProximosAVencer', () => {
     const usecase = new NotificarPlazosProximosAVencer(
       analistaRepositoryFalso([analistaA, analistaB]),
       vulnerabilidadRepository,
-      emisorDeAlertasDePrueba(servicioDeNotificaciones)
+      emisorDeAlertasDePrueba(servicioDeNotificaciones),
+      new EscalaDeClasificacionRepositoryEnMemoria()
     );
 
     await usecase.ejecutar();
@@ -102,7 +104,8 @@ describe('NotificarPlazosProximosAVencer', () => {
     const usecase = new NotificarPlazosProximosAVencer(
       analistaRepositoryFalso([analista]),
       vulnerabilidadRepository,
-      emisorDeAlertasDePrueba(servicioDeNotificaciones)
+      emisorDeAlertasDePrueba(servicioDeNotificaciones),
+      new EscalaDeClasificacionRepositoryEnMemoria()
     );
 
     await usecase.ejecutar();
@@ -117,7 +120,8 @@ describe('NotificarPlazosProximosAVencer', () => {
     const usecase = new NotificarPlazosProximosAVencer(
       analistaRepositoryFalso([]),
       vulnerabilidadRepository,
-      emisorDeAlertasDePrueba(servicioDeNotificaciones)
+      emisorDeAlertasDePrueba(servicioDeNotificaciones),
+      new EscalaDeClasificacionRepositoryEnMemoria()
     );
 
     await usecase.ejecutar();
@@ -135,7 +139,8 @@ describe('NotificarPlazosProximosAVencer', () => {
     const usecase = new NotificarPlazosProximosAVencer(
       analistaRepositoryFalso([analista]),
       vulnerabilidadRepositoryFalso({ 'analista-A': [vulnerabilidadProximaAVencer('1')] }),
-      emisorDeAlertasDePrueba(servicioDeNotificaciones)
+      emisorDeAlertasDePrueba(servicioDeNotificaciones),
+      new EscalaDeClasificacionRepositoryEnMemoria()
     );
 
     await usecase.ejecutar();
@@ -151,7 +156,8 @@ describe('NotificarPlazosProximosAVencer', () => {
     const usecase = new NotificarPlazosProximosAVencer(
       analistaRepositoryFalso([analista]),
       vulnerabilidadRepositoryFalso({ 'analista-A': muchas }),
-      emisorDeAlertasDePrueba(servicioDeNotificaciones)
+      emisorDeAlertasDePrueba(servicioDeNotificaciones),
+      new EscalaDeClasificacionRepositoryEnMemoria()
     );
 
     await usecase.ejecutar();
@@ -183,7 +189,8 @@ describe('NotificarPlazosProximosAVencer', () => {
     const usecase = new NotificarPlazosProximosAVencer(
       analistaRepositoryFalso([analistaA, analistaB]),
       vulnerabilidadRepositoryFalso({ 'analista-A': [vulnerabilidadProximaAVencer('1')], 'analista-B': [vulnerabilidadProximaAVencer('2')] }),
-      emisorDeAlertasDePrueba(servicioDeNotificaciones)
+      emisorDeAlertasDePrueba(servicioDeNotificaciones),
+      new EscalaDeClasificacionRepositoryEnMemoria()
     );
 
     await expect(usecase.ejecutar()).rejects.toThrow('No se pudieron emitir las alertas de plazo de 1 analista(s): analista-A: base caída');
@@ -195,4 +202,36 @@ describe('NotificarPlazosProximosAVencer', () => {
     await usecase.ejecutar();
     expect(servicioDeNotificaciones.notificarPlazoProximoAVencer).toHaveBeenLastCalledWith(expect.objectContaining({ id: '1' }), 'analista-A');
   });
+
+  // RF-100 + RF-28/RF-69: el plazo depende del nivel según la escala de CADA
+  // analista, leída una sola vez por analista.
+  test('dos analistas con escalas distintas: cada uno recibe lo suyo según su escala', async () => {
+    const seisDiasAtras = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
+    const ochoSiete = (id: string) =>
+      new Vulnerabilidad(id, new IdentificadorCVE(`CVE-2024-${id.padStart(4, '0')}`), new CvssScore(8.7), 'desc', new TipoAccesoValue('Sí'), 1, undefined, undefined, undefined, seisDiasAtras);
+    const conCvss = new Analista('analista-A', 'Ana', new Correo('ana@example.com'), 'hash', 'analista');
+    const conPropia = new Analista('analista-B', 'Beto', new Correo('beto@example.com'), 'hash', 'analista');
+    const escalas = new EscalaDeClasificacionRepositoryEnMemoria();
+    await escalas.guardar('analista-B', EscalaDeClasificacion.personalizada({ moderado: 4, alto: 7, critico: 8.5 }));
+    const obtenerEscala = jest.spyOn(escalas, 'obtener');
+    const servicioDeNotificaciones = servicioDeNotificacionesFalso();
+    const usecase = new NotificarPlazosProximosAVencer(
+      analistaRepositoryFalso([conCvss, conPropia]),
+      vulnerabilidadRepositoryFalso({ 'analista-A': [ochoSiete('1'), ochoSiete('2')], 'analista-B': [ochoSiete('3'), ochoSiete('4')] }),
+      emisorDeAlertasDePrueba(servicioDeNotificaciones),
+      escalas
+    );
+
+    await usecase.ejecutar();
+
+    // Con CVSS un 8.7 es Alto (30 días): a los 6 días no está por vencer. Con
+    // "Crítico desde 8.5" es Crítico (7 días): vence mañana.
+    const destinatarios = (servicioDeNotificaciones.notificarPlazoProximoAVencer as jest.Mock).mock.calls.map(([v, analistaId]) => [v.id, analistaId]);
+    expect(destinatarios).toEqual([
+      ['3', 'analista-B'],
+      ['4', 'analista-B']
+    ]);
+    expect(obtenerEscala).toHaveBeenCalledTimes(2);
+  });
 });
+

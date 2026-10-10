@@ -62,19 +62,27 @@ describe('ConsolaServicioDeNotificaciones — notificarImportacionCompletada (RF
     const notificacionRepository = notificacionRepositoryEnMemoria();
     const servicio = new ConsolaServicioDeNotificaciones(notificacionRepository);
 
-    await servicio.notificarImportacionCompletada('analista-7', { importados: 150, rechazados: 3, criticas: 8 });
+    await servicio.notificarImportacionCompletada('analista-7', {
+      importados: 150,
+      rechazados: 3,
+      criticas: 8,
+      criterioDeCriticas: 'según el corte de Crítico de tu escala: CVSS desde 8.5'
+    });
 
     const propias = await notificacionRepository.listarPorAnalista('analista-7');
     expect(propias).toHaveLength(1);
     expect(propias[0].tipo).toBe('ImportacionCompletada');
-    expect(propias[0].mensaje).toBe('Importación completada: 150 importados, 3 rechazados, 8 crítica(s) detectada(s)');
+    // RF-99 + RF-28/RF-69: dice con qué regla se contaron las críticas.
+    expect(propias[0].mensaje).toBe(
+      'Importación completada: 150 importados, 3 rechazados, 8 crítica(s) detectada(s) (según el corte de Crítico de tu escala: CVSS desde 8.5)'
+    );
   });
 
   test('sin críticas, el mensaje no menciona críticas', async () => {
     const notificacionRepository = notificacionRepositoryEnMemoria();
     const servicio = new ConsolaServicioDeNotificaciones(notificacionRepository);
 
-    await servicio.notificarImportacionCompletada('analista-7', { importados: 10, rechazados: 0, criticas: 0 });
+    await servicio.notificarImportacionCompletada('analista-7', { importados: 10, rechazados: 0, criticas: 0, criterioDeCriticas: 'según el corte de Crítico de tu escala: CVSS desde 9.0' });
 
     const propias = await notificacionRepository.listarPorAnalista('analista-7');
     expect(propias[0].mensaje).toBe('Importación completada: 10 importados, 0 rechazados');

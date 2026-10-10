@@ -118,13 +118,15 @@ export async function recopilarDatosDeInforme(
   const locales = vulnerabilidades.filter((item) => item.tipoAcceso?.valor === 'Local').map((item) => item.cvssScore.valor);
   const comparacionAccesoRemotoLocal = compararGrupos(remotos, locales);
 
-  const rankingUrgencia = generarRanking(vulnerabilidades);
+  // Tanda (e) del Paso 2: escala del analista. Hasta entonces, CVSS explícito.
+  const rankingUrgencia = generarRanking(vulnerabilidades, EscalaDeClasificacion.CVSS);
 
   const interpretacion = generarInterpretacion(
     vulnerabilidades.length,
     { media: resumenEstadistico.media, mediana: resumenEstadistico.mediana, coeficienteVariacion: resumenEstadistico.coeficienteVariacion },
     comparacionAccesoRemotoLocal,
-    rankingUrgencia
+    rankingUrgencia,
+    EscalaDeClasificacion.CVSS
   );
 
   const muestraDeRegistros = {

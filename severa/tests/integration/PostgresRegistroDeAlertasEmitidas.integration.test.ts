@@ -4,6 +4,7 @@ import { PostgresVulnerabilidadRepository } from '../../src/infrastructure/adapt
 import { PostgresNotificacionRepository } from '../../src/infrastructure/adapters/out/persistencia/repositorios/PostgresNotificacionRepository';
 import { ConsolaServicioDeNotificaciones } from '../../src/infrastructure/adapters/out/notificaciones/ConsolaServicioDeNotificaciones';
 import { EmisorDeAlertasDePlazo } from '../../src/application/usecases/module_notificaciones_alertas/EmisorDeAlertasDePlazo';
+import { PostgresEscalaDeClasificacionRepository } from '../../src/infrastructure/adapters/out/persistencia/repositorios/PostgresEscalaDeClasificacionRepository';
 import { GenerarRankingUrgencia } from '../../src/application/usecases/module_priorizacion_clasificacion/GenerarRankingUrgencia';
 import { Vulnerabilidad } from '../../src/domain/entities/Vulnerabilidad';
 import { IdentificadorCVE } from '../../src/domain/shared/value-objects/IdentificadorCVE';
@@ -151,7 +152,7 @@ describe('PostgresRegistroDeAlertasEmitidas — integración real', () => {
   // visitar Priorización varias veces con muchas vulnerabilidades vencidas.
   describe('RF-76 de punta a punta: generar el ranking varias veces', () => {
     const emisor = new EmisorDeAlertasDePlazo(registro, new ConsolaServicioDeNotificaciones(notificacionRepository));
-    const ranking = new GenerarRankingUrgencia(vulnerabilidadRepository, emisor);
+    const ranking = new GenerarRankingUrgencia(vulnerabilidadRepository, emisor, new PostgresEscalaDeClasificacionRepository(pool));
     let consola: jest.SpyInstance;
 
     beforeEach(() => {
@@ -166,7 +167,7 @@ describe('PostgresRegistroDeAlertasEmitidas — integración real', () => {
       await cargarVencidas(ANALISTA_A, 40);
 
       for (let visita = 0; visita < 5; visita += 1) {
-        expect(await ranking.ejecutar(ANALISTA_A)).toHaveLength(40);
+        expect((await ranking.ejecutar(ANALISTA_A)).entradas).toHaveLength(40);
       }
 
       const notificaciones = await notificacionRepository.listarPorAnalista(ANALISTA_A);

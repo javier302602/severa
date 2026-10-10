@@ -140,7 +140,9 @@ function clasificarFila(
 ): FilaProcesada {
   try {
     const cve = new IdentificadorCVE(String(row[columnas.cve] ?? '').trim());
-    const cvss = new CvssScore(Number(row[columnas.cvss]));
+    // Redondeado a un decimal como lo guarda la base (NUMERIC(3,1)): lo que se
+    // clasifica al importar es lo mismo que queda en el catálogo.
+    const cvss = CvssScore.redondeado(Number(row[columnas.cvss]));
     const tipoAcceso = new TipoAccesoValue(String(row[columnas.acceso] ?? '').trim());
 
     const diasParaParcheRaw = mapeoColumnas?.diasParaParche

@@ -58,11 +58,11 @@ export class ConsolaServicioDeNotificaciones implements ServicioDeNotificaciones
 
   async notificarImportacionCompletada(
     analistaId: string,
-    resumen: { importados: number; rechazados: number; criticas: number }
+    resumen: { importados: number; rechazados: number; criticas: number; criterioDeCriticas: string }
   ): Promise<void> {
     const mensaje =
       `Importación completada: ${resumen.importados} importados, ${resumen.rechazados} rechazados` +
-      (resumen.criticas > 0 ? `, ${resumen.criticas} crítica(s) detectada(s)` : '');
+      (resumen.criticas > 0 ? `, ${resumen.criticas} crítica(s) detectada(s) (${resumen.criterioDeCriticas})` : '');
     console.log(`[RF-99] ${mensaje}`);
     await this.notificacionRepository.guardar(
       new Notificacion(randomUUID(), 'ImportacionCompletada', analistaId, false, new Date(), mensaje)

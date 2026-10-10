@@ -1,5 +1,5 @@
 import { Vulnerabilidad } from '../../entities/Vulnerabilidad';
-import { clasificar } from './ClasificadorDeRiesgo';
+import { EscalaDeClasificacion } from '../../shared/value-objects/EscalaDeClasificacion';
 import { NivelDeRiesgo } from '../../shared/value-objects/NivelDeRiesgo';
 import { calcularMedia, calcularDesviacionEstandarMuestral } from '../descriptive-statistics/EstadisticaDescriptiva';
 
@@ -89,14 +89,17 @@ function zScoresPorBucket(valores: number[]): number[] {
  *      a RF-73. Las vulnerabilidades sin días registrados (undefined) se
  *      ubican al final de su grupo en ese desempate final.
  */
-export function generarRanking(vulnerabilidades: Vulnerabilidad[], opciones: OpcionesDeRanking = {}): EntradaRanking[] {
+// RF-28 / RF-69 (Modo B): el nivel de cada vulnerabilidad —y por lo tanto el
+// grupo dentro del que se pondera— sale de la escala del analista. Es
+// obligatoria: ningún consumidor puede quedar clasificando con CVSS sin querer.
+export function generarRanking(vulnerabilidades: Vulnerabilidad[], escala: EscalaDeClasificacion, opciones: OpcionesDeRanking = {}): EntradaRanking[] {
   const pesoCriterio = opciones.pesoCriterio ?? PESO_CRITERIO_POR_DEFECTO;
   const pesoUrgencia = opciones.pesoUrgencia ?? PESO_URGENCIA_POR_DEFECTO;
 
   const entradas: Array<{ vulnerabilidad: Vulnerabilidad; nivelDeRiesgo: NivelDeRiesgo; puntaje: number }> = vulnerabilidades.map(
     (vulnerabilidad) => ({
       vulnerabilidad,
-      nivelDeRiesgo: clasificar(vulnerabilidad.cvssScore).valor,
+      nivelDeRiesgo: escala.clasificar(vulnerabilidad.cvssScore.valor),
       puntaje: 0
     })
   );
@@ -163,6 +166,7 @@ export function estimarPlazoRecomendado(nivelDeRiesgo: NivelDeRiesgo, plazosPers
  */
 export function estaPlazoExcedido(
   vulnerabilidad: Vulnerabilidad,
+  escala: EscalaDeClasificacion,
   fechaActual: Date = new Date(),
   plazosPersonalizados?: PlazosPersonalizados
 ): boolean {
@@ -170,7 +174,7 @@ export function estaPlazoExcedido(
     return false;
   }
 
-  const nivelDeRiesgo = clasificar(vulnerabilidad.cvssScore).valor;
+  const nivelDeRiesgo = escala.clasificar(vulnerabilidad.cvssScore.valor);
   const plazo = estimarPlazoRecomendado(nivelDeRiesgo, plazosPersonalizados);
   const milisegundosPorDia = 1000 * 60 * 60 * 24;
   const diasTranscurridos = Math.floor((fechaActual.getTime() - vulnerabilidad.fechaCarga.getTime()) / milisegundosPorDia);
@@ -191,6 +195,7 @@ export function estaPlazoExcedido(
  */
 export function estaPlazoProximoAVencer(
   vulnerabilidad: Vulnerabilidad,
+  escala: EscalaDeClasificacion,
   fechaActual: Date = new Date(),
   horasDeAntelacion = 48,
   plazosPersonalizados?: PlazosPersonalizados
@@ -199,7 +204,7 @@ export function estaPlazoProximoAVencer(
     return false;
   }
 
-  const nivelDeRiesgo = clasificar(vulnerabilidad.cvssScore).valor;
+  const nivelDeRiesgo = escala.clasificar(vulnerabilidad.cvssScore.valor);
   const plazoEnDias = estimarPlazoRecomendado(nivelDeRiesgo, plazosPersonalizados);
   const msPorHora = 1000 * 60 * 60;
   const vencimiento = vulnerabilidad.fechaCarga.getTime() + plazoEnDias * 24 * msPorHora;
@@ -221,12 +226,16 @@ export type RelacionPlazoReal =
  * explícitamente "no aplicable" en vez de forzar el cálculo con un valor
  * inventado (0, o el plazo recomendado mismo).
  */
-export function evaluarRelacionPlazoReal(vulnerabilidad: Vulnerabilidad, plazosPersonalizados?: PlazosPersonalizados): RelacionPlazoReal {
+export function evaluarRelacionPlazoReal(
+  vulnerabilidad: Vulnerabilidad,
+  escala: EscalaDeClasificacion,
+  plazosPersonalizados?: PlazosPersonalizados
+): RelacionPlazoReal {
   if (vulnerabilidad.diasParaParche === undefined) {
     return { aplicable: false, motivo: 'La vulnerabilidad no registra la variable temporal de atención real (Días para Parche)' };
   }
 
-  const nivelDeRiesgo = clasificar(vulnerabilidad.cvssScore).valor;
+  const nivelDeRiesgo = escala.clasificar(vulnerabilidad.cvssScore.valor);
   const plazoRecomendado = estimarPlazoRecomendado(nivelDeRiesgo, plazosPersonalizados);
   const diasReales = vulnerabilidad.diasParaParche;
 
