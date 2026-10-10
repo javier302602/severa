@@ -2,6 +2,8 @@ import { Link, useParams } from 'react-router-dom';
 import { useVulnerabilidad } from '../../hooks/useVulnerabilidad';
 import { Spinner } from '../../components/ui/Spinner';
 import { MensajeError } from '../../components/ui/MensajeError';
+import { BadgeNivelRiesgo } from '../../components/ui/BadgeNivelRiesgo';
+import { RotuloEscala } from '../../components/ui/RotuloEscala';
 import { mensajeDeError } from '../../utils/mensajeDeError';
 import { RUTAS } from '../../routes/paths';
 
@@ -26,6 +28,14 @@ export function VulnerabilidadDetallePage() {
             <dd className="text-slate-900 dark:text-slate-100">{data.software}</dd>
             <dt className="text-slate-600 dark:text-slate-400">CVSS Score</dt>
             <dd className="text-slate-900 dark:text-slate-100">{data.cvssScore.toFixed(1)}</dd>
+            {/* RF-25 + RF-28/RF-69: el nivel con la escala del analista, y cuál es. */}
+            <dt className="text-slate-600 dark:text-slate-400">Nivel de riesgo</dt>
+            <dd className="space-y-1">
+              <BadgeNivelRiesgo nivel={data.nivelDeRiesgo} />
+              <div>
+                <RotuloEscala descripcion={data.escala} />
+              </div>
+            </dd>
             <dt className="text-slate-600 dark:text-slate-400">Tipo de acceso</dt>
             <dd className="text-slate-900 dark:text-slate-100">{data.tipoAcceso}</dd>
           </dl>

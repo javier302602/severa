@@ -5,6 +5,7 @@ import {
   VariableNumericaVulnerabilidad,
   VariableCategoricaVulnerabilidad
 } from '../../../../../domain/services/classification/VariablesVulnerabilidad';
+import { EscalaDeClasificacion, RangoDeNivel } from '../../../../../domain/shared/value-objects/EscalaDeClasificacion';
 
 // Paginación (2026-07-19): opcional para no romper a ExportarBusquedaFiltrada,
 // que necesita TODAS las filas para el CSV — solo la búsqueda para pantalla
@@ -52,7 +53,14 @@ export interface VulnerabilidadRepository {
   // de esta retoma. Los nuevos métodos son los que consumen los casos de uso
   // de M-04 de ahora en más.
   filtrarPorRango(variable: VariableNumericaVulnerabilidad, minimo: number, maximo: number, analistaId: string): Promise<Vulnerabilidad[]>;
-  filtrarPorCategoria(variable: VariableCategoricaVulnerabilidad, valor: string, analistaId: string): Promise<Vulnerabilidad[]>;
+  // 'severidad' no se filtra contra la columna: el nivel de riesgo depende de
+  // la escala del analista (RF-28/RF-69) y se filtra con filtrarPorNivelDeRiesgo.
+  filtrarPorCategoria(variable: Exclude<VariableCategoricaVulnerabilidad, 'severidad'>, valor: string, analistaId: string): Promise<Vulnerabilidad[]>;
+  // RF-28 / RF-69 (Modo B): las vulnerabilidades cuyo cvssScore cae en el
+  // rango de un nivel según la escala del analista (EscalaDeClasificacion.rango):
+  // desde `minimo` incluido hasta `menorQue` excluido. Por rango de cvss_score
+  // en SQL, nunca contra la columna `severidad`.
+  filtrarPorNivelDeRiesgo(rango: RangoDeNivel, analistaId: string): Promise<Vulnerabilidad[]>;
   listarPorTipoAcceso(tipoAcceso: 'Remoto' | 'Local', analistaId: string): Promise<Vulnerabilidad[]>;
   listarPorTipoVulnerabilidad(tipoVulnerabilidad: string, analistaId: string): Promise<Vulnerabilidad[]>;
   listarPorSoftware(software: string, analistaId: string): Promise<Vulnerabilidad[]>;
@@ -64,8 +72,10 @@ export interface VulnerabilidadRepository {
   // escritos distinto (ej. minúsculas, con/sin versión).
   listarSoftwareDisponible(analistaId: string): Promise<string[]>;
   actualizarEstado(cve: string, estado: EstadoRemediacion, analistaId: string, fechaRemediacion?: Date): Promise<void>;
-  // RF-88: combina en una sola consulta todos los criterios presentes en el filtro.
-  buscarConFiltros(filtro: FiltroVulnerabilidad, analistaId: string, paginacion?: Paginacion): Promise<Vulnerabilidad[]>;
+  // RF-88: combina en una sola consulta todos los criterios presentes en el
+  // filtro. El nivel de riesgo (filtro.nivelDeRiesgo) se traduce a un rango de
+  // cvssScore con `escala`, la vigente del analista.
+  buscarConFiltros(filtro: FiltroVulnerabilidad, analistaId: string, escala: EscalaDeClasificacion, paginacion?: Paginacion): Promise<Vulnerabilidad[]>;
   // "Restablecer mis datos": borra SOLO las vulnerabilidades del analista que
   // la invoca — nunca el catálogo completo de todos los analistas (ver
   // ReiniciarDataset.ts). Devuelve cuántas filas propias existían antes del

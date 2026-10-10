@@ -21,9 +21,6 @@ lo dice.
   por analista en el backend (migración 015, `ConfigurarUmbralCritico`) pero
   el frontend no lo ofrece. En el Paso 2 la alerta pasa a usar el corte de
   Crítico de la escala cuando el analista no fijó un umbral propio.
-- **`ExportarBusquedaFiltrada` (aplicación) importa un adaptador de
-  infraestructura** (`ExportadorExcelAgrupado`). `lint:deps` no lo detecta:
-  sus reglas solo vigilan el dominio.
 
 ## Paso 5 — RNF
 

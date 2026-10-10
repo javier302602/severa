@@ -5,6 +5,7 @@ import { IdentificadorCVE } from '../../src/domain/shared/value-objects/Identifi
 import { CvssScore } from '../../src/domain/shared/value-objects/CvssScore';
 import { TipoAccesoValue } from '../../src/domain/shared/value-objects/TipoAcceso';
 import { FiltroVulnerabilidad } from '../../src/domain/shared/value-objects/FiltroVulnerabilidad';
+import { EscalaDeClasificacion } from '../../src/domain/shared/value-objects/EscalaDeClasificacion';
 
 // Test de integración REAL: pega contra un Postgres de verdad (mismo
 // DATABASE_URL que usa la app — requiere `docker compose up -d postgres` o
@@ -242,16 +243,16 @@ describe('PostgresVulnerabilidadRepository — integración real (Sprint 16 + mi
 
     test('sin paginación, devuelve las 5 filas (comportamiento previo, usado por ExportarBusquedaFiltrada)', async () => {
       const filtro = new FiltroVulnerabilidad({ componente: 'Paginacion De Prueba' });
-      const resultado = await repository.buscarConFiltros(filtro, ANALISTA_DE_PRUEBA);
+      const resultado = await repository.buscarConFiltros(filtro, ANALISTA_DE_PRUEBA, EscalaDeClasificacion.CVSS);
       expect(resultado).toHaveLength(5);
     });
 
     test('con limite=2, offset=0 y offset=2 devuelve páginas consecutivas sin solapar ni saltear filas', async () => {
       const filtro = new FiltroVulnerabilidad({ componente: 'Paginacion De Prueba' });
 
-      const pagina1 = await repository.buscarConFiltros(filtro, ANALISTA_DE_PRUEBA, { limite: 2, offset: 0 });
-      const pagina2 = await repository.buscarConFiltros(filtro, ANALISTA_DE_PRUEBA, { limite: 2, offset: 2 });
-      const pagina3 = await repository.buscarConFiltros(filtro, ANALISTA_DE_PRUEBA, { limite: 2, offset: 4 });
+      const pagina1 = await repository.buscarConFiltros(filtro, ANALISTA_DE_PRUEBA, EscalaDeClasificacion.CVSS, { limite: 2, offset: 0 });
+      const pagina2 = await repository.buscarConFiltros(filtro, ANALISTA_DE_PRUEBA, EscalaDeClasificacion.CVSS, { limite: 2, offset: 2 });
+      const pagina3 = await repository.buscarConFiltros(filtro, ANALISTA_DE_PRUEBA, EscalaDeClasificacion.CVSS, { limite: 2, offset: 4 });
 
       expect(pagina1.map((v) => v.cve.valor)).toEqual(['CVE-1999-9201', 'CVE-1999-9202']);
       expect(pagina2.map((v) => v.cve.valor)).toEqual(['CVE-1999-9203', 'CVE-1999-9204']);
@@ -275,9 +276,9 @@ describe('PostgresVulnerabilidadRepository — integración real (Sprint 16 + mi
       }
       const filtro = new FiltroVulnerabilidad({ componente: 'Paginacion Empate' });
 
-      const pagina1 = await repository.buscarConFiltros(filtro, ANALISTA_DE_PRUEBA, { limite: 2, offset: 0 });
-      const pagina2 = await repository.buscarConFiltros(filtro, ANALISTA_DE_PRUEBA, { limite: 2, offset: 2 });
-      const pagina3 = await repository.buscarConFiltros(filtro, ANALISTA_DE_PRUEBA, { limite: 2, offset: 4 });
+      const pagina1 = await repository.buscarConFiltros(filtro, ANALISTA_DE_PRUEBA, EscalaDeClasificacion.CVSS, { limite: 2, offset: 0 });
+      const pagina2 = await repository.buscarConFiltros(filtro, ANALISTA_DE_PRUEBA, EscalaDeClasificacion.CVSS, { limite: 2, offset: 2 });
+      const pagina3 = await repository.buscarConFiltros(filtro, ANALISTA_DE_PRUEBA, EscalaDeClasificacion.CVSS, { limite: 2, offset: 4 });
 
       const todasLasFilas = [...pagina1, ...pagina2, ...pagina3].map((v) => v.cve.valor);
       expect(todasLasFilas).toEqual([...new Set(todasLasFilas)]); // sin duplicados
@@ -302,7 +303,7 @@ describe('PostgresVulnerabilidadRepository — integración real (Sprint 16 + mi
       );
 
       const filtro = new FiltroVulnerabilidad({ componente: 'Apache Log4j' });
-      const resultado = await repository.buscarConFiltros(filtro, ANALISTA_DE_PRUEBA);
+      const resultado = await repository.buscarConFiltros(filtro, ANALISTA_DE_PRUEBA, EscalaDeClasificacion.CVSS);
 
       expect(resultado.map((v) => v.cve.valor)).toEqual([CVES_COMPONENTE[0]]);
     });
@@ -316,7 +317,7 @@ describe('PostgresVulnerabilidadRepository — integración real (Sprint 16 + mi
       );
 
       const filtro = new FiltroVulnerabilidad({ componente: 'RCE', variableComponente: 'tipoVulnerabilidad' });
-      const resultado = await repository.buscarConFiltros(filtro, ANALISTA_DE_PRUEBA);
+      const resultado = await repository.buscarConFiltros(filtro, ANALISTA_DE_PRUEBA, EscalaDeClasificacion.CVSS);
 
       expect(resultado.map((v) => v.cve.valor)).toEqual([CVES_COMPONENTE[0]]);
     });
@@ -434,14 +435,24 @@ describe('PostgresVulnerabilidadRepository — integración real (Sprint 16 + mi
       await pool.query('DELETE FROM vulnerabilidades WHERE cve = ANY($1)', [CVES_CATEGORIA]);
     });
 
-    test('variable="severidad" (default) filtra por la columna severidad, igual que antes de esta ronda', async () => {
+    // RF-28 / RF-69 (Modo B): el nivel de riesgo ya no se filtra contra la
+    // columna `severidad` sino por el rango de cvss_score que le da la escala
+    // (los bordes, con CVSS y con una escala propia, los cubre
+    // BordesDeEscalaDeClasificacion.integration.test.ts).
+    test('filtrarPorNivelDeRiesgo filtra por el rango de cvss_score de la escala, no por la columna severidad', async () => {
       await repository.guardar(
-        new Vulnerabilidad(CVES_CATEGORIA[0], new IdentificadorCVE(CVES_CATEGORIA[0]), new CvssScore(9.5), 'Categoria Severidad').asignarAnalista(ANALISTA_DE_PRUEBA)
+        new Vulnerabilidad(CVES_CATEGORIA[0], new IdentificadorCVE(CVES_CATEGORIA[0]), new CvssScore(8.7), 'Categoria Severidad').asignarAnalista(ANALISTA_DE_PRUEBA)
       );
+      const propia = EscalaDeClasificacion.personalizada({ moderado: 4, alto: 7, critico: 8.5 });
 
-      const resultado = await repository.filtrarPorCategoria('severidad', 'Crítica', ANALISTA_DE_PRUEBA);
+      const criticasConCvss = await repository.filtrarPorNivelDeRiesgo(EscalaDeClasificacion.CVSS.rango('Crítico'), ANALISTA_DE_PRUEBA);
+      const criticasConPropia = await repository.filtrarPorNivelDeRiesgo(propia.rango('Crítico'), ANALISTA_DE_PRUEBA);
 
-      expect(resultado.map((v) => v.cve.valor)).toEqual([CVES_CATEGORIA[0]]);
+      expect(criticasConCvss.map((v) => v.cve.valor)).not.toContain(CVES_CATEGORIA[0]);
+      expect(criticasConPropia.map((v) => v.cve.valor)).toContain(CVES_CATEGORIA[0]);
+      // La columna sigue diciendo lo que calculó CVSS al importar: no se reescribe.
+      const { rows } = await pool.query('SELECT severidad FROM vulnerabilidades WHERE cve = $1 AND analista_id = $2', [CVES_CATEGORIA[0], ANALISTA_DE_PRUEBA]);
+      expect(rows[0].severidad).toBe('Alta');
     });
 
     // tipoAcceso es la única variable categórica cuya columna SQL es BOOLEAN

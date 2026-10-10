@@ -12,6 +12,9 @@ import {
 import type { CriteriosBusqueda } from '../../api/busquedaService';
 import type { FiltroFavorito } from '../../api/filtroFavoritoService';
 import type { EstadoRemediacion } from '../../types/EstadoRemediacion';
+import { BadgeNivelRiesgo } from '../../components/ui/BadgeNivelRiesgo';
+import { RotuloEscala } from '../../components/ui/RotuloEscala';
+import { NIVELES_DE_RIESGO, nivelDeRiesgoDesdeTexto } from '../../constants/nivelesDeRiesgo';
 import { BadgeEstadoRemediacion } from '../../components/ui/BadgeEstadoRemediacion';
 import { Spinner } from '../../components/ui/Spinner';
 import { MensajeError } from '../../components/ui/MensajeError';
@@ -77,7 +80,7 @@ function aDatosFiltro(criterios: CriteriosBusqueda): DatosFiltro {
     cve: criterios.cve ?? '',
     cvssMin: criterios.cvssMin !== undefined ? String(criterios.cvssMin) : '',
     cvssMax: criterios.cvssMax !== undefined ? String(criterios.cvssMax) : '',
-    severidad: criterios.severidad ?? '',
+    severidad: criterios.severidad ? (nivelDeRiesgoDesdeTexto(criterios.severidad) ?? criterios.severidad) : '',
     componente: criterios.componente ?? '',
     estadoRemediacion: criterios.estadoRemediacion ?? '',
     fechaDesde: criterios.fechaDesde ?? '',
@@ -141,7 +144,14 @@ function SeccionFavoritos({
         <ul className="divide-y divide-slate-200 dark:divide-slate-700">
           {data.map((favorito) => (
             <li key={favorito.id} className="flex items-center justify-between gap-3 py-2">
-              <span className="text-sm text-slate-800 dark:text-slate-200">{favorito.nombre}</span>
+              <span className="text-sm text-slate-800 dark:text-slate-200">
+                {favorito.nombre}
+                {favorito.criterios.severidad && (
+                  <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">
+                    Nivel de riesgo: {nivelDeRiesgoDesdeTexto(favorito.criterios.severidad) ?? favorito.criterios.severidad}
+                  </span>
+                )}
+              </span>
               <button
                 type="button"
                 onClick={() => onUsarFavorito(favorito)}
@@ -189,7 +199,11 @@ export function BusquedaAvanzadaPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Búsqueda avanzada</h1>
+      <div className="space-y-1">
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Búsqueda avanzada</h1>
+        {/* RF-28 / RF-69: con qué escala se filtra, se muestra y se exporta el nivel de riesgo. */}
+        <RotuloEscala />
+      </div>
 
       <form
         onSubmit={handleSubmit(onSubmit)}
@@ -239,7 +253,7 @@ export function BusquedaAvanzadaPage() {
 
         <div>
           <label htmlFor="severidad" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-            Severidad
+            Nivel de riesgo
           </label>
           <select
             id="severidad"
@@ -247,10 +261,11 @@ export function BusquedaAvanzadaPage() {
             className="campo-formulario mt-1 w-full"
           >
             <option value="">—</option>
-            <option value="Baja">Baja</option>
-            <option value="Media">Media</option>
-            <option value="Alta">Alta</option>
-            <option value="Crítica">Crítica</option>
+            {NIVELES_DE_RIESGO.map((nivel) => (
+              <option key={nivel} value={nivel}>
+                {nivel}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -341,6 +356,7 @@ export function BusquedaAvanzadaPage() {
                 <th className="px-4 py-2">CVE</th>
                 <th className="px-4 py-2">Software</th>
                 <th className="px-4 py-2">CVSS</th>
+                <th className="px-4 py-2">Nivel de riesgo</th>
                 <th className="px-4 py-2">Estado</th>
                 <th className="px-4 py-2">Fecha de carga</th>
               </tr>
@@ -355,6 +371,9 @@ export function BusquedaAvanzadaPage() {
                   </td>
                   <td className="px-4 py-2">{item.software}</td>
                   <td className="px-4 py-2">{item.cvssScore.toFixed(1)}</td>
+                  <td className="px-4 py-2">
+                    <BadgeNivelRiesgo nivel={item.nivelDeRiesgo} />
+                  </td>
                   <td className="px-4 py-2">
                     <BadgeEstadoRemediacion estado={item.estadoRemediacion} />
                   </td>

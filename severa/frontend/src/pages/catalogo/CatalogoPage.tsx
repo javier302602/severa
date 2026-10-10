@@ -6,6 +6,9 @@ import { Link } from 'react-router-dom';
 import { useBuscarVulnerabilidades } from '../../hooks/useBusqueda';
 import type { CriteriosBusqueda } from '../../api/busquedaService';
 import type { EstadoRemediacion } from '../../types/EstadoRemediacion';
+import { BadgeNivelRiesgo } from '../../components/ui/BadgeNivelRiesgo';
+import { RotuloEscala } from '../../components/ui/RotuloEscala';
+import { NIVELES_DE_RIESGO } from '../../constants/nivelesDeRiesgo';
 import { BadgeEstadoRemediacion } from '../../components/ui/BadgeEstadoRemediacion';
 import { Spinner } from '../../components/ui/Spinner';
 import { MensajeError } from '../../components/ui/MensajeError';
@@ -75,7 +78,11 @@ export function CatalogoPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Catálogo de vulnerabilidades</h1>
+      <div className="space-y-1">
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Catálogo de vulnerabilidades</h1>
+        {/* RF-28 / RF-69: con qué escala se filtra y se muestra el nivel de riesgo. */}
+        <RotuloEscala />
+      </div>
 
       <form
         onSubmit={handleSubmit(onSubmit)}
@@ -125,7 +132,7 @@ export function CatalogoPage() {
 
         <div>
           <label htmlFor="severidad" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-            Severidad
+            Nivel de riesgo
           </label>
           <select
             id="severidad"
@@ -133,10 +140,11 @@ export function CatalogoPage() {
             className="campo-formulario mt-1 w-full"
           >
             <option value="">—</option>
-            <option value="Baja">Baja</option>
-            <option value="Media">Media</option>
-            <option value="Alta">Alta</option>
-            <option value="Crítica">Crítica</option>
+            {NIVELES_DE_RIESGO.map((nivel) => (
+              <option key={nivel} value={nivel}>
+                {nivel}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -189,6 +197,7 @@ export function CatalogoPage() {
                 <th className="px-4 py-2">CVE</th>
                 <th className="px-4 py-2">Software</th>
                 <th className="px-4 py-2">CVSS</th>
+                <th className="px-4 py-2">Nivel de riesgo</th>
                 <th className="px-4 py-2">Estado</th>
                 <th className="px-4 py-2">Fecha de carga</th>
               </tr>
@@ -203,6 +212,9 @@ export function CatalogoPage() {
                   </td>
                   <td className="px-4 py-2">{item.software}</td>
                   <td className="px-4 py-2">{item.cvssScore.toFixed(1)}</td>
+                  <td className="px-4 py-2">
+                    <BadgeNivelRiesgo nivel={item.nivelDeRiesgo} />
+                  </td>
                   <td className="px-4 py-2">
                     <BadgeEstadoRemediacion estado={item.estadoRemediacion} />
                   </td>

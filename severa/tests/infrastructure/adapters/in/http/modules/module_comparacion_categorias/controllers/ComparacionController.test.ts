@@ -38,6 +38,7 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => {
     buscarPorCve: jest.fn(),
     filtrarPorRangoCvss: jest.fn(),
     filtrarPorSeveridad: jest.fn(),
+    filtrarPorNivelDeRiesgo: jest.fn().mockResolvedValue([]),
     filtrarPorRango: jest.fn(),
     filtrarPorCategoria: jest.fn(),
     listarPorTipoAcceso: jest.fn(async (tipoAcceso: 'Remoto' | 'Local', analistaId: string) =>

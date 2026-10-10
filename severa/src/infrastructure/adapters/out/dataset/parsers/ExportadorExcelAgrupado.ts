@@ -1,34 +1,37 @@
 import ExcelJS from 'exceljs';
 import { PassThrough } from 'stream';
 import { Vulnerabilidad } from '../../../../../domain/entities/Vulnerabilidad';
+import { NivelDeRiesgo } from '../../../../../domain/shared/value-objects/NivelDeRiesgo';
+import { EscalaDeClasificacion } from '../../../../../domain/shared/value-objects/EscalaDeClasificacion';
 import {
   ENCABEZADO_EXPORTACION,
-  agruparPorSeveridad,
+  agruparPorNivelDeRiesgo,
   filaDeExportacion,
-  GrupoDeSeveridad
-} from '../../../../../domain/services/ExportacionAgrupadaPorSeveridad';
+  lineaDeEscala
+} from '../../../../../domain/services/ExportacionAgrupadaPorNivelDeRiesgo';
+import { ExportadorDeCatalogoAgrupado } from '../../../../../application/ports/out/exportacion/ExportadorDeCatalogoAgrupado';
 
 // Bug real reportado: la descarga de vulnerabilidades era "un solo cuadro
 // sin separación visual". Se arma un .xlsx real con exceljs (la librería
 // "xlsx"/SheetJS Community Edition ya usada en el resto del proyecto NO
 // escribe estilos de celda al guardar — verificado escribiendo y releyendo
 // un archivo — así que el color de fondo y la fusión de celdas de acá son
-// posibles solo porque exceljs sí los soporta) — un bloque por severidad,
+// posibles solo porque exceljs sí los soporta) — un bloque por nivel de riesgo,
 // con encabezado de fila fusionada y color, encabezado de columnas propio,
 // datos, y una fila en blanco antes del siguiente bloque.
-const COLOR_POR_SEVERIDAD: Record<GrupoDeSeveridad['severidad'], string> = {
-  Crítica: 'FFDC2626', // rojo
-  Alta: 'FFEA580C', // naranja
-  Media: 'FFCA8A04', // amarillo/ámbar (texto oscuro por contraste, ver abajo)
-  Baja: 'FF16A34A' // verde
+const COLOR_POR_NIVEL: Record<NivelDeRiesgo, string> = {
+  Crítico: 'FFDC2626', // rojo
+  Alto: 'FFEA580C', // naranja
+  Moderado: 'FFCA8A04', // amarillo/ámbar (texto oscuro por contraste, ver abajo)
+  Bajo: 'FF16A34A' // verde
 };
 
-const TEXTO_OSCURO_POR_SEVERIDAD = new Set<GrupoDeSeveridad['severidad']>(['Media']);
+const TEXTO_OSCURO_POR_NIVEL = new Set<NivelDeRiesgo>(['Moderado']);
 
-function estiloEncabezadoDeBloque(severidad: GrupoDeSeveridad['severidad']): Partial<ExcelJS.Style> {
+function estiloEncabezadoDeBloque(nivel: NivelDeRiesgo): Partial<ExcelJS.Style> {
   return {
-    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: COLOR_POR_SEVERIDAD[severidad] } },
-    font: { bold: true, size: 12, color: { argb: TEXTO_OSCURO_POR_SEVERIDAD.has(severidad) ? 'FF1E293B' : 'FFFFFFFF' } },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: COLOR_POR_NIVEL[nivel] } },
+    font: { bold: true, size: 12, color: { argb: TEXTO_OSCURO_POR_NIVEL.has(nivel) ? 'FF1E293B' : 'FFFFFFFF' } },
     alignment: { horizontal: 'center', vertical: 'middle' }
   };
 }
@@ -55,10 +58,10 @@ const ESTILO_ENCABEZADO_COLUMNAS: Partial<ExcelJS.Style> = {
 const ANCHO_MAXIMO_COLUMNA = 40;
 const ANCHO_MINIMO_COLUMNA = 8;
 
-function calcularAnchosDeColumnas(vulnerabilidades: Vulnerabilidad[]): number[] {
+function calcularAnchosDeColumnas(vulnerabilidades: Vulnerabilidad[], escala: EscalaDeClasificacion): number[] {
   const anchos = ENCABEZADO_EXPORTACION.map((titulo) => titulo.length);
   for (const vulnerabilidad of vulnerabilidades) {
-    const fila = filaDeExportacion(vulnerabilidad);
+    const fila = filaDeExportacion(vulnerabilidad, escala);
     fila.forEach((valor, indice) => {
       anchos[indice] = Math.min(ANCHO_MAXIMO_COLUMNA, Math.max(anchos[indice], valor.length));
     });
@@ -77,7 +80,7 @@ function calcularAnchosDeColumnas(vulnerabilidades: Vulnerabilidad[]): number[] 
 // de cuántas filas tenga el dataset. El contrato externo (Promise<Buffer>)
 // no cambia — se junta el stream de salida en un Buffer acá adentro, no en
 // el controller.
-export async function construirExcelAgrupadoPorSeveridad(vulnerabilidades: Vulnerabilidad[]): Promise<Buffer> {
+export async function construirExcelAgrupadoPorNivelDeRiesgo(vulnerabilidades: Vulnerabilidad[], escala: EscalaDeClasificacion): Promise<Buffer> {
   const destino = new PassThrough();
   const chunks: Buffer[] = [];
   destino.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -87,17 +90,23 @@ export async function construirExcelAgrupadoPorSeveridad(vulnerabilidades: Vulne
   });
 
   const libro = new ExcelJS.stream.xlsx.WorkbookWriter({ stream: destino, useStyles: true });
-  const hoja = libro.addWorksheet('Vulnerabilidades por severidad');
-  hoja.columns = calcularAnchosDeColumnas(vulnerabilidades).map((width) => ({ width }));
+  const hoja = libro.addWorksheet('Vulnerabilidades por nivel');
+  hoja.columns = calcularAnchosDeColumnas(vulnerabilidades, escala).map((width) => ({ width }));
+
+  // RF-28 / RF-69: el archivo dice con qué escala se clasificó.
+  const filaEscala = hoja.addRow([lineaDeEscala(escala)]);
+  filaEscala.getCell(1).style = { font: { italic: true, color: { argb: 'FF475569' } } };
+  filaEscala.commit();
+  hoja.addRow([]).commit();
 
   let hayCeldasVacias = false;
   const indiceRevisar = ENCABEZADO_EXPORTACION.length - 1;
 
-  for (const grupo of agruparPorSeveridad(vulnerabilidades)) {
-    const filaTitulo = hoja.addRow([`SEVERIDAD: ${grupo.severidad.toUpperCase()} (${grupo.vulnerabilidades.length} vulnerabilidades)`]);
+  for (const grupo of agruparPorNivelDeRiesgo(vulnerabilidades, escala)) {
+    const filaTitulo = hoja.addRow([`NIVEL DE RIESGO: ${grupo.nivel.toUpperCase()} (${grupo.vulnerabilidades.length} vulnerabilidades)`]);
     hoja.mergeCells(filaTitulo.number, 1, filaTitulo.number, ENCABEZADO_EXPORTACION.length);
     filaTitulo.height = 20;
-    filaTitulo.getCell(1).style = estiloEncabezadoDeBloque(grupo.severidad);
+    filaTitulo.getCell(1).style = estiloEncabezadoDeBloque(grupo.nivel);
     filaTitulo.commit();
 
     const filaEncabezado = hoja.addRow(ENCABEZADO_EXPORTACION);
@@ -118,7 +127,7 @@ export async function construirExcelAgrupadoPorSeveridad(vulnerabilidades: Vulne
     // total, no millones) se mantienen — esas sí son baratas a cualquier
     // escala.
     for (const vulnerabilidad of grupo.vulnerabilidades) {
-      const datos = filaDeExportacion(vulnerabilidad);
+      const datos = filaDeExportacion(vulnerabilidad, escala);
       if (datos[indiceRevisar] === '✓') {
         hayCeldasVacias = true;
       }
@@ -145,4 +154,12 @@ export async function construirExcelAgrupadoPorSeveridad(vulnerabilidades: Vulne
   await listo;
 
   return Buffer.concat(chunks);
+}
+
+// El adaptador que inyecta el contenedor en los casos de uso de exportación
+// (RF-24, RF-90): la aplicación conoce solo el puerto.
+export class ExportadorExcelAgrupado implements ExportadorDeCatalogoAgrupado {
+  exportar(vulnerabilidades: Vulnerabilidad[], escala: EscalaDeClasificacion): Promise<Buffer> {
+    return construirExcelAgrupadoPorNivelDeRiesgo(vulnerabilidades, escala);
+  }
 }

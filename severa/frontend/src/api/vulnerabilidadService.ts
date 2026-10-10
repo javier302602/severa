@@ -1,4 +1,5 @@
 import { httpClient } from './httpClient';
+import type { NivelDeRiesgo } from './priorizacionService';
 
 // Contrato verificado contra VulnerabilidadController.ts — GET /:cve NO
 // incluye estadoRemediacion (a diferencia de GET /vulnerabilidades/buscar).
@@ -9,6 +10,10 @@ export interface VulnerabilidadDetalle {
   cve: string;
   software: string;
   cvssScore: number;
+  // RF-28 / RF-69: el nivel con la escala vigente del analista, y cómo se
+  // llama esa escala ("Escala CVSS (por defecto)", "Escala personalizada: …").
+  nivelDeRiesgo: NivelDeRiesgo;
+  escala: string;
   tipoAcceso: 'Remoto' | 'Local';
 }
 

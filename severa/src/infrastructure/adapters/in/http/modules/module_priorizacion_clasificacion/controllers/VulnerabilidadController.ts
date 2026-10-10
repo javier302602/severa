@@ -1,5 +1,6 @@
 import express from 'express';
 import { container } from '../../../../../../config/container';
+import { EscalaVigente } from '../../../../../../../application/ports/in/module_priorizacion_clasificacion/EscalaDeClasificacionUseCases';
 import {
   esVariableNumericaValida,
   esVariableCategoricaValida,
@@ -42,7 +43,9 @@ const VARIABLE_CATEGORICA_POR_DEFECTO: VariableCategoricaVulnerabilidad = 'sever
 // antes. Ahora expone los mismos campos que el resto de los endpoints que
 // devuelven vulnerabilidades (ver BusquedaController.ts), más los que solo
 // tiene sentido mostrar en el detalle de una.
-function armarFichaVulnerabilidad(vulnerabilidad: Vulnerabilidad) {
+// RF-25 + RF-28/RF-69: la ficha incluye el nivel de riesgo calculado con la
+// escala vigente del analista, y cuál es esa escala.
+function armarFichaVulnerabilidad(vulnerabilidad: Vulnerabilidad, escala: EscalaVigente) {
   const variableNumerica: VariableNumericaVulnerabilidad = 'cvssScore';
   const variableCategorica: VariableCategoricaVulnerabilidad = 'tipoAcceso';
 
@@ -51,6 +54,8 @@ function armarFichaVulnerabilidad(vulnerabilidad: Vulnerabilidad) {
     cve: vulnerabilidad.cve.valor,
     software: vulnerabilidad.descripcion,
     cvssScore: vulnerabilidad.cvssScore.valor,
+    nivelDeRiesgo: escala.escala.clasificar(vulnerabilidad.cvssScore.valor),
+    escala: escala.escala.describir(),
     tipoAcceso: vulnerabilidad.tipoAcceso?.valor ?? 'Local',
     tipoVulnerabilidad: vulnerabilidad.tipoVulnerabilidad,
     diasParaParche: vulnerabilidad.diasParaParche ?? null,
@@ -63,13 +68,14 @@ function armarFichaVulnerabilidad(vulnerabilidad: Vulnerabilidad) {
 }
 
 vulnerabilidadRouter.get('/:cve', async (req, res) => {
-  const vulnerabilidad = await container.consultarVulnerabilidadPorCveUseCase.ejecutar(req.params.cve, req.analistaAutenticado!.id);
+  const analistaId = req.analistaAutenticado!.id;
+  const vulnerabilidad = await container.consultarVulnerabilidadPorCveUseCase.ejecutar(req.params.cve, analistaId);
   if (!vulnerabilidad) {
     res.status(404).json({ error: 'Vulnerabilidad no encontrada' });
     return;
   }
 
-  res.json(armarFichaVulnerabilidad(vulnerabilidad));
+  res.json(armarFichaVulnerabilidad(vulnerabilidad, await container.obtenerEscalaDeClasificacionUseCase.ejecutar(analistaId)));
 });
 
 vulnerabilidadRouter.get('/', async (req, res) => {
@@ -88,8 +94,15 @@ vulnerabilidadRouter.get('/', async (req, res) => {
 
     if (severidad) {
       const variable = variableQuery !== undefined ? validarVariableCategorica(variableQuery) : VARIABLE_CATEGORICA_POR_DEFECTO;
-      const resultados = await container.filtrarPorCategoriaClasificacionUseCase.ejecutar(severidad, req.analistaAutenticado!.id, variable);
-      res.json(resultados.map((item) => ({ cve: item.cve.valor, cvssScore: item.cvssScore.valor, software: item.descripcion })));
+      const { vulnerabilidades } = await container.filtrarPorCategoriaClasificacionUseCase.ejecutar(severidad, req.analistaAutenticado!.id, variable);
+      res.json(
+        vulnerabilidades.map(({ vulnerabilidad: item, nivelDeRiesgo }) => ({
+          cve: item.cve.valor,
+          cvssScore: item.cvssScore.valor,
+          nivelDeRiesgo,
+          software: item.descripcion
+        }))
+      );
       return;
     }
 

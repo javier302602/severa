@@ -9,6 +9,7 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => {
   const { CvssScore } = require('../../../../../../../../src/domain/shared/value-objects/CvssScore');
   const { TipoAccesoValue } = require('../../../../../../../../src/domain/shared/value-objects/TipoAcceso');
   const { EstadoRemediacionValue } = require('../../../../../../../../src/domain/shared/value-objects/EstadoRemediacion');
+  const { EscalaDeClasificacion } = require('../../../../../../../../src/domain/shared/value-objects/EscalaDeClasificacion');
 
   const vulnerabilidadCompleta = new Vulnerabilidad(
     '1',
@@ -48,7 +49,14 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => {
         ejecutar: jest.fn().mockResolvedValue([vulnerabilidadRango])
       },
       filtrarPorCategoriaClasificacionUseCase: {
-        ejecutar: jest.fn().mockResolvedValue([vulnerabilidadCategoria])
+        ejecutar: jest.fn().mockResolvedValue({
+          escala: { escala: EscalaDeClasificacion.CVSS, personalizada: false },
+          vulnerabilidades: [{ vulnerabilidad: vulnerabilidadCategoria, nivelDeRiesgo: 'Crítico' }]
+        })
+      },
+      // RF-28 / RF-69: la ficha se arma con la escala vigente del analista.
+      obtenerEscalaDeClasificacionUseCase: {
+        ejecutar: jest.fn().mockResolvedValue({ escala: EscalaDeClasificacion.CVSS, personalizada: false })
       }
     }
   };
@@ -86,6 +94,23 @@ describe('GET /vulnerabilidades/:cve — RF (Sprint 17)', () => {
       fechaRemediacion: null
     });
     expect(new Date(res.body.fechaCarga)).toEqual(FECHA_CARGA);
+  });
+
+  test('RF-25 + RF-28/RF-69: la ficha trae el nivel de riesgo según la escala del analista, y cuál es esa escala', async () => {
+    const { EscalaDeClasificacion } = jest.requireActual('../../../../../../../../src/domain/shared/value-objects/EscalaDeClasificacion');
+    const obtenerEscala = container.obtenerEscalaDeClasificacionUseCase.ejecutar as jest.Mock;
+
+    const conCvss = await conToken(conHttps(request(app).get('/vulnerabilidades/CVE-2021-44228')));
+    // Con otra escala vigente, la ficha la nombra (10.0 es Crítico con cualquier escala válida).
+    obtenerEscala.mockResolvedValueOnce({ escala: EscalaDeClasificacion.personalizada({ moderado: 4, alto: 7, critico: 10 }), personalizada: true });
+    const conPropia = await conToken(conHttps(request(app).get('/vulnerabilidades/CVE-2021-44228')));
+
+    expect(conCvss.body).toMatchObject({ nivelDeRiesgo: 'Crítico', escala: 'Escala CVSS (por defecto)' });
+    expect(conPropia.body).toMatchObject({
+      nivelDeRiesgo: 'Crítico',
+      escala: 'Escala personalizada: Moderado desde 4.0, Alto desde 7.0, Crítico desde 10.0'
+    });
+    expect(obtenerEscala).toHaveBeenCalledWith('analista-1');
   });
 
   // RF-25/RF-30 (M-04, retoma): envelope genérico ADITIVO — los campos
@@ -126,11 +151,11 @@ describe('GET /vulnerabilidades — filtro por rango (RF-27) y por categoría (R
     expect(container.filtrarPorRangoDeVariableUseCase.ejecutar).toHaveBeenCalledWith(7, 10, 'analista-1', 'cvssScore');
   });
 
-  test('RETROCOMPATIBILIDAD: sin variable, severidad delega igual que antes (default severidad)', async () => {
+  test('RETROCOMPATIBILIDAD: sin variable, severidad delega igual que antes (default severidad), y cada resultado trae su nivel', async () => {
     const res = await conToken(conHttps(request(app).get('/vulnerabilidades').query({ severidad: 'Crítica' })));
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual([{ cve: 'CVE-2022-00002', cvssScore: 9.8, software: 'OpenSSL' }]);
+    expect(res.body).toEqual([{ cve: 'CVE-2022-00002', cvssScore: 9.8, nivelDeRiesgo: 'Crítico', software: 'OpenSSL' }]);
     expect(container.filtrarPorCategoriaClasificacionUseCase.ejecutar).toHaveBeenCalledWith('Crítica', 'analista-1', 'severidad');
   });
 

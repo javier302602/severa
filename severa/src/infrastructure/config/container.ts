@@ -121,6 +121,7 @@ import { GuardarPlantillaDeAnalisis } from '../../application/usecases/module_pe
 import { ListarPlantillasDeAnalisis } from '../../application/usecases/module_perfil_analista/ListarPlantillasDeAnalisis';
 import { EliminarPlantillaDeAnalisis } from '../../application/usecases/module_perfil_analista/EliminarPlantillaDeAnalisis';
 import { AplicarPlantillaDeAnalisis } from '../../application/usecases/module_perfil_analista/AplicarPlantillaDeAnalisis';
+import { ExportadorExcelAgrupado } from '../adapters/out/dataset/parsers/ExportadorExcelAgrupado';
 import { PostgresEscalaDeClasificacionRepository } from '../adapters/out/persistencia/repositorios/PostgresEscalaDeClasificacionRepository';
 import {
   GuardarEscalaDeClasificacion,
@@ -152,6 +153,8 @@ const historialAnalisisRepository = new PostgresHistorialAnalisisRepository(pool
 const datasetGenericoRepository = new PostgresDatasetGenericoRepository(pool);
 const plantillaDeAnalisisRepository = new PostgresPlantillaDeAnalisisRepository(pool);
 const escalaDeClasificacionRepository = new PostgresEscalaDeClasificacionRepository(pool);
+// RF-24 / RF-90: el catálogo agrupado por nivel de riesgo en .xlsx.
+const exportadorDeCatalogoAgrupado = new ExportadorExcelAgrupado();
 const hasher = new BcryptHasher();
 // RF-03: adaptador simulado (consola), mismo criterio que
 // ConsolaServicioDeNotificaciones — no hay infraestructura SMTP real.
@@ -290,7 +293,7 @@ export const container = {
   ),
   consultarVulnerabilidadPorCveUseCase: new ConsultarVulnerabilidadPorCVE(vulnerabilidadRepository),
   filtrarPorRangoDeVariableUseCase: new FiltrarPorRangoDeVariable(vulnerabilidadRepository),
-  filtrarPorCategoriaClasificacionUseCase: new FiltrarPorCategoriaClasificacion(vulnerabilidadRepository),
+  filtrarPorCategoriaClasificacionUseCase: new FiltrarPorCategoriaClasificacion(vulnerabilidadRepository, escalaDeClasificacionRepository),
   // RF-94: decorado, auditado y notificado. Invocado directamente por
   // SincronizarConApiNvd y, desde Sprint 14, indirectamente por
   // ImportarDatasetDesdeArchivo (RF-17) — sigue sin tener una ruta HTTP
@@ -316,7 +319,7 @@ export const container = {
     analistaRepository
   ),
   // RF-24: primera ruta HTTP para exportar el dataset validado (GET /dataset/exportar).
-  exportarDatasetValidadoUseCase: new ExportarDatasetValidado(vulnerabilidadRepository),
+  exportarDatasetValidadoUseCase: new ExportarDatasetValidado(vulnerabilidadRepository, escalaDeClasificacionRepository, exportadorDeCatalogoAgrupado),
   calcularResumenEstadisticoUseCase: conHistorialDelCatalogo(
     new CalcularResumenEstadistico(vulnerabilidadRepository),
     historialDeAnalisis,
@@ -409,7 +412,7 @@ export const container = {
   // RF-83: adaptador real (node-cron) conectado — antes el caso de uso
   // existía pero no había forma de invocarlo.
   programarInformePeriodicoUseCase: new ProgramarInformePeriodico(programadorDeTareas, generarInformeConAuditoria),
-  buscarConFiltrosUseCase: new BuscarConFiltros(vulnerabilidadRepository),
+  buscarConFiltrosUseCase: new BuscarConFiltros(vulnerabilidadRepository, escalaDeClasificacionRepository),
   // RF-28 / RF-69 (Modo B): escala de clasificación del catálogo, por
   // analista. Cambiarla se audita.
   obtenerEscalaDeClasificacionUseCase: new ObtenerEscalaDeClasificacion(escalaDeClasificacionRepository),
@@ -424,7 +427,7 @@ export const container = {
   guardarFiltroFavoritoUseCase: new GuardarFiltroFavorito(filtroFavoritoRepository),
   listarFiltrosFavoritosUseCase: new ListarFiltrosFavoritos(filtroFavoritoRepository),
   eliminarFiltroFavoritoUseCase: new EliminarFiltroFavorito(filtroFavoritoRepository),
-  exportarBusquedaFiltradaUseCase: new ExportarBusquedaFiltrada(vulnerabilidadRepository),
+  exportarBusquedaFiltradaUseCase: new ExportarBusquedaFiltrada(vulnerabilidadRepository, escalaDeClasificacionRepository, exportadorDeCatalogoAgrupado),
   consultarAuditoriaUseCase: new ConsultarAuditoria(auditoriaRepository),
   obtenerNotificacionesUseCase: new ObtenerNotificaciones(notificacionRepository),
   marcarNotificacionLeidaUseCase: new MarcarNotificacionLeida(notificacionRepository),

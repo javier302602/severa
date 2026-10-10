@@ -13,6 +13,7 @@ import { GenerarGrafico } from '../../src/application/usecases/module_visualizac
 import { CompararPorTipoAcceso } from '../../src/application/usecases/module_comparacion_categorias/CompararPorTipoAcceso';
 import { GenerarRankingUrgencia } from '../../src/application/usecases/module_priorizacion_clasificacion/GenerarRankingUrgencia';
 import { BuscarConFiltros } from '../../src/application/usecases/module_busqueda_filtros_avanzados/BuscarConFiltros';
+import { PostgresEscalaDeClasificacionRepository } from '../../src/infrastructure/adapters/out/persistencia/repositorios/PostgresEscalaDeClasificacionRepository';
 import { recopilarDatosDeInforme } from '../../src/application/usecases/module_reportes_exportacion/RecopilarDatosDeInforme';
 import { GraficosOutputPort } from '../../src/application/ports/out/graphics/GraficosOutputPort';
 import { ServicioDeNotificaciones } from '../../src/application/ports/out/notificaciones/ServicioDeNotificaciones';
@@ -255,11 +256,11 @@ describe('Multi-tenancy: aislamiento de datos por analista (Paso 5) — integrac
   // ------------------------------------------------------------------
   describe('Búsqueda (BuscarConFiltros)', () => {
     test('un filtro amplio (cvssMin=0) de B nunca devuelve CVEs de A', async () => {
-      const usecase = new BuscarConFiltros(vulnerabilidadRepository);
+      const usecase = new BuscarConFiltros(vulnerabilidadRepository, new PostgresEscalaDeClasificacionRepository(pool));
       const filtroAmplio = new FiltroVulnerabilidad({ cvssMin: 0 });
 
       const resultadosDeB = await usecase.ejecutar(filtroAmplio, ANALISTA_B);
-      const cvesDeB = resultadosDeB.map((item) => item.cve.valor);
+      const cvesDeB = resultadosDeB.vulnerabilidades.map(({ vulnerabilidad }) => vulnerabilidad.cve.valor);
 
       expect(cvesDeB).toEqual(expect.arrayContaining([CVE_SOLO_B_1, CVE_SOLO_B_2]));
       expect(cvesDeB).not.toContain(CVE_SOLO_A_1);

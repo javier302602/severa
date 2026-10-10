@@ -18,6 +18,14 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => {
   const { CvssScore } = require('../../../../../../../../src/domain/shared/value-objects/CvssScore');
   const { TipoAccesoValue } = require('../../../../../../../../src/domain/shared/value-objects/TipoAcceso');
   const { FiltroFavorito } = require('../../../../../../../../src/domain/entities/FiltroFavorito');
+  const { EscalaDeClasificacion } = require('../../../../../../../../src/domain/shared/value-objects/EscalaDeClasificacion');
+  const { ExportadorExcelAgrupado } = require('../../../../../../../../src/infrastructure/adapters/out/dataset/parsers/ExportadorExcelAgrupado');
+  const { EscalaDeClasificacionRepositoryEnMemoria } = require('../../../../../../../dobles/EscalaDeClasificacionRepositoryEnMemoria');
+
+  // RF-28 / RF-69: el analista B tiene una escala propia en la que su 5.5 es
+  // Bajo (Moderado recién desde 6.0); A usa la de CVSS.
+  const escalas = new EscalaDeClasificacionRepositoryEnMemoria();
+  escalas.escalas.set('analista-busqueda-B', EscalaDeClasificacion.personalizada({ moderado: 6, alto: 7, critico: 9 }));
 
   // Catálogos separados por analista, para los tests de scoping/IDOR.
   const catalogoPorAnalista: Record<string, InstanceType<typeof Vulnerabilidad>[]> = {
@@ -37,6 +45,7 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => {
     buscarPorCve: jest.fn(),
     filtrarPorRangoCvss: jest.fn(),
     filtrarPorSeveridad: jest.fn(),
+    filtrarPorNivelDeRiesgo: jest.fn().mockResolvedValue([]),
     filtrarPorRango: jest.fn(),
     filtrarPorCategoria: jest.fn(),
     listarPorTipoAcceso: jest.fn(),
@@ -74,8 +83,8 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => {
 
   return {
     container: {
-      buscarConFiltrosUseCase: new BuscarConFiltros(vulnerabilidadRepository),
-      exportarBusquedaFiltradaUseCase: new ExportarBusquedaFiltrada(vulnerabilidadRepository),
+      buscarConFiltrosUseCase: new BuscarConFiltros(vulnerabilidadRepository, escalas),
+      exportarBusquedaFiltradaUseCase: new ExportarBusquedaFiltrada(vulnerabilidadRepository, escalas, new ExportadorExcelAgrupado()),
       guardarFiltroFavoritoUseCase: new GuardarFiltroFavorito(filtroFavoritoRepository),
       listarFiltrosFavoritosUseCase: new ListarFiltrosFavoritos(filtroFavoritoRepository),
       eliminarFiltroFavoritoUseCase: new EliminarFiltroFavorito(filtroFavoritoRepository),
@@ -113,8 +122,36 @@ describe('GET /vulnerabilidades/buscar — RF-84 a RF-88', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual([
-      expect.objectContaining({ cve: 'CVE-2021-44228', cvssScore: 10, estadoRemediacion: 'Pendiente' })
+      expect.objectContaining({ cve: 'CVE-2021-44228', cvssScore: 10, nivelDeRiesgo: 'Crítico', estadoRemediacion: 'Pendiente' })
     ]);
+  });
+
+  test('RF-28 / RF-69: el nivel de cada resultado sale de la escala vigente del analista, en el vocabulario unificado', async () => {
+    // B tiene su escala: su 5.5 es Bajo (con CVSS sería Moderado).
+    const res = await conToken('analista-busqueda-B')(conHttps(request(app).get('/vulnerabilidades/buscar').query({ cvssMin: 0 })));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([expect.objectContaining({ cve: 'CVE-2021-20021', nivelDeRiesgo: 'Bajo' })]);
+    // Y la escala que recibe el repositorio para filtrar es la de B.
+    expect(repo.buscarConFiltros.mock.calls.at(-1)[2].cortes).toEqual({ moderado: 6, alto: 7, critico: 9 });
+  });
+
+  test('el nombre viejo de un nivel ("Crítica") llega al filtro con el nombre unificado', async () => {
+    repo.buscarConFiltros.mockClear();
+
+    await conToken('analista-busqueda-A')(conHttps(request(app).get('/vulnerabilidades/buscar').query({ severidad: 'Crítica' })));
+
+    expect(repo.buscarConFiltros.mock.calls[0][0].nivelDeRiesgo).toBe('Crítico');
+  });
+
+  test('un nivel que no existe responde 400 con un mensaje claro, sin consultar', async () => {
+    repo.buscarConFiltros.mockClear();
+
+    const res = await conToken('analista-busqueda-A')(conHttps(request(app).get('/vulnerabilidades/buscar').query({ severidad: 'Urgente' })));
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('no es un nivel de riesgo');
+    expect(repo.buscarConFiltros).not.toHaveBeenCalled();
   });
 
   test('RF-88: combina 6 filtros a la vez en un solo FiltroVulnerabilidad, sin que se pisen entre sí', async () => {
@@ -142,7 +179,7 @@ describe('GET /vulnerabilidades/buscar — RF-84 a RF-88', () => {
     expect(filtroRecibido.componente).toBe('Apache Log4j');
     expect(filtroRecibido.estadoRemediacion).toBe('Pendiente');
     expect(filtroRecibido.cve).toBeUndefined();
-    expect(filtroRecibido.severidad).toBeUndefined();
+    expect(filtroRecibido.nivelDeRiesgo).toBeUndefined();
   });
 
   test('paginación: sin query params usa el default (200, offset 0)', async () => {
@@ -150,7 +187,7 @@ describe('GET /vulnerabilidades/buscar — RF-84 a RF-88', () => {
 
     await conToken('analista-busqueda-A')(conHttps(request(app).get('/vulnerabilidades/buscar').query({ severidad: 'Crítica' })));
 
-    expect(repo.buscarConFiltros.mock.calls[0][2]).toEqual({ limite: 200, offset: 0 });
+    expect(repo.buscarConFiltros.mock.calls[0][3]).toEqual({ limite: 200, offset: 0 });
   });
 
   test('paginación: pagina y limite explícitos calculan el offset correcto', async () => {
@@ -160,7 +197,7 @@ describe('GET /vulnerabilidades/buscar — RF-84 a RF-88', () => {
       conHttps(request(app).get('/vulnerabilidades/buscar').query({ severidad: 'Crítica', pagina: 3, limite: 50 }))
     );
 
-    expect(repo.buscarConFiltros.mock.calls[0][2]).toEqual({ limite: 50, offset: 100 });
+    expect(repo.buscarConFiltros.mock.calls[0][3]).toEqual({ limite: 50, offset: 100 });
   });
 
   test('paginación: un límite por encima del tope se acota a 500', async () => {
@@ -170,7 +207,7 @@ describe('GET /vulnerabilidades/buscar — RF-84 a RF-88', () => {
       conHttps(request(app).get('/vulnerabilidades/buscar').query({ severidad: 'Crítica', limite: 9999 }))
     );
 
-    expect(repo.buscarConFiltros.mock.calls[0][2].limite).toBe(500);
+    expect(repo.buscarConFiltros.mock.calls[0][3].limite).toBe(500);
   });
 
   // M-11 (retoma, RF-86): variableComponente generaliza `componente` más
@@ -267,7 +304,8 @@ describe('POST /filtros-favoritos — RF-89', () => {
     );
 
     expect(res.status).toBe(201);
-    expect(res.body).toMatchObject({ analistaId: 'analista-busqueda-A', nombre: 'Mi filtro', criterios: { severidad: 'Alta' } });
+    // RF-28 / RF-69: el nivel se guarda con su nombre unificado.
+    expect(res.body).toMatchObject({ analistaId: 'analista-busqueda-A', nombre: 'Mi filtro', criterios: { severidad: 'Alto' } });
   });
 
   test('criterios vacíos responde 400 antes de persistir', async () => {
@@ -320,6 +358,13 @@ describe('GET /filtros-favoritos — RF-89', () => {
 
     expect(resA.body.some((f: { nombre: string }) => f.nombre === 'Críticos')).toBe(true);
     expect(resB.body.some((f: { nombre: string }) => f.nombre === 'Críticos')).toBe(false);
+  });
+
+  test('un favorito guardado con el nombre viejo ("Crítica") se devuelve con el nuevo ("Crítico")', async () => {
+    const res = await conToken('analista-busqueda-A')(conHttps(request(app).get('/filtros-favoritos')));
+
+    const criticos = res.body.find((f: { nombre: string }) => f.nombre === 'Críticos');
+    expect(criticos.criterios).toEqual({ severidad: 'Crítico' });
   });
 
   test('sin autenticar responde 401', async () => {

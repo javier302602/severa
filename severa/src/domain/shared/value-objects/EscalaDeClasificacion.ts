@@ -75,7 +75,10 @@ export class EscalaDeClasificacion {
         'Los cortes tienen que ir en orden: Moderado empieza antes que Alto, y Alto antes que Crítico, sin repetirse.'
       );
     }
-    return new EscalaDeClasificacion({ moderado: cortes.moderado, alto: cortes.alto, critico: cortes.critico });
+    // Se guarda redondeado a la décima: 0.1 + 0.2 llega como 0.30000000000000004
+    // y tiene que comportarse igual que el 0.3 que guarda la base (NUMERIC(3,1)).
+    const aDecima = (valor: number) => Math.round(valor * 10) / 10;
+    return new EscalaDeClasificacion({ moderado: aDecima(cortes.moderado), alto: aDecima(cortes.alto), critico: aDecima(cortes.critico) });
   }
 
   get esCvss(): boolean {

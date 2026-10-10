@@ -1,5 +1,6 @@
 import { httpClient } from './httpClient';
 import type { EstadoRemediacion } from '../types/EstadoRemediacion';
+import type { NivelDeRiesgo } from './priorizacionService';
 
 // Contrato verificado contra BusquedaController.ts. FiltroVulnerabilidad
 // (backend) exige al menos un criterio presente, o lanza FiltroVacioError
@@ -9,6 +10,8 @@ export interface CriteriosBusqueda {
   cve?: string;
   cvssMin?: number;
   cvssMax?: number;
+  // El nivel de riesgo (Bajo, Moderado, Alto, Crítico). Se llama `severidad`
+  // porque así lo recibe el backend y lo guardan los favoritos.
   severidad?: string;
   fechaDesde?: string;
   fechaHasta?: string;
@@ -19,6 +22,8 @@ export interface CriteriosBusqueda {
 export interface VulnerabilidadBusqueda {
   cve: string;
   cvssScore: number;
+  // RF-28 / RF-69: calculado con la escala vigente del analista.
+  nivelDeRiesgo: NivelDeRiesgo;
   software: string;
   estadoRemediacion: EstadoRemediacion;
   fechaCarga: string;

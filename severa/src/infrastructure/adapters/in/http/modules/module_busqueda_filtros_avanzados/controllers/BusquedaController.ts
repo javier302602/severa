@@ -1,6 +1,10 @@
 import express from 'express';
 import { container } from '../../../../../../config/container';
-import { FiltroVulnerabilidad, CriteriosFiltroVulnerabilidad } from '../../../../../../../domain/shared/value-objects/FiltroVulnerabilidad';
+import {
+  FiltroVulnerabilidad,
+  CriteriosFiltroVulnerabilidad,
+  normalizarCriterios
+} from '../../../../../../../domain/shared/value-objects/FiltroVulnerabilidad';
 import { EstadoRemediacion } from '../../../../../../../domain/shared/value-objects/EstadoRemediacion';
 
 // M-11 (RF-84 a RF-90): rutas literales /vulnerabilidades/buscar y
@@ -71,12 +75,16 @@ busquedaRouter.get('/vulnerabilidades/buscar', async (req, res) => {
   try {
     const query = req.query as Record<string, unknown>;
     const filtro = new FiltroVulnerabilidad(parseCriterios(query));
-    const resultados = await container.buscarConFiltrosUseCase.ejecutar(filtro, req.analistaAutenticado!.id, parsePaginacion(query));
+    const { vulnerabilidades } = await container.buscarConFiltrosUseCase.ejecutar(filtro, req.analistaAutenticado!.id, parsePaginacion(query));
 
+    // RF-28 / RF-69: cada resultado con su nivel de riesgo según la escala
+    // vigente del analista (la misma con la que se filtró), en el vocabulario
+    // unificado (Bajo, Moderado, Alto, Crítico).
     res.json(
-      resultados.map((item) => ({
+      vulnerabilidades.map(({ vulnerabilidad: item, nivelDeRiesgo }) => ({
         cve: item.cve.valor,
         cvssScore: item.cvssScore.valor,
+        nivelDeRiesgo,
         software: item.descripcion,
         estadoRemediacion: item.estadoRemediacion.valor,
         fechaCarga: item.fechaCarga
@@ -108,13 +116,16 @@ busquedaRouter.get('/vulnerabilidades/buscar/exportar', async (req, res) => {
 // el analistaId SIEMPRE sale de req.analistaAutenticado.id (JWT verificado),
 // nunca de lo que mande el cliente — es imposible acceder a favoritos ajenos.
 busquedaRouter.post('/filtros-favoritos', async (req, res) => {
-  const { nombre, criterios } = req.body;
+  const { nombre } = req.body;
+  // RF-89 + RF-28/RF-69: el nivel de riesgo se guarda con su nombre unificado
+  // ("Alta" se guarda como "Alto").
+  const criterios = normalizarCriterios(req.body.criterios ?? {});
   const analistaId = req.analistaAutenticado!.id;
 
   try {
     // Valida los criterios (incluida la regla de "al menos uno presente") antes
     // de guardarlos, para no persistir un filtro favorito inservible.
-    new FiltroVulnerabilidad(criterios ?? {});
+    new FiltroVulnerabilidad(criterios);
 
     const filtroFavorito = await container.guardarFiltroFavoritoUseCase.ejecutar({ analistaId, nombre, criterios });
     res.status(201).json({
@@ -133,12 +144,15 @@ busquedaRouter.get('/filtros-favoritos', async (req, res) => {
   const analistaId = req.analistaAutenticado!.id;
 
   const favoritos = await container.listarFiltrosFavoritosUseCase.ejecutar(analistaId);
+  // Un favorito guardado antes de unificar el vocabulario ("Alta", "Media")
+  // se muestra con el nombre nuevo; al aplicarlo se interpreta con la escala
+  // vigente, como cualquier búsqueda.
   res.json(
     favoritos.map((favorito) => ({
       id: favorito.id,
       analistaId: favorito.analistaId,
       nombre: favorito.nombre,
-      criterios: favorito.criterios,
+      criterios: normalizarCriterios(favorito.criterios),
       fechaCreacion: favorito.fechaCreacion
     }))
   );

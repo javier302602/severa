@@ -15,6 +15,7 @@ function repoFalso(vulnerabilidades: Vulnerabilidad[]): VulnerabilidadRepository
     buscarPorCve: jest.fn(),
     filtrarPorRangoCvss: jest.fn(),
     filtrarPorSeveridad: jest.fn(),
+    filtrarPorNivelDeRiesgo: jest.fn().mockResolvedValue([]),
     filtrarPorRango: jest.fn(),
     filtrarPorCategoria: jest.fn(),
     listarPorTipoAcceso: jest.fn(),

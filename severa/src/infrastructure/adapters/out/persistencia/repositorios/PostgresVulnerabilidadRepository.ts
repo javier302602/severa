@@ -5,6 +5,7 @@ import { IdentificadorCVE } from '../../../../../domain/shared/value-objects/Ide
 import { CvssScore } from '../../../../../domain/shared/value-objects/CvssScore';
 import { TipoAccesoValue } from '../../../../../domain/shared/value-objects/TipoAcceso';
 import { EstadoRemediacion, EstadoRemediacionValue } from '../../../../../domain/shared/value-objects/EstadoRemediacion';
+import { EscalaDeClasificacion, RangoDeNivel } from '../../../../../domain/shared/value-objects/EscalaDeClasificacion';
 import { FiltroVulnerabilidad } from '../../../../../domain/shared/value-objects/FiltroVulnerabilidad';
 import {
   VariableNumericaVulnerabilidad,
@@ -220,9 +221,45 @@ export class PostgresVulnerabilidadRepository implements VulnerabilidadRepositor
   // condición fija (no es un criterio más del FiltroVulnerabilidad que
   // controla el cliente — llega aparte, del token) para que ningún filtro
   // pueda, ni por accidente, devolver resultados de otro analista.
-  async buscarConFiltros(filtro: FiltroVulnerabilidad, analistaId: string, paginacion?: Paginacion): Promise<Vulnerabilidad[]> {
-    const condiciones: string[] = [];
+  async buscarConFiltros(
+    filtro: FiltroVulnerabilidad,
+    analistaId: string,
+    escala: EscalaDeClasificacion,
+    paginacion?: Paginacion
+  ): Promise<Vulnerabilidad[]> {
     const valores: unknown[] = [];
+    const condiciones = PostgresVulnerabilidadRepository.condicionesDeFiltro(filtro, analistaId, escala, valores);
+
+    // cve como desempate (2026-07-19): con miles de filas empatadas en el
+    // mismo cvss_score (visto en datos reales: 4154 filas en 7.5 dentro de un
+    // solo analista), "ORDER BY cvss_score DESC" a secas no es determinista
+    // — Postgres puede devolver los empates en distinto orden entre dos
+    // ejecuciones, así que páginas consecutivas (LIMIT/OFFSET) pueden
+    // solaparse o saltearse filas. cve es único por analista (constraint
+    // UNIQUE(analista_id, cve)), así que agregarlo como desempate fija el
+    // orden sin cambiar el criterio principal (mayor CVSS primero).
+    let sql = `SELECT * FROM vulnerabilidades WHERE ${condiciones.join(' AND ')} ORDER BY cvss_score DESC, cve ASC`;
+    if (paginacion) {
+      valores.push(paginacion.limite);
+      sql += ` LIMIT $${valores.length}`;
+      valores.push(paginacion.offset);
+      sql += ` OFFSET $${valores.length}`;
+    }
+
+    const result = await this.pool.query(sql, valores);
+    return result.rows.map((row) => this.mapRow(row));
+  }
+
+  // Las condiciones del WHERE de buscarConFiltros, en un solo lugar: lo que
+  // pagine o cuente sobre los mismos criterios tiene que usar exactamente
+  // estas (hoy el frontend pide la página siguiente con la misma consulta).
+  private static condicionesDeFiltro(
+    filtro: FiltroVulnerabilidad,
+    analistaId: string,
+    escala: EscalaDeClasificacion,
+    valores: unknown[]
+  ): string[] {
+    const condiciones: string[] = [];
 
     valores.push(analistaId);
     condiciones.push(`analista_id = $${valores.length}`);
@@ -239,9 +276,11 @@ export class PostgresVulnerabilidadRepository implements VulnerabilidadRepositor
       valores.push(filtro.cvssMax);
       condiciones.push(`cvss_score <= $${valores.length}`);
     }
-    if (filtro.severidad) {
-      valores.push(filtro.severidad);
-      condiciones.push(`severidad ILIKE $${valores.length}`);
+    // RF-28 / RF-69 (Modo B): el nivel es un rango de cvss_score según la
+    // escala del analista, no la columna `severidad` (calculada con CVSS al
+    // importar). Usa el índice (analista_id, cvss_score) de la migración 007.
+    if (filtro.nivelDeRiesgo) {
+      condiciones.push(PostgresVulnerabilidadRepository.condicionDeRango(escala.rango(filtro.nivelDeRiesgo), valores));
     }
     // LIMITACIÓN CONOCIDA (RF-85): se filtra contra fecha_carga (cuándo SEVERA
     // importó el registro), no contra la fecha real de publicación del CVE en
@@ -271,23 +310,30 @@ export class PostgresVulnerabilidadRepository implements VulnerabilidadRepositor
       condiciones.push(`estado_remediacion = $${valores.length}`);
     }
 
-    // cve como desempate (2026-07-19): con miles de filas empatadas en el
-    // mismo cvss_score (visto en datos reales: 4154 filas en 7.5 dentro de un
-    // solo analista), "ORDER BY cvss_score DESC" a secas no es determinista
-    // — Postgres puede devolver los empates en distinto orden entre dos
-    // ejecuciones, así que páginas consecutivas (LIMIT/OFFSET) pueden
-    // solaparse o saltearse filas. cve es único por analista (constraint
-    // UNIQUE(analista_id, cve)), así que agregarlo como desempate fija el
-    // orden sin cambiar el criterio principal (mayor CVSS primero).
-    let sql = `SELECT * FROM vulnerabilidades WHERE ${condiciones.join(' AND ')} ORDER BY cvss_score DESC, cve ASC`;
-    if (paginacion) {
-      valores.push(paginacion.limite);
-      sql += ` LIMIT $${valores.length}`;
-      valores.push(paginacion.offset);
-      sql += ` OFFSET $${valores.length}`;
-    }
+    return condiciones;
+  }
 
-    const result = await this.pool.query(sql, valores);
+  // El rango de un nivel (EscalaDeClasificacion.rango) como condición SQL:
+  // mínimo incluido, `menorQue` excluido. Es la misma regla de corte que
+  // EscalaDeClasificacion.clasificar() — lo comprueba
+  // tests/integration/BordesDeEscalaDeClasificacion.integration.test.ts.
+  private static condicionDeRango(rango: RangoDeNivel, valores: unknown[]): string {
+    valores.push(rango.minimo);
+    let condicion = `cvss_score >= $${valores.length}`;
+    if (rango.menorQue !== null) {
+      valores.push(rango.menorQue);
+      condicion += ` AND cvss_score < $${valores.length}`;
+    }
+    return condicion;
+  }
+
+  async filtrarPorNivelDeRiesgo(rango: RangoDeNivel, analistaId: string): Promise<Vulnerabilidad[]> {
+    const valores: unknown[] = [analistaId];
+    const condicion = PostgresVulnerabilidadRepository.condicionDeRango(rango, valores);
+    const result = await this.pool.query(
+      `SELECT * FROM vulnerabilidades WHERE analista_id = $1 AND ${condicion} ORDER BY cvss_score DESC, cve ASC`,
+      valores
+    );
     return result.rows.map((row) => this.mapRow(row));
   }
 
@@ -326,10 +372,11 @@ export class PostgresVulnerabilidadRepository implements VulnerabilidadRepositor
     diasParaParche: 'dias_para_parche'
   };
 
-  private static readonly COLUMNA_SQL_CATEGORICA: Record<VariableCategoricaVulnerabilidad, string> = {
+  // Sin 'severidad': el nivel de riesgo se filtra por rango de cvss_score con
+  // la escala del analista (filtrarPorNivelDeRiesgo), nunca contra la columna.
+  private static readonly COLUMNA_SQL_CATEGORICA: Record<Exclude<VariableCategoricaVulnerabilidad, 'severidad'>, string> = {
     tipoAcceso: 'acceso_remoto',
-    estadoRemediacion: 'estado_remediacion',
-    severidad: 'severidad'
+    estadoRemediacion: 'estado_remediacion'
   };
 
   // RF-86 (M-11, retoma): mismo patrón que las dos de arriba, para la
@@ -351,7 +398,11 @@ export class PostgresVulnerabilidadRepository implements VulnerabilidadRepositor
   // tipoAcceso es la única variable categórica cuya columna SQL (acceso_remoto)
   // no es del mismo tipo que el `valor` recibido (BOOLEAN vs. 'Remoto'/'Local')
   // — se traduce acá, en el único punto que conoce ambos vocabularios.
-  async filtrarPorCategoria(variable: VariableCategoricaVulnerabilidad, valor: string, analistaId: string): Promise<Vulnerabilidad[]> {
+  async filtrarPorCategoria(
+    variable: Exclude<VariableCategoricaVulnerabilidad, 'severidad'>,
+    valor: string,
+    analistaId: string
+  ): Promise<Vulnerabilidad[]> {
     const columna = PostgresVulnerabilidadRepository.COLUMNA_SQL_CATEGORICA[variable];
     const valorSql = variable === 'tipoAcceso' ? new TipoAccesoValue(valor).valor === 'Remoto' : valor;
     const operador = variable === 'tipoAcceso' ? '=' : 'ILIKE';

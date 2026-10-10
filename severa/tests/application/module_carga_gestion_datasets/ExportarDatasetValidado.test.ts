@@ -5,6 +5,9 @@ import { Vulnerabilidad } from '../../../src/domain/entities/Vulnerabilidad';
 import { IdentificadorCVE } from '../../../src/domain/shared/value-objects/IdentificadorCVE';
 import { CvssScore } from '../../../src/domain/shared/value-objects/CvssScore';
 import { TipoAccesoValue } from '../../../src/domain/shared/value-objects/TipoAcceso';
+import { EscalaDeClasificacion } from '../../../src/domain/shared/value-objects/EscalaDeClasificacion';
+import { ExportadorExcelAgrupado } from '../../../src/infrastructure/adapters/out/dataset/parsers/ExportadorExcelAgrupado';
+import { EscalaDeClasificacionRepositoryEnMemoria } from '../../dobles/EscalaDeClasificacionRepositoryEnMemoria';
 
 function repositorioFalso(resultados: Vulnerabilidad[]): VulnerabilidadRepository {
   return {
@@ -15,6 +18,7 @@ function repositorioFalso(resultados: Vulnerabilidad[]): VulnerabilidadRepositor
     buscarPorCve: jest.fn().mockResolvedValue(null),
     filtrarPorRangoCvss: jest.fn().mockResolvedValue([]),
     filtrarPorSeveridad: jest.fn().mockResolvedValue([]),
+    filtrarPorNivelDeRiesgo: jest.fn().mockResolvedValue([]),
     filtrarPorRango: jest.fn(),
     filtrarPorCategoria: jest.fn(),
     listarPorTipoAcceso: jest.fn().mockResolvedValue([]),
@@ -29,7 +33,7 @@ function repositorioFalso(resultados: Vulnerabilidad[]): VulnerabilidadRepositor
 
 // Bug real reportado: la descarga del dataset completo era una lista plana
 // (3 columnas, sin encabezado), y después "un solo cuadro sin separación
-// visual". Ahora exporta un .xlsx real agrupado por severidad, con color y
+// visual". Ahora exporta un .xlsx real agrupado por nivel de riesgo, con color y
 // celdas fusionadas (ver el detalle de contenido en
 // tests/infrastructure/ExportadorExcelAgrupado.test.ts — acá solo se
 // confirma que este usecase pide los datos correctos y devuelve un .xlsx
@@ -40,7 +44,7 @@ describe('ExportarDatasetValidado', () => {
       new Vulnerabilidad('1', new IdentificadorCVE('CVE-2021-44228'), new CvssScore(10.0), 'Apache Log4j', new TipoAccesoValue('Sí'))
     ];
     const repository = repositorioFalso(dataset);
-    const usecase = new ExportarDatasetValidado(repository);
+    const usecase = new ExportarDatasetValidado(repository, new EscalaDeClasificacionRepositoryEnMemoria(), new ExportadorExcelAgrupado());
 
     const buffer = await usecase.ejecutar('analista-1');
 
@@ -49,15 +53,27 @@ describe('ExportarDatasetValidado', () => {
 
     const libro = new ExcelJS.Workbook();
     await libro.xlsx.load(buffer as any);
-    expect(libro.worksheets[0].getRow(3).getCell(1).value).toBe('CVE-2021-44228');
+    expect(libro.worksheets[0].getRow(5).getCell(1).value).toBe('CVE-2021-44228');
   });
 
   test('catálogo vacío igual devuelve un .xlsx válido (sin bloques)', async () => {
-    const usecase = new ExportarDatasetValidado(repositorioFalso([]));
+    const usecase = new ExportarDatasetValidado(repositorioFalso([]), new EscalaDeClasificacionRepositoryEnMemoria(), new ExportadorExcelAgrupado());
 
     const buffer = await usecase.ejecutar('analista-1');
 
     const libro = new ExcelJS.Workbook();
     await expect(libro.xlsx.load(buffer as any)).resolves.not.toThrow();
+  });
+
+  test('RF-28 / RF-69: agrupa con la escala vigente del analista', async () => {
+    const ochoSiete = new Vulnerabilidad('5', new IdentificadorCVE('CVE-2021-08700'), new CvssScore(8.7), 'Router', new TipoAccesoValue('Sí'));
+    const escalas = new EscalaDeClasificacionRepositoryEnMemoria();
+    await escalas.guardar('analista-1', EscalaDeClasificacion.personalizada({ moderado: 4, alto: 7, critico: 8.5 }));
+    const usecase = new ExportarDatasetValidado(repositorioFalso([ochoSiete]), escalas, new ExportadorExcelAgrupado());
+
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load((await usecase.ejecutar('analista-1')) as any);
+
+    expect(String(libro.worksheets[0].getRow(3).getCell(1).value)).toBe('NIVEL DE RIESGO: CRÍTICO (1 vulnerabilidades)');
   });
 });

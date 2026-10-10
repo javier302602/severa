@@ -1,4 +1,4 @@
-import { FiltroVulnerabilidad } from '../../../../src/domain/shared/value-objects/FiltroVulnerabilidad';
+import { FiltroVulnerabilidad, normalizarCriterios } from '../../../../src/domain/shared/value-objects/FiltroVulnerabilidad';
 import { FiltroVacioError } from '../../../../src/domain/errors/FiltroVacioError';
 import { CvssFueraDeRangoError } from '../../../../src/domain/errors/CvssFueraDeRangoError';
 import { VariableDeConsultaInvalidaError } from '../../../../src/domain/errors/VariableDeConsultaInvalidaError';
@@ -26,7 +26,8 @@ describe('FiltroVulnerabilidad', () => {
     });
 
     expect(filtro.cvssMin).toBe(9.0);
-    expect(filtro.severidad).toBe('Crítica');
+    // El nivel se guarda con su nombre unificado: 'Crítica' es 'Crítico'.
+    expect(filtro.nivelDeRiesgo).toBe('Crítico');
     expect(filtro.componente).toBe('Apache Log4j');
     expect(filtro.cve).toBeUndefined();
   });
@@ -82,6 +83,35 @@ describe('FiltroVulnerabilidad', () => {
 
     test('variableComponente NO cuenta como criterio independiente: sola (sin componente ni nada más) sigue tirando FiltroVacioError', () => {
       expect(() => new FiltroVulnerabilidad({ variableComponente: 'software' })).toThrow(FiltroVacioError);
+    });
+  });
+
+  describe('nivel de riesgo (RF-28 / RF-69)', () => {
+    test.each([
+      ['Bajo', 'Bajo'],
+      ['Baja', 'Bajo'],
+      ['Media', 'Moderado'],
+      ['moderado', 'Moderado'],
+      ['Alta', 'Alto'],
+      ['Crítica', 'Crítico'],
+      ['CRITICO', 'Crítico']
+    ])('"%s" se entiende como %s (los nombres viejos se siguen aceptando)', (texto, nivel) => {
+      expect(new FiltroVulnerabilidad({ severidad: texto }).nivelDeRiesgo).toBe(nivel);
+    });
+
+    test('un texto que no es un nivel se rechaza con un mensaje claro, en vez de no encontrar nada', () => {
+      expect(() => new FiltroVulnerabilidad({ severidad: 'Urgente' })).toThrow('"Urgente" no es un nivel de riesgo: usá Bajo, Moderado, Alto o Crítico');
+    });
+  });
+
+  describe('normalizarCriterios — favoritos guardados con el nombre viejo', () => {
+    test('"Alta" pasa a "Alto" y el resto de los criterios no cambia', () => {
+      expect(normalizarCriterios({ severidad: 'Alta', cvssMin: 5 })).toEqual({ severidad: 'Alto', cvssMin: 5 });
+    });
+
+    test('sin nivel, o con un texto que no es un nivel, los criterios quedan como estaban', () => {
+      expect(normalizarCriterios({ cvssMin: 5 })).toEqual({ cvssMin: 5 });
+      expect(normalizarCriterios({ severidad: 'Urgente' })).toEqual({ severidad: 'Urgente' });
     });
   });
 });

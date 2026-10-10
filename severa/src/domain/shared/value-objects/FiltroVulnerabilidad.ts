@@ -3,6 +3,8 @@ import { CvssScore } from './CvssScore';
 import { EstadoRemediacion } from './EstadoRemediacion';
 import { FiltroVacioError } from '../../errors/FiltroVacioError';
 import { VariableDeConsultaInvalidaError } from '../../errors/VariableDeConsultaInvalidaError';
+import { NivelDeRiesgo } from './NivelDeRiesgo';
+import { nivelDeRiesgoDesdeTexto } from './EscalaDeClasificacion';
 import {
   VariableCategoricaAbiertaVulnerabilidad,
   esVariableCategoricaAbiertaValida
@@ -53,11 +55,34 @@ function resolverVariableComponente(valor: string | undefined): VariableCategori
 // opcionales individualmente, pero al menos uno debe estar presente (si no,
 // FiltroVacioError). cve y cvssMin/cvssMax reutilizan la validación ya
 // existente de IdentificadorCVE (RF-84) y CvssScore en vez de duplicarla.
+function nivelDeRiesgoValido(texto: string): NivelDeRiesgo {
+  const nivel = nivelDeRiesgoDesdeTexto(texto);
+  if (!nivel) {
+    throw new VariableDeConsultaInvalidaError(`"${texto}" no es un nivel de riesgo: usá Bajo, Moderado, Alto o Crítico`);
+  }
+  return nivel;
+}
+
+// Los criterios con el nivel de riesgo escrito con su nombre unificado: un
+// favorito guardado con "Alta" se muestra y se vuelve a guardar como "Alto".
+// Un texto que no nombra ningún nivel se deja como está (al usarlo,
+// FiltroVulnerabilidad lo rechaza con un mensaje claro).
+export function normalizarCriterios(criterios: CriteriosFiltroVulnerabilidad): CriteriosFiltroVulnerabilidad {
+  if (typeof criterios.severidad !== 'string' || criterios.severidad === '') return criterios;
+  const nivel = nivelDeRiesgoDesdeTexto(criterios.severidad);
+  return nivel ? { ...criterios, severidad: nivel } : criterios;
+}
+
 export class FiltroVulnerabilidad {
   public readonly cve?: IdentificadorCVE;
   public readonly cvssMin?: number;
   public readonly cvssMax?: number;
-  public readonly severidad?: string;
+  // RF-28 / RF-69 (Modo B): el nivel de riesgo pedido, ya con el nombre
+  // unificado. El criterio sigue llegando como `severidad` (así lo mandan las
+  // URLs y lo tienen guardado los favoritos) y se aceptan los nombres viejos
+  // (Baja, Media, Alta, Crítica). Qué rango de CVSS le corresponde lo decide
+  // la escala del analista al consultar, no este objeto.
+  public readonly nivelDeRiesgo?: NivelDeRiesgo;
   public readonly fechaDesde?: Date;
   public readonly fechaHasta?: Date;
   public readonly componente?: string;
@@ -84,7 +109,7 @@ export class FiltroVulnerabilidad {
     this.cve = cve !== undefined ? new IdentificadorCVE(cve) : undefined;
     this.cvssMin = cvssMin !== undefined ? new CvssScore(cvssMin).valor : undefined;
     this.cvssMax = cvssMax !== undefined ? new CvssScore(cvssMax).valor : undefined;
-    this.severidad = severidad;
+    this.nivelDeRiesgo = severidad !== undefined && severidad !== '' ? nivelDeRiesgoValido(severidad) : undefined;
     this.fechaDesde = fechaDesde;
     this.fechaHasta = fechaHasta;
     this.componente = componente;

@@ -1,4 +1,6 @@
 import { CortesDeClasificacion, EscalaDeClasificacion } from '../../../../domain/shared/value-objects/EscalaDeClasificacion';
+import { Vulnerabilidad } from '../../../../domain/entities/Vulnerabilidad';
+import { NivelDeRiesgo } from '../../../../domain/shared/value-objects/NivelDeRiesgo';
 
 // RF-28 / RF-69 (Modo B): la escala con la que se clasifica el catálogo del
 // analista.
@@ -26,4 +28,17 @@ export interface GuardarEscalaDeClasificacionUseCase {
 export interface RestablecerEscalaDeClasificacionUseCase {
   // Vuelve a la escala CVSS.
   ejecutar(analistaId: string): Promise<ResultadoCambioDeEscala>;
+}
+
+// Un listado del catálogo con el nivel de riesgo de cada vulnerabilidad,
+// calculado con la misma escala con la que se filtró (y que viaja junto, para
+// que la pantalla diga cuál fue).
+export interface VulnerabilidadClasificada {
+  vulnerabilidad: Vulnerabilidad;
+  nivelDeRiesgo: NivelDeRiesgo;
+}
+
+export interface CatalogoClasificado {
+  escala: EscalaVigente;
+  vulnerabilidades: VulnerabilidadClasificada[];
 }
