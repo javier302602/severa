@@ -30,7 +30,13 @@ const COLOR_EJE = '#334155';
 const COLOR_BARRA_PRIMARIA = '#4682B4';
 const COLOR_LINEA_MEDIA = '#dc2626';
 const COLOR_LINEA_MEDIANA = '#16a34a';
+// Por nivel de riesgo. Se conservan las claves con los nombres viejos para
+// lo que todavía llegue con ellos.
 const COLORES_SEVERIDAD: Record<string, string> = {
+  Crítico: '#8B0000',
+  Alto: '#ff8c00',
+  Moderado: '#ffd700',
+  Bajo: '#add8e6',
   Crítica: '#8B0000',
   Alta: '#ff8c00',
   Media: '#ffd700',
@@ -156,6 +162,15 @@ export interface OpcionesGrafico {
   etiquetaEjeY?: string;
   alto?: number;
   colorBarra?: string;
+  // Una línea al pie, dentro del gráfico (RF-28/RF-69: la escala de niveles).
+  nota?: string;
+}
+
+// Escribe la nota al pie debajo de lo dibujado y devuelve dónde termina.
+function dibujarNota(doc: PDFKit.PDFDocument, nota: string | undefined, y: number): number {
+  if (!nota) return y;
+  doc.fontSize(7).fillColor(COLOR_TEXTO_SECUNDARIO).font('Helvetica').text(nota, doc.page.margins.left, y, { width: anchoDisponible(doc) });
+  return y + 12;
 }
 
 // Barras verticales — sirve tanto para gráficos de barras (severidad) como
@@ -189,7 +204,7 @@ export function dibujarBarras(doc: PDFKit.PDFDocument, datos: DatoBarra[], opcio
   dibujarMarcasEjeVertical(doc, marcasEje, areaAbsoluta);
   dibujarEtiquetasEjes(doc, opciones.etiquetaEjeX, opciones.etiquetaEjeY, areaAbsoluta);
 
-  return finalizar(doc, yBase + 30);
+  return finalizar(doc, dibujarNota(doc, opciones.nota, yBase + 30));
 }
 
 // Barras horizontales — Top N (tipos de vulnerabilidad, software). Antes no
@@ -236,7 +251,7 @@ export function dibujarBarrasHorizontales(doc: PDFKit.PDFDocument, datos: DatoBa
   dibujarMarcasEjeHorizontal(doc, marcasEje, areaAbsoluta);
   dibujarEtiquetasEjes(doc, opciones.etiquetaEjeX, undefined, areaAbsoluta);
 
-  return finalizar(doc, offsetY + lienzo.alto + 10);
+  return finalizar(doc, dibujarNota(doc, opciones.nota, offsetY + lienzo.alto + 10));
 }
 
 export function dibujarHistograma(
@@ -542,5 +557,5 @@ export function dibujarPastel(doc: PDFKit.PDFDocument, datos: DatoBarra[], opcio
     yLeyenda += 14;
   });
 
-  return finalizar(doc, offsetY + lienzo.alto + 10);
+  return finalizar(doc, dibujarNota(doc, opciones.nota, offsetY + lienzo.alto + 10));
 }

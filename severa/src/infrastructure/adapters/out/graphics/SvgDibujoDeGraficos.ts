@@ -33,7 +33,13 @@ const COLOR_EJE = '#334155';
 const COLOR_BARRA_PRIMARIA = '#4682B4';
 const COLOR_LINEA_MEDIA = '#dc2626';
 const COLOR_LINEA_MEDIANA = '#16a34a';
+// Por nivel de riesgo. Se conservan las claves con los nombres viejos para
+// lo que todavía llegue con ellos.
 const COLORES_SEVERIDAD: Record<string, string> = {
+  Crítico: '#8B0000',
+  Alto: '#ff8c00',
+  Moderado: '#ffd700',
+  Bajo: '#add8e6',
   Crítica: '#8B0000',
   Alta: '#ff8c00',
   Media: '#ffd700',
@@ -45,6 +51,17 @@ export interface OpcionesGraficoSvg {
   etiquetaEjeX?: string;
   etiquetaEjeY?: string;
   colorBarra?: string;
+  // Una línea al pie, dentro del gráfico (RF-28/RF-69: la escala de niveles).
+  nota?: string;
+}
+
+const ALTO_NOTA = 16;
+
+// El gráfico con su nota al pie: se agranda el lienzo en vez de apretar la
+// nota contra los ejes, así no tapa ninguna etiqueta.
+function envolverConNota(contenido: string, nota: string | undefined, alto: number = ALTO): string {
+  if (!nota) return envolverSvg(contenido, alto);
+  return envolverSvg(contenido + texto(8, alto + 10, nota, { tamano: 7, color: COLOR_TEXTO_SECUNDARIO }), alto + ALTO_NOTA);
 }
 
 // Los datos que llegan acá (etiquetas de software, tipo de vulnerabilidad,
@@ -194,12 +211,13 @@ export function dibujarBarras(datos: DatoBarra[], opciones: OpcionesGraficoSvg):
     )
     .join('');
 
-  return envolverSvg(
+  return envolverConNota(
     titulo(opciones.titulo) +
       ejes(area) +
       marcasEjeVertical(marcasEje, area) +
       etiquetasEjes(opciones.etiquetaEjeX, opciones.etiquetaEjeY, area) +
-      barrasSvg
+      barrasSvg,
+    opciones.nota
   );
 }
 
@@ -405,7 +423,7 @@ export function dibujarPastel(datos: DatoBarra[], opciones: OpcionesGraficoSvg):
     })
     .join('');
 
-  return envolverSvg(titulo(opciones.titulo) + porciones + leyenda);
+  return envolverConNota(titulo(opciones.titulo) + porciones + leyenda, opciones.nota);
 }
 
 // M-10 Ronda 2, Pasada 2-D Paso 2 (RF-130): equivalente SVG de

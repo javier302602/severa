@@ -38,7 +38,7 @@ export interface GrupoDeNivelDeRiesgo {
 
 // La línea que encabeza el archivo: con qué escala se clasificó.
 export function lineaDeEscala(escala: EscalaDeClasificacion): string {
-  return `Niveles de riesgo según: ${escala.describir()}`;
+  return escala.leyenda();
 }
 
 // Grupos no vacíos, en orden Crítico > Alto > Moderado > Bajo — única fuente

@@ -72,10 +72,11 @@ export class SvgGraficosAdapter implements GraficosOutputPort {
     formato: 'svg' | 'json' | 'png' | 'pdf',
     titulo = 'Barras',
     etiquetaEjeY = 'Cantidad',
-    etiquetaEjeX?: string
+    etiquetaEjeX?: string,
+    nota?: string
   ): Promise<unknown> {
     if (formato === 'json') return { tipo: 'barras', datos };
-    const opciones = { titulo, etiquetaEjeX, etiquetaEjeY };
+    const opciones = { titulo, etiquetaEjeX, etiquetaEjeY, nota };
     return this.entregar(
       formato,
       () => dibujarBarras(datos as DatoBarra[], opciones),
@@ -83,12 +84,12 @@ export class SvgGraficosAdapter implements GraficosOutputPort {
     );
   }
 
-  async renderizarPastel(datos: unknown, formato: 'svg' | 'json' | 'png' | 'pdf', titulo = 'Pastel'): Promise<unknown> {
+  async renderizarPastel(datos: unknown, formato: 'svg' | 'json' | 'png' | 'pdf', titulo = 'Pastel', nota?: string): Promise<unknown> {
     if (formato === 'json') return { tipo: 'pastel', datos };
     return this.entregar(
       formato,
-      () => dibujarPastel(datos as DatoBarra[], { titulo }),
-      (doc) => dibujarPastelPdf(doc, datos as DatoBarra[], { titulo })
+      () => dibujarPastel(datos as DatoBarra[], { titulo, nota }),
+      (doc) => dibujarPastelPdf(doc, datos as DatoBarra[], { titulo, nota })
     );
   }
 

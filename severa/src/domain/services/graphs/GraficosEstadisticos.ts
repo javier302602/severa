@@ -2,9 +2,8 @@ import { Vulnerabilidad } from '../../entities/Vulnerabilidad';
 import { calcularMedia, calcularMediana } from '../descriptive-statistics/EstadisticaDescriptiva';
 import { generarTablaAgrupada } from '../descriptive-statistics/DistribucionFrecuencias';
 import { minimoDe, maximoDe } from '../MinMax';
-import { CvssScore } from '../../shared/value-objects/CvssScore';
+import { EscalaDeClasificacion, NIVELES_DE_RIESGO } from '../../shared/value-objects/EscalaDeClasificacion';
 import {
-  obtenerSeveridadPorDefecto,
   obtenerValorCategorico,
   obtenerValorNumerico,
   VariableCategoricaVulnerabilidad,
@@ -93,17 +92,17 @@ export function generarDatosHistogramaCvss(scores: number[], opciones: OpcionesH
 // ETIQUETA_POR_NIVEL directo, ahora importan obtenerSeveridadPorDefecto de
 // VariablesVulnerabilidad.ts en su lugar — ETIQUETA_POR_NIVEL deja de
 // exportarse desde acá.
-const ORDEN_SEVERIDAD_POR_DEFECTO = ['Baja', 'Media', 'Alta', 'Crítica'];
-
-export function contarPorSeveridad(scores: number[]): DatoConteo[] {
-  const conteos = new Map(ORDEN_SEVERIDAD_POR_DEFECTO.map((etiqueta) => [etiqueta, 0]));
-
+// RF-28 / RF-69 (Modo B): cuántas vulnerabilidades caen en cada nivel de
+// riesgo según la escala del analista, siempre los cuatro niveles en orden
+// (Bajo, Moderado, Alto, Crítico), aunque alguno quede en 0. Recibe solo los
+// puntajes que el llamador ya trajo: no consulta nada por su cuenta.
+export function contarPorNivelDeRiesgo(scores: number[], escala: EscalaDeClasificacion): DatoConteo[] {
+  const conteos = new Map<string, number>(NIVELES_DE_RIESGO.map((nivel) => [nivel, 0]));
   scores.forEach((score) => {
-    const etiqueta = obtenerSeveridadPorDefecto(new CvssScore(score));
-    conteos.set(etiqueta, (conteos.get(etiqueta) ?? 0) + 1);
+    const nivel = escala.clasificar(score);
+    conteos.set(nivel, conteos.get(nivel)! + 1);
   });
-
-  return ORDEN_SEVERIDAD_POR_DEFECTO.map((etiqueta) => ({ etiqueta, valor: conteos.get(etiqueta)! }));
+  return NIVELES_DE_RIESGO.map((nivel) => ({ etiqueta: nivel, valor: conteos.get(nivel)! }));
 }
 
 export function generarDatosHistogramaAgrupado(scores: number[]): DatosHistogramaCvss {
@@ -126,20 +125,24 @@ export function generarDatosHistogramaAgrupado(scores: number[]): DatosHistogram
 // contarPorCategoria('severidad') delega en ella para no duplicar la lógica
 // del caso default.
 const CATEGORIAS_POR_VARIABLE: Record<VariableCategoricaVulnerabilidad, string[]> = {
-  severidad: ORDEN_SEVERIDAD_POR_DEFECTO,
+  severidad: [...NIVELES_DE_RIESGO],
   tipoAcceso: ['Remoto', 'Local'],
   estadoRemediacion: ['Pendiente', 'EnProceso', 'Remediada']
 };
 
-export function contarPorCategoria(vulnerabilidades: Vulnerabilidad[], variable: VariableCategoricaVulnerabilidad = 'severidad'): DatoConteo[] {
+export function contarPorCategoria(
+  vulnerabilidades: Vulnerabilidad[],
+  variable: VariableCategoricaVulnerabilidad,
+  escala: EscalaDeClasificacion
+): DatoConteo[] {
   if (variable === 'severidad') {
-    return contarPorSeveridad(vulnerabilidades.map((v) => v.cvssScore.valor));
+    return contarPorNivelDeRiesgo(vulnerabilidades.map((v) => v.cvssScore.valor), escala);
   }
 
   const categorias = CATEGORIAS_POR_VARIABLE[variable];
   const conteos = new Map(categorias.map((etiqueta) => [etiqueta, 0]));
   vulnerabilidades.forEach((v) => {
-    const etiqueta = obtenerValorCategorico(v, variable);
+    const etiqueta = obtenerValorCategorico(v, variable, escala);
     conteos.set(etiqueta, (conteos.get(etiqueta) ?? 0) + 1);
   });
 
@@ -155,6 +158,7 @@ export function contarPorCategoria(vulnerabilidades: Vulnerabilidad[], variable:
 // generarDatosCvssPorAcceso, verificado con test de equivalencia.
 export function generarDatosPromedioPorCategoria(
   vulnerabilidades: Vulnerabilidad[],
+  escala: EscalaDeClasificacion,
   variableAgrupacion: VariableCategoricaVulnerabilidad = 'tipoAcceso',
   variableValor: VariableNumericaVulnerabilidad = 'cvssScore'
 ): DatoConteo[] {
@@ -162,7 +166,7 @@ export function generarDatosPromedioPorCategoria(
 
   return categorias.map((etiqueta) => {
     const valores = vulnerabilidades
-      .filter((v) => obtenerValorCategorico(v, variableAgrupacion) === etiqueta)
+      .filter((v) => obtenerValorCategorico(v, variableAgrupacion, escala) === etiqueta)
       .map((v) => obtenerValorNumerico(v, variableValor))
       .filter((v): v is number => v !== undefined);
 

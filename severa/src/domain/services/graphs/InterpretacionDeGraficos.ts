@@ -26,7 +26,7 @@ const UMBRAL_DIFERENCIA_DESPRECIABLE = 0.05;
 export function interpretarHistogramaCvss(datos: DatosHistogramaCvss): string {
   return (
     `La distribución tiene media ${datos.media.toFixed(2)} y mediana ${datos.mediana.toFixed(2)} — su cercanía indica que la ` +
-    'severidad alta no es un puñado de casos aislados, sino un patrón consistente en buena parte de la muestra.'
+    'concentración de puntajes CVSS altos no es un puñado de casos aislados, sino un patrón consistente en buena parte de la muestra.'
   );
 }
 
@@ -41,25 +41,26 @@ export function interpretarHistogramaDiasParche(datos: DatosHistogramaCvss): str
   return `El tiempo promedio de espera es de ${datos.media.toFixed(1)} días.`;
 }
 
-// El total de vulnerabilidades no se recibe aparte: contarPorSeveridad
-// siempre devuelve las 4 categorías completas, así que sumar `datos` YA da
-// el total (mismo dato, sin pedirlo dos veces).
-export function interpretarBarrasSeveridad(datos: DatoConteo[]): string {
+// El total de vulnerabilidades no se recibe aparte: contarPorNivelDeRiesgo
+// siempre devuelve los 4 niveles completos, así que sumar `datos` YA da el
+// total (mismo dato, sin pedirlo dos veces). Los niveles salen de la escala
+// del analista (RF-28 / RF-69), que el gráfico dice en su nota.
+export function interpretarBarrasNivelDeRiesgo(datos: DatoConteo[]): string {
   const total = datos.reduce((acumulado, item) => acumulado + item.valor, 0);
   const criticasYAltas = datos
-    .filter((item) => item.etiqueta === 'Crítica' || item.etiqueta === 'Alta')
+    .filter((item) => item.etiqueta === 'Crítico' || item.etiqueta === 'Alto')
     .reduce((acumulado, item) => acumulado + item.valor, 0);
   const porcentaje = total === 0 ? 0 : (criticasYAltas / total) * 100;
-  return `${porcentaje.toFixed(1)}% de las vulnerabilidades analizadas son Crítica o Alta.`;
+  return `${porcentaje.toFixed(1)}% de las vulnerabilidades analizadas tienen nivel de riesgo Crítico o Alto.`;
 }
 
-export function interpretarPastelSeveridad(): string {
+export function interpretarPastelNivelDeRiesgo(): string {
   return 'La proporción de cada color corresponde exactamente a los porcentajes de la leyenda.';
 }
 
-// M-07 (retoma, RF-52/53): interpretarBarrasSeveridad calcula "% Crítica o
-// Alta", un concepto que solo tiene sentido para severidad — no hay un
-// "Crítica o Alta" de tipoAcceso ni de estadoRemediacion. Para esas otras
+// M-07 (retoma, RF-52/53): interpretarBarrasNivelDeRiesgo calcula "% Crítico
+// o Alto", un concepto que solo tiene sentido para el nivel de riesgo — no hay
+// un "Crítico o Alto" de tipoAcceso ni de estadoRemediacion. Para esas otras
 // variables, en vez de forzar una noción de "gravedad" que no aplica, se
 // informa cuál categoría es la más frecuente y qué porcentaje representa —
 // interpretación honesta sobre lo que los datos realmente muestran.
@@ -88,12 +89,12 @@ export function interpretarCvssPorAcceso(datos: DatoConteo[]): string {
   const diferencia = remoto - local;
 
   if (Math.abs(diferencia) < UMBRAL_DIFERENCIA_DESPRECIABLE) {
-    return 'La severidad promedio entre acceso remoto y local es prácticamente igual en esta muestra.';
+    return 'El CVSS promedio entre acceso remoto y local es prácticamente igual en esta muestra.';
   }
 
   const cual = diferencia > 0 ? 'remoto' : 'local';
   return (
-    `Las vulnerabilidades de acceso ${cual} presentan, en promedio, una severidad ${Math.abs(diferencia).toFixed(2)} puntos mayor, ` +
+    `Las vulnerabilidades de acceso ${cual} presentan, en promedio, un CVSS ${Math.abs(diferencia).toFixed(2)} puntos mayor, ` +
     'lo que sugiere priorizar su remediación.'
   );
 }
@@ -123,8 +124,8 @@ export function interpretarDispersionCvssDias(datos: { puntos: Array<{ x: number
   }
   const fuerza =
     Math.abs(datos.correlacion) < UMBRAL_CORRELACION_DEBIL
-      ? 'una relación lineal débil: la severidad, por sí sola, no determina la velocidad de respuesta ante una vulnerabilidad.'
-      : 'una relación lineal apreciable entre severidad y tiempo de parche.';
+      ? 'una relación lineal débil: el CVSS, por sí solo, no determina la velocidad de respuesta ante una vulnerabilidad.'
+      : 'una relación lineal apreciable entre el CVSS y el tiempo de parche.';
   return `La correlación obtenida es ${datos.correlacion.toFixed(3)} — ${fuerza}`;
 }
 

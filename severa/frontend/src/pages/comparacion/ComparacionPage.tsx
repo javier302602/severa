@@ -1,7 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { useComparacionAcceso, useComparacionSoftware, useComparacionTipo, useSoftwareDisponible } from '../../hooks/useComparacion';
-import type { ComparacionGrupos } from '../../api/comparacionService';
+import {
+  useComparacionAcceso,
+  useComparacionPorCategoria,
+  useComparacionSoftware,
+  useComparacionTipo,
+  useSoftwareDisponible
+} from '../../hooks/useComparacion';
+import type { ComparacionGrupos, VariableDeAgrupacion, VariableDeValor } from '../../api/comparacionService';
+import { RotuloEscala } from '../../components/ui/RotuloEscala';
 import { Spinner } from '../../components/ui/Spinner';
 import { MensajeError } from '../../components/ui/MensajeError';
 import { EstadoVacio } from '../../components/ui/EstadoVacio';
@@ -254,6 +261,85 @@ function SeccionComparacionSoftware() {
 // vulnerabilidad, software) contra la misma forma de respuesta
 // (ComparadorDeCategorias.compararGrupos) — una sección por endpoint, mismo
 // estilo de tarjetas que ResumenEstadisticoPage.
+const VARIABLES_DE_AGRUPACION: Array<{ valor: VariableDeAgrupacion; etiqueta: string }> = [
+  { valor: 'severidad', etiqueta: 'Nivel de riesgo' },
+  { valor: 'tipoAcceso', etiqueta: 'Tipo de acceso' },
+  { valor: 'estadoRemediacion', etiqueta: 'Estado de remediación' },
+  { valor: 'tipoVulnerabilidad', etiqueta: 'Tipo de vulnerabilidad' },
+  { valor: 'software', etiqueta: 'Software' }
+];
+
+const VARIABLES_DE_VALOR: Array<{ valor: VariableDeValor; etiqueta: string }> = [
+  { valor: 'cvssScore', etiqueta: 'CVSS' },
+  { valor: 'diasParaParche', etiqueta: 'Días para parche' }
+];
+
+// M-08 (RF-62 a RF-64): comparar N categorías de una variable. Agrupar por
+// nivel de riesgo usa la escala del analista (RF-28 / RF-69), y la sección lo
+// dice con el rótulo enlazado a su configuración.
+function SeccionPorCategoria() {
+  const [agrupacion, setAgrupacion] = useState<VariableDeAgrupacion>('severidad');
+  const [valor, setValor] = useState<VariableDeValor>('cvssScore');
+  const { data, isLoading, isError, error } = useComparacionPorCategoria(agrupacion, valor);
+  const etiquetaAgrupacion = VARIABLES_DE_AGRUPACION.find((v) => v.valor === agrupacion)!.etiqueta;
+  const etiquetaValor = VARIABLES_DE_VALOR.find((v) => v.valor === valor)!.etiqueta;
+
+  return (
+    <section className="space-y-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm p-6">
+      <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Por categoría</h2>
+      <div className="flex flex-wrap items-end gap-4">
+        <label className="text-sm text-slate-700 dark:text-slate-300">
+          <span className="block font-medium">Agrupar por</span>
+          <select value={agrupacion} onChange={(evento) => setAgrupacion(evento.target.value as VariableDeAgrupacion)} className="campo-formulario mt-1">
+            {VARIABLES_DE_AGRUPACION.map((v) => (
+              <option key={v.valor} value={v.valor}>
+                {v.etiqueta}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm text-slate-700 dark:text-slate-300">
+          <span className="block font-medium">Comparar</span>
+          <select value={valor} onChange={(evento) => setValor(evento.target.value as VariableDeValor)} className="campo-formulario mt-1">
+            {VARIABLES_DE_VALOR.map((v) => (
+              <option key={v.valor} value={v.valor}>
+                {v.etiqueta}
+              </option>
+            ))}
+          </select>
+        </label>
+        {agrupacion === 'severidad' && <RotuloEscala />}
+      </div>
+
+      {isLoading && <Spinner etiqueta="Comparando…" />}
+      {isError && <MensajeError mensaje={mensajeDeError(error)} />}
+      {data && data.length === 0 && <EstadoVacio mensaje="No hay vulnerabilidades para comparar." />}
+      {data && data.length > 0 && (
+        <table className="w-full overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm text-sm">
+          <thead className="bg-slate-50 dark:bg-slate-800/60 text-left text-slate-600 dark:text-slate-400">
+            <tr>
+              <th className="px-4 py-2">{etiquetaAgrupacion}</th>
+              <th className="px-4 py-2">Cantidad</th>
+              <th className="px-4 py-2">Media de {etiquetaValor}</th>
+              <th className="px-4 py-2">Desv. estándar</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((fila) => (
+              <tr key={fila.categoria} className="border-t border-slate-100 dark:border-slate-800">
+                <td className="px-4 py-2 font-medium text-slate-900 dark:text-slate-100">{fila.categoria}</td>
+                <td className="px-4 py-2">{fila.cantidad}</td>
+                <td className="px-4 py-2">{formatearEstadistico(fila.media)}</td>
+                <td className="px-4 py-2">{formatearEstadistico(fila.desviacionEstandar)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+
 export function ComparacionPage() {
   return (
     <div className="space-y-6">
@@ -267,6 +353,7 @@ export function ComparacionPage() {
         usarHook={useComparacionTipo}
       />
       <SeccionComparacionSoftware />
+      <SeccionPorCategoria />
     </div>
   );
 }

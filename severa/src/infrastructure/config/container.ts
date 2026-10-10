@@ -331,7 +331,7 @@ export const container = {
   // de uso que alimenta la pantalla.
   exportarDistribucionFrecuenciasUseCase: new ExportarDistribucionFrecuencias(generarDistribucionFrecuenciasUseCase),
   generarGraficoUseCase: conHistorialDelCatalogo(
-    new GenerarGrafico(vulnerabilidadRepository, graficosOutputPort),
+    new GenerarGrafico(vulnerabilidadRepository, graficosOutputPort, escalaDeClasificacionRepository),
     historialDeAnalisis,
     'Graficos',
     ([, analistaId]) => analistaId
@@ -368,13 +368,13 @@ export const container = {
   // cross-tab — CompararPorTipoAcceso/CompararPorTipoDeVulnerabilidad/
   // CompararPorSoftware (arriba) quedan intactos, sin relación con estos dos.
   compararPorCategoriaUseCase: conHistorialDelCatalogo(
-    new CompararPorCategoria(vulnerabilidadRepository),
+    new CompararPorCategoria(vulnerabilidadRepository, escalaDeClasificacionRepository),
     historialDeAnalisis,
     'ComparacionPorCategorias',
     ([analistaId]) => analistaId
   ),
   compararPorCategoriasCruzadasUseCase: conHistorialDelCatalogo(
-    new CompararPorCategoriasCruzadas(vulnerabilidadRepository),
+    new CompararPorCategoriasCruzadas(vulnerabilidadRepository, escalaDeClasificacionRepository),
     historialDeAnalisis,
     'ComparacionPorCategorias',
     ([analistaId]) => analistaId

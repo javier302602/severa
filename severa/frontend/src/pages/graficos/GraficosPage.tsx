@@ -1,12 +1,13 @@
 import { TarjetaGrafico } from '../../components/graficos/TarjetaGrafico';
 import type { TipoGrafico } from '../../api/graficoService';
+import { RotuloEscala } from '../../components/ui/RotuloEscala';
 
 // M-07 (RF-51 a RF-61): los 10 gráficos del análisis estadístico.
 const GRAFICOS: Array<{ tipo: TipoGrafico; titulo: string; limite?: number }> = [
   { tipo: 'histogramaCvss', titulo: 'Histograma de CVSS Score' },
   { tipo: 'histogramaCvssAgrupado', titulo: 'Histograma de CVSS (intervalos agrupados)' },
-  { tipo: 'barrasSeveridad', titulo: 'Barras por severidad' },
-  { tipo: 'pastelSeveridad', titulo: 'Distribución por severidad' },
+  { tipo: 'barrasSeveridad', titulo: 'Barras por nivel de riesgo' },
+  { tipo: 'pastelSeveridad', titulo: 'Distribución por nivel de riesgo' },
   { tipo: 'boxplotCvss', titulo: 'Boxplot de CVSS' },
   { tipo: 'dispersionCvssDias', titulo: 'Dispersión: CVSS vs. días para parche' },
   { tipo: 'cvssPorAcceso', titulo: 'CVSS promedio por tipo de acceso' },
@@ -18,7 +19,11 @@ const GRAFICOS: Array<{ tipo: TipoGrafico; titulo: string; limite?: number }> = 
 export function GraficosPage() {
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Gráficos</h1>
+      <div className="space-y-1">
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Gráficos</h1>
+        {/* RF-28 / RF-69: con qué escala se cuentan los niveles de riesgo (también va escrita en cada gráfico por nivel). */}
+        <RotuloEscala />
+      </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {GRAFICOS.map(({ tipo, titulo, limite }) => (
           <TarjetaGrafico key={tipo} tipo={tipo} titulo={titulo} limite={limite} />

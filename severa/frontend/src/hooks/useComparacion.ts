@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { comparacionService } from '../api/comparacionService';
+import { comparacionService, type VariableDeAgrupacion, type VariableDeValor } from '../api/comparacionService';
 
 export function useComparacionAcceso() {
   return useQuery({ queryKey: ['comparacion', 'acceso'], queryFn: comparacionService.compararAcceso });
@@ -27,5 +27,14 @@ export function useSoftwareDisponible() {
   return useQuery({
     queryKey: ['comparacion', 'software-disponible'],
     queryFn: comparacionService.listarSoftwareDisponible
+  });
+}
+
+// Bajo la clave ['comparacion', …]: al cambiar la escala de niveles de riesgo
+// se vuelve a pedir (ver useEscalaDeClasificacion).
+export function useComparacionPorCategoria(variableAgrupacion: VariableDeAgrupacion, variableValor: VariableDeValor) {
+  return useQuery({
+    queryKey: ['comparacion', 'por-categoria', variableAgrupacion, variableValor],
+    queryFn: () => comparacionService.compararPorCategoria(variableAgrupacion, variableValor)
   });
 }

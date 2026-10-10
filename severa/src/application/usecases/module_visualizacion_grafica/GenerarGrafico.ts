@@ -2,6 +2,8 @@ import { Vulnerabilidad } from '../../../domain/entities/Vulnerabilidad';
 import { GenerarGraficoUseCase, TipoGrafico } from '../../ports/in/module_visualizacion_grafica/GenerarGraficoUseCase';
 import { VulnerabilidadRepository } from '../../ports/out/persistencia/repositorios/VulnerabilidadRepository';
 import { GraficosOutputPort } from '../../ports/out/graphics/GraficosOutputPort';
+import { EscalaDeClasificacionRepository } from '../../ports/out/persistencia/repositorios/EscalaDeClasificacionRepository';
+import { escalaVigente } from '../module_priorizacion_clasificacion/EscalaDeClasificacion';
 import {
   DatosHistogramaCvss,
   generarDatosHistograma,
@@ -26,9 +28,9 @@ import {
 import { VariableDeConsultaInvalidaError } from '../../../domain/errors/VariableDeConsultaInvalidaError';
 import {
   interpretarHistogramaCvss,
-  interpretarBarrasSeveridad,
+  interpretarBarrasNivelDeRiesgo,
   interpretarBarrasPorCategoria,
-  interpretarPastelSeveridad,
+  interpretarPastelNivelDeRiesgo,
   interpretarBoxplotCvss,
   interpretarHistogramaAgrupado,
   interpretarCvssPorAcceso,
@@ -55,11 +57,12 @@ const TEXTO_HISTOGRAMA: Record<
   diasParaParche: { titulo: 'Histograma de días para parche', etiquetaEje: 'Días para parche', interpretar: interpretarHistogramaDiasParche }
 };
 
-// M-07 (retoma, RF-52/53/56/57): capa de texto por variable categórica —
-// 'severidad' es textualmente idéntica a lo que ya usaba el código
-// ("Barras por severidad", "Distribución por severidad", eje "Severidad").
+// M-07 (retoma, RF-52/53/56/57): capa de texto por variable categórica.
+// 'severidad' es el nivel de riesgo (RF-28 / RF-69): se rotula así, con el
+// vocabulario unificado; el parámetro de las URLs sigue siendo
+// variable=severidad.
 const TEXTO_CATEGORIA: Record<VariableCategoricaVulnerabilidad, { tituloSufijo: string; etiquetaEje: string }> = {
-  severidad: { tituloSufijo: 'por severidad', etiquetaEje: 'Severidad' },
+  severidad: { tituloSufijo: 'por nivel de riesgo', etiquetaEje: 'Nivel de riesgo' },
   tipoAcceso: { tituloSufijo: 'por tipo de acceso', etiquetaEje: 'Tipo de acceso' },
   estadoRemediacion: { tituloSufijo: 'por estado de remediación', etiquetaEje: 'Estado de remediación' }
 };
@@ -99,7 +102,8 @@ function construirHistogramaAgrupadoGenerico(valores: number[], etiqueta: string
 export class GenerarGrafico implements GenerarGraficoUseCase {
   constructor(
     private readonly vulnerabilidadRepository: VulnerabilidadRepository,
-    private readonly graficosOutputPort: GraficosOutputPort
+    private readonly graficosOutputPort: GraficosOutputPort,
+    private readonly escalaRepository: EscalaDeClasificacionRepository
   ) {}
 
   async ejecutar(
@@ -111,6 +115,12 @@ export class GenerarGrafico implements GenerarGraficoUseCase {
     const lista = vulnerabilidades ?? await this.vulnerabilidadRepository.listar(analistaId);
     const scores = lista.map((item) => item.cvssScore.valor);
     const formato = opciones.formato ?? 'svg';
+    // RF-28 / RF-69: los gráficos por nivel de riesgo usan la escala del
+    // analista y la escriben dentro del gráfico (la lleva también el PNG o el
+    // PDF exportado, RF-61). Se clasifica en memoria sobre la misma lista que
+    // ya se traía: no se consulta más catálogo que antes.
+    const { escala } = await escalaVigente(this.escalaRepository, analistaId);
+    const notaDeEscala = (variable: VariableCategoricaVulnerabilidad) => (variable === 'severidad' ? escala.leyenda() : undefined);
 
     switch (tipo) {
       case 'histogramaCvss': {
@@ -131,18 +141,26 @@ export class GenerarGrafico implements GenerarGraficoUseCase {
       }
       case 'barrasSeveridad': {
         const variable = resolverVariableCategorica(opciones.variable, 'severidad');
-        const datos = contarPorCategoria(lista, variable);
+        const datos = contarPorCategoria(lista, variable, escala);
         const texto = TEXTO_CATEGORIA[variable];
-        const resultado = await this.graficosOutputPort.renderizarBarras(datos, formato, `Barras ${texto.tituloSufijo}`, 'Cantidad', texto.etiquetaEje);
-        const interpretar = variable === 'severidad' ? () => interpretarBarrasSeveridad(datos) : () => interpretarBarrasPorCategoria(datos, texto.etiquetaEje);
+        const resultado = await this.graficosOutputPort.renderizarBarras(
+          datos,
+          formato,
+          `Barras ${texto.tituloSufijo}`,
+          'Cantidad',
+          texto.etiquetaEje,
+          notaDeEscala(variable)
+        );
+        const interpretar =
+          variable === 'severidad' ? () => interpretarBarrasNivelDeRiesgo(datos) : () => interpretarBarrasPorCategoria(datos, texto.etiquetaEje);
         return this.envolver(formato, resultado, interpretar);
       }
       case 'pastelSeveridad': {
         const variable = resolverVariableCategorica(opciones.variable, 'severidad');
-        const datos = contarPorCategoria(lista, variable);
+        const datos = contarPorCategoria(lista, variable, escala);
         const texto = TEXTO_CATEGORIA[variable];
-        const resultado = await this.graficosOutputPort.renderizarPastel(datos, formato, `Distribución ${texto.tituloSufijo}`);
-        return this.envolver(formato, resultado, interpretarPastelSeveridad);
+        const resultado = await this.graficosOutputPort.renderizarPastel(datos, formato, `Distribución ${texto.tituloSufijo}`, notaDeEscala(variable));
+        return this.envolver(formato, resultado, interpretarPastelNivelDeRiesgo);
       }
       case 'boxplotCvss': {
         // Bug real (auditoría de cierre de Mejora 4): antes mandaba
@@ -181,7 +199,7 @@ export class GenerarGrafico implements GenerarGraficoUseCase {
         // que la reemplaza sin dejar un alias sin uso.
         const variableAgrupacion = resolverVariableCategorica(opciones.variableAgrupacion, 'tipoAcceso');
         const variableValor = resolverVariableNumerica(opciones.variableValor, 'cvssScore');
-        const datos = generarDatosPromedioPorCategoria(lista, variableAgrupacion, variableValor);
+        const datos = generarDatosPromedioPorCategoria(lista, escala, variableAgrupacion, variableValor);
 
         const esCasoDefault = variableAgrupacion === 'tipoAcceso' && variableValor === 'cvssScore';
         const etiquetaAgrupacion = TEXTO_CATEGORIA[variableAgrupacion].etiquetaEje;
@@ -191,7 +209,7 @@ export class GenerarGrafico implements GenerarGraficoUseCase {
         // combinación arma un título genérico pero claro.
         const titulo = esCasoDefault ? 'CVSS por tipo de acceso' : `${etiquetaValor} por ${etiquetaAgrupacion.toLowerCase()}`;
 
-        const resultado = await this.graficosOutputPort.renderizarBarras(datos, formato, titulo, etiquetaValor, etiquetaAgrupacion);
+        const resultado = await this.graficosOutputPort.renderizarBarras(datos, formato, titulo, etiquetaValor, etiquetaAgrupacion, notaDeEscala(variableAgrupacion));
         const interpretar = esCasoDefault ? () => interpretarCvssPorAcceso(datos) : () => interpretarPromedioPorCategoria(datos, etiquetaValor);
         return this.envolver(formato, resultado, interpretar);
       }

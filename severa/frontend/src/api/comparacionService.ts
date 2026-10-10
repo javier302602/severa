@@ -17,7 +17,23 @@ export interface ComparacionGrupos {
   sdB: number | null;
 }
 
+// M-08 (RF-62 a RF-64): N categorías de una variable de agrupación, con la
+// media y la desviación de la variable de valor en cada una. Agrupar por
+// 'severidad' es agrupar por nivel de riesgo, con la escala del analista
+// (RF-28 / RF-69).
+export type VariableDeAgrupacion = 'severidad' | 'tipoAcceso' | 'estadoRemediacion' | 'tipoVulnerabilidad' | 'software';
+export type VariableDeValor = 'cvssScore' | 'diasParaParche';
+
+export interface EstadisticoPorCategoria {
+  categoria: string;
+  media: number | null;
+  desviacionEstandar: number | null;
+  cantidad: number;
+}
+
 export const comparacionService = {
+  compararPorCategoria: (variableAgrupacion: VariableDeAgrupacion, variableValor: VariableDeValor): Promise<EstadisticoPorCategoria[]> =>
+    httpClient.get('/comparacion/por-categoria', { variableAgrupacion, variableValor }),
   // /acceso no toma parámetros: el backend arma los grupos fijos
   // Remoto/Local a partir de TODO el catálogo (GET /comparacion/acceso).
   compararAcceso: (): Promise<ComparacionGrupos> => httpClient.get('/comparacion/acceso'),

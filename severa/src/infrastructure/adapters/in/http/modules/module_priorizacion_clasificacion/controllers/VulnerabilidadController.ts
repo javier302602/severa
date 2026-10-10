@@ -63,7 +63,7 @@ function armarFichaVulnerabilidad(vulnerabilidad: Vulnerabilidad, escala: Escala
     fechaCarga: vulnerabilidad.fechaCarga,
     fechaRemediacion: vulnerabilidad.fechaRemediacion ?? null,
     variableClasificacion: { variable: variableNumerica, valor: obtenerValorNumerico(vulnerabilidad, variableNumerica) },
-    variableAgrupacion: { variable: variableCategorica, valor: obtenerValorCategorico(vulnerabilidad, variableCategorica) }
+    variableAgrupacion: { variable: variableCategorica, valor: obtenerValorCategorico(vulnerabilidad, variableCategorica, escala.escala) }
   };
 }
 

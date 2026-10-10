@@ -20,8 +20,8 @@ import {
 } from './DibujoDeGraficosPdf';
 import {
   interpretarHistogramaCvss,
-  interpretarBarrasSeveridad,
-  interpretarPastelSeveridad,
+  interpretarBarrasNivelDeRiesgo,
+  interpretarPastelNivelDeRiesgo,
   interpretarBoxplotCvss,
   interpretarHistogramaAgrupado,
   interpretarDispersionCvssDias,
@@ -593,7 +593,7 @@ export function construirDefinicionesGraficos(
       fundamento: 'un gráfico de barras representa la frecuencia absoluta de una variable cualitativa ordinal.',
       relacion: `los conteos son los mismos usados para calcular el porcentaje "Crítica+Alta" de ${referencias.indicadoresDePriorizacion}.`,
       dibujar: (d) => (d.y = dibujarBarras(d, g.barrasSeveridad, { titulo: 'Gráfico 2: Distribución por severidad', etiquetaEjeX: 'Severidad', etiquetaEjeY: 'Cantidad' })),
-      analisis: (d) => parrafo(d, interpretarBarrasSeveridad(g.barrasSeveridad))
+      analisis: (d) => parrafo(d, interpretarBarrasNivelDeRiesgo(g.barrasSeveridad))
     },
     {
       numero: 3,
@@ -603,7 +603,7 @@ export function construirDefinicionesGraficos(
       fundamento: 'mismos datos del Gráfico 2, expresados como porcentaje del total en vez de conteo absoluto.',
       relacion: 'reutiliza exactamente los mismos conteos del Gráfico 2 — no se recalcula nada nuevo.',
       dibujar: (d) => (d.y = dibujarPastel(d, g.pastelSeveridad, { titulo: 'Gráfico 3: Composición por severidad' })),
-      analisis: (d) => parrafo(d, interpretarPastelSeveridad())
+      analisis: (d) => parrafo(d, interpretarPastelNivelDeRiesgo())
     },
     {
       numero: 4,

@@ -5,6 +5,7 @@ import { IdentificadorCVE } from '../../../src/domain/shared/value-objects/Ident
 import { CvssScore } from '../../../src/domain/shared/value-objects/CvssScore';
 import { TipoAccesoValue } from '../../../src/domain/shared/value-objects/TipoAcceso';
 import { VariableDeConsultaInvalidaError } from '../../../src/domain/errors/VariableDeConsultaInvalidaError';
+import { EscalaDeClasificacionRepositoryEnMemoria } from '../../dobles/EscalaDeClasificacionRepositoryEnMemoria';
 
 function repositorioFalso(vulnerabilidades: Vulnerabilidad[]): VulnerabilidadRepository {
   return {
@@ -35,7 +36,7 @@ const dataset = [
 
 describe('CompararPorCategoriasCruzadas — M-08 (retoma, RF-65)', () => {
   test('sin variables explícitas, cruza tipoAcceso (default A) x estadoRemediacion (default B)', async () => {
-    const usecase = new CompararPorCategoriasCruzadas(repositorioFalso(dataset));
+    const usecase = new CompararPorCategoriasCruzadas(repositorioFalso(dataset), new EscalaDeClasificacionRepositoryEnMemoria());
     const resultado = await usecase.ejecutar('analista-1');
 
     // Ambas vulnerabilidades quedan en 'Pendiente' (default de la entidad) -> 2 celdas observadas.
@@ -48,7 +49,7 @@ describe('CompararPorCategoriasCruzadas — M-08 (retoma, RF-65)', () => {
   });
 
   test('con variables explícitas (una abierta, una cerrada)', async () => {
-    const usecase = new CompararPorCategoriasCruzadas(repositorioFalso(dataset));
+    const usecase = new CompararPorCategoriasCruzadas(repositorioFalso(dataset), new EscalaDeClasificacionRepositoryEnMemoria());
     const resultado = await usecase.ejecutar('analista-1', 'software', 'tipoAcceso');
 
     expect(resultado).toEqual(
@@ -63,7 +64,7 @@ describe('CompararPorCategoriasCruzadas — M-08 (retoma, RF-65)', () => {
     const conDias = [
       new Vulnerabilidad('1', new IdentificadorCVE('CVE-2024-00001'), new CvssScore(9.5), 'A', new TipoAccesoValue('Sí'), 7)
     ];
-    const usecase = new CompararPorCategoriasCruzadas(repositorioFalso(conDias));
+    const usecase = new CompararPorCategoriasCruzadas(repositorioFalso(conDias), new EscalaDeClasificacionRepositoryEnMemoria());
     const resultado = (await usecase.ejecutar('analista-1', 'tipoAcceso', 'estadoRemediacion', 'diasParaParche')) as Array<{
       categoriaA: string;
       media: number | null;
@@ -73,17 +74,17 @@ describe('CompararPorCategoriasCruzadas — M-08 (retoma, RF-65)', () => {
   });
 
   test('variableAgrupacionA===variableAgrupacionB tira VariableDeConsultaInvalidaError', async () => {
-    const usecase = new CompararPorCategoriasCruzadas(repositorioFalso(dataset));
+    const usecase = new CompararPorCategoriasCruzadas(repositorioFalso(dataset), new EscalaDeClasificacionRepositoryEnMemoria());
     await expect(usecase.ejecutar('analista-1', 'tipoAcceso', 'tipoAcceso')).rejects.toThrow(VariableDeConsultaInvalidaError);
   });
 
   test('variableAgrupacionA inválida tira VariableDeConsultaInvalidaError', async () => {
-    const usecase = new CompararPorCategoriasCruzadas(repositorioFalso(dataset));
+    const usecase = new CompararPorCategoriasCruzadas(repositorioFalso(dataset), new EscalaDeClasificacionRepositoryEnMemoria());
     await expect(usecase.ejecutar('analista-1', 'noExiste', 'tipoAcceso')).rejects.toThrow(VariableDeConsultaInvalidaError);
   });
 
   test('variableValor inválida tira VariableDeConsultaInvalidaError', async () => {
-    const usecase = new CompararPorCategoriasCruzadas(repositorioFalso(dataset));
+    const usecase = new CompararPorCategoriasCruzadas(repositorioFalso(dataset), new EscalaDeClasificacionRepositoryEnMemoria());
     await expect(usecase.ejecutar('analista-1', 'tipoAcceso', 'estadoRemediacion', 'noExiste')).rejects.toThrow(
       VariableDeConsultaInvalidaError
     );
@@ -91,7 +92,7 @@ describe('CompararPorCategoriasCruzadas — M-08 (retoma, RF-65)', () => {
 
   test('con una lista de vulnerabilidades ya cargada, no consulta el repositorio', async () => {
     const repo = repositorioFalso([]);
-    const usecase = new CompararPorCategoriasCruzadas(repo);
+    const usecase = new CompararPorCategoriasCruzadas(repo, new EscalaDeClasificacionRepositoryEnMemoria());
 
     await usecase.ejecutar('analista-1', undefined, undefined, undefined, dataset);
 

@@ -2,9 +2,9 @@ import {
   interpretarHistogramaCvss,
   interpretarHistogramaAgrupado,
   interpretarHistogramaDiasParche,
-  interpretarBarrasSeveridad,
+  interpretarBarrasNivelDeRiesgo,
   interpretarBarrasPorCategoria,
-  interpretarPastelSeveridad,
+  interpretarPastelNivelDeRiesgo,
   interpretarBoxplotCvss,
   interpretarCvssPorAcceso,
   interpretarPromedioPorCategoria,
@@ -39,29 +39,29 @@ describe('InterpretacionDeGraficos', () => {
     expect(texto).toContain('12.3');
   });
 
-  test('interpretarBarrasSeveridad calcula el % de Crítica+Alta a partir de las 4 categorías, sin que se lo pasen aparte', () => {
+  test('interpretarBarrasNivelDeRiesgo calcula el % de Crítico+Alto a partir de las 4 categorías, sin que se lo pasen aparte', () => {
     const datos = [
-      { etiqueta: 'Baja', valor: 10 },
-      { etiqueta: 'Media', valor: 40 },
-      { etiqueta: 'Alta', valor: 30 },
-      { etiqueta: 'Crítica', valor: 20 }
+      { etiqueta: 'Bajo', valor: 10 },
+      { etiqueta: 'Moderado', valor: 40 },
+      { etiqueta: 'Alto', valor: 30 },
+      { etiqueta: 'Crítico', valor: 20 }
     ];
     // (30+20)/100 = 50%
-    expect(interpretarBarrasSeveridad(datos)).toContain('50.0%');
+    expect(interpretarBarrasNivelDeRiesgo(datos)).toBe('50.0% de las vulnerabilidades analizadas tienen nivel de riesgo Crítico o Alto.');
   });
 
-  test('interpretarBarrasSeveridad con total 0 no divide por cero', () => {
+  test('interpretarBarrasNivelDeRiesgo con total 0 no divide por cero', () => {
     const datos = [
-      { etiqueta: 'Baja', valor: 0 },
-      { etiqueta: 'Media', valor: 0 },
-      { etiqueta: 'Alta', valor: 0 },
-      { etiqueta: 'Crítica', valor: 0 }
+      { etiqueta: 'Bajo', valor: 0 },
+      { etiqueta: 'Moderado', valor: 0 },
+      { etiqueta: 'Alto', valor: 0 },
+      { etiqueta: 'Crítico', valor: 0 }
     ];
-    expect(interpretarBarrasSeveridad(datos)).toContain('0.0%');
+    expect(interpretarBarrasNivelDeRiesgo(datos)).toContain('0.0%');
   });
 
-  test('interpretarPastelSeveridad es texto fijo (mismos datos que las barras, solo cambia la presentación)', () => {
-    expect(interpretarPastelSeveridad()).toContain('leyenda');
+  test('interpretarPastelNivelDeRiesgo es texto fijo (mismos datos que las barras, solo cambia la presentación)', () => {
+    expect(interpretarPastelNivelDeRiesgo()).toContain('leyenda');
   });
 
   // M-07 (retoma, RF-52/53): interpretación genérica para variables

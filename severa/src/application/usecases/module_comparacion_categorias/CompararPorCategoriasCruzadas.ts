@@ -1,6 +1,8 @@
 import { Vulnerabilidad } from '../../../domain/entities/Vulnerabilidad';
 import { CompararPorCategoriasCruzadasUseCase } from '../../ports/in/module_comparacion_categorias/CompararPorCategoriasCruzadasUseCase';
 import { VulnerabilidadRepository } from '../../ports/out/persistencia/repositorios/VulnerabilidadRepository';
+import { EscalaDeClasificacionRepository } from '../../ports/out/persistencia/repositorios/EscalaDeClasificacionRepository';
+import { escalaVigente } from '../module_priorizacion_clasificacion/EscalaDeClasificacion';
 import { compararPorCategoriasCruzadas, resolverVariableAgrupacion } from '../../../domain/services/inferential-statistics/ComparacionPorCategoriasGenerico';
 import { esVariableNumericaValida, VariableNumericaVulnerabilidad } from '../../../domain/services/classification/VariablesVulnerabilidad';
 import { VariableDeConsultaInvalidaError } from '../../../domain/errors/VariableDeConsultaInvalidaError';
@@ -18,7 +20,12 @@ function resolverVariableValor(valor: string | undefined): VariableNumericaVulne
 }
 
 export class CompararPorCategoriasCruzadas implements CompararPorCategoriasCruzadasUseCase {
-  constructor(private readonly vulnerabilidadRepository: VulnerabilidadRepository) {}
+  // RF-28 / RF-69: agrupar por nivel de riesgo ('severidad') usa la escala del
+  // analista, con el vocabulario unificado.
+  constructor(
+    private readonly vulnerabilidadRepository: VulnerabilidadRepository,
+    private readonly escalaRepository: EscalaDeClasificacionRepository
+  ) {}
 
   async ejecutar(
     analistaId: string,
@@ -32,6 +39,7 @@ export class CompararPorCategoriasCruzadas implements CompararPorCategoriasCruza
     const agrupacionB = resolverVariableAgrupacion(variableAgrupacionB ?? VARIABLE_AGRUPACION_B_POR_DEFECTO);
     const valor = resolverVariableValor(variableValor);
 
-    return compararPorCategoriasCruzadas(lista, agrupacionA, agrupacionB, valor);
+    const { escala } = await escalaVigente(this.escalaRepository, analistaId);
+    return compararPorCategoriasCruzadas(lista, agrupacionA, agrupacionB, escala, valor);
   }
 }

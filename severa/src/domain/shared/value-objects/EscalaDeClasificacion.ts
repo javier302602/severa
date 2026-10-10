@@ -115,6 +115,13 @@ export class EscalaDeClasificacion {
     return NIVELES_DE_RIESGO.map((nivel) => this.rango(nivel));
   }
 
+  // La línea que acompaña todo lo que sale de la aplicación con niveles de
+  // riesgo (un Excel, un gráfico exportado), para que se sepa con qué escala
+  // se clasificó.
+  leyenda(): string {
+    return `Niveles de riesgo según: ${this.describir()}`;
+  }
+
   // Cómo se nombra la escala en pantallas, informes y exportaciones.
   describir(): string {
     if (this.esCvss) return 'Escala CVSS (por defecto)';

@@ -8,6 +8,7 @@ import {
   obtenerValorCategorico,
   obtenerValorNumerico
 } from '../classification/VariablesVulnerabilidad';
+import { EscalaDeClasificacion, NIVELES_DE_RIESGO } from '../../shared/value-objects/EscalaDeClasificacion';
 
 // M-08 (retoma, RF-62/63/64/65/67). Archivo NUEVO y separado de
 // ComparadorDeCategorias.ts a propósito: compararGrupos()/ComparacionGrupos
@@ -44,9 +45,9 @@ export type VariableAgrupacionVulnerabilidad =
   | { tipo: 'cerrada'; variable: VariableCategoricaVulnerabilidad }
   | { tipo: 'abierta'; variable: VariableCategoricaAbiertaVulnerabilidad };
 
-function obtenerClaveDeAgrupacion(vulnerabilidad: Vulnerabilidad, variable: VariableAgrupacionVulnerabilidad): string {
+function obtenerClaveDeAgrupacion(vulnerabilidad: Vulnerabilidad, variable: VariableAgrupacionVulnerabilidad, escala: EscalaDeClasificacion): string {
   return variable.tipo === 'cerrada'
-    ? obtenerValorCategorico(vulnerabilidad, variable.variable)
+    ? obtenerValorCategorico(vulnerabilidad, variable.variable, escala)
     : obtenerValorCategoricoAbierto(vulnerabilidad, variable.variable);
 }
 
@@ -57,7 +58,8 @@ function obtenerClaveDeAgrupacion(vulnerabilidad: Vulnerabilidad, variable: Vari
 // evita acoplar el dominio de "comparación" (M-08) al de "gráficos" (M-07),
 // que son conceptualmente aparte aunque lean la misma entidad.
 const CATEGORIAS_POR_VARIABLE_CERRADA: Record<VariableCategoricaVulnerabilidad, string[]> = {
-  severidad: ['Baja', 'Media', 'Alta', 'Crítica'],
+  // RF-28 / RF-69: el nivel de riesgo, con el vocabulario unificado.
+  severidad: [...NIVELES_DE_RIESGO],
   tipoAcceso: ['Remoto', 'Local'],
   estadoRemediacion: ['Pendiente', 'EnProceso', 'Remediada']
 };
@@ -104,12 +106,13 @@ export interface EstadisticoPorCategoria {
 export function compararPorCategorias(
   vulnerabilidades: Vulnerabilidad[],
   variableAgrupacion: VariableAgrupacionVulnerabilidad,
+  escala: EscalaDeClasificacion,
   variableValor: VariableNumericaVulnerabilidad = 'cvssScore'
 ): EstadisticoPorCategoria[] {
   const categorias = obtenerCategoriasDeAgrupacion(vulnerabilidades, variableAgrupacion);
 
   return categorias.map((categoria) => {
-    const delGrupo = vulnerabilidades.filter((v) => obtenerClaveDeAgrupacion(v, variableAgrupacion) === categoria);
+    const delGrupo = vulnerabilidades.filter((v) => obtenerClaveDeAgrupacion(v, variableAgrupacion, escala) === categoria);
     const valores = delGrupo.map((v) => obtenerValorNumerico(v, variableValor)).filter((v): v is number => v !== undefined);
 
     return {
@@ -145,6 +148,7 @@ export function compararPorCategoriasCruzadas(
   vulnerabilidades: Vulnerabilidad[],
   variableAgrupacionA: VariableAgrupacionVulnerabilidad,
   variableAgrupacionB: VariableAgrupacionVulnerabilidad,
+  escala: EscalaDeClasificacion,
   variableValor: VariableNumericaVulnerabilidad = 'cvssScore'
 ): CeldaComparacionCruzada[] {
   if (mismaVariableDeAgrupacion(variableAgrupacionA, variableAgrupacionB)) {
@@ -153,8 +157,8 @@ export function compararPorCategoriasCruzadas(
 
   const grupos = new Map<string, Vulnerabilidad[]>();
   vulnerabilidades.forEach((v) => {
-    const categoriaA = obtenerClaveDeAgrupacion(v, variableAgrupacionA);
-    const categoriaB = obtenerClaveDeAgrupacion(v, variableAgrupacionB);
+    const categoriaA = obtenerClaveDeAgrupacion(v, variableAgrupacionA, escala);
+    const categoriaB = obtenerClaveDeAgrupacion(v, variableAgrupacionB, escala);
     const clave = JSON.stringify([categoriaA, categoriaB]);
     const grupo = grupos.get(clave);
     if (grupo) {

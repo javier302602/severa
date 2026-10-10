@@ -12,6 +12,7 @@ import { IdentificadorCVE } from '../../../../src/domain/shared/value-objects/Id
 import { CvssScore } from '../../../../src/domain/shared/value-objects/CvssScore';
 import { TipoAccesoValue } from '../../../../src/domain/shared/value-objects/TipoAcceso';
 import { EstadoRemediacionValue } from '../../../../src/domain/shared/value-objects/EstadoRemediacion';
+import { EscalaDeClasificacion } from '../../../../src/domain/shared/value-objects/EscalaDeClasificacion';
 
 function vulnerabilidadDePrueba(overrides: {
   cvss?: number;
@@ -72,25 +73,29 @@ describe('VariablesVulnerabilidad — M-04 (retoma), Modo A', () => {
 
   describe('obtenerValorCategorico', () => {
     test('tipoAcceso devuelve "Remoto"/"Local" tal cual el value object', () => {
-      expect(obtenerValorCategorico(vulnerabilidadDePrueba({ tipoAcceso: 'Sí' }), 'tipoAcceso')).toBe('Remoto');
-      expect(obtenerValorCategorico(vulnerabilidadDePrueba({ tipoAcceso: 'No' }), 'tipoAcceso')).toBe('Local');
+      expect(obtenerValorCategorico(vulnerabilidadDePrueba({ tipoAcceso: 'Sí' }), 'tipoAcceso', EscalaDeClasificacion.CVSS)).toBe('Remoto');
+      expect(obtenerValorCategorico(vulnerabilidadDePrueba({ tipoAcceso: 'No' }), 'tipoAcceso', EscalaDeClasificacion.CVSS)).toBe('Local');
     });
 
     test('tipoAcceso ausente en la entidad usa "Local" como default (mismo criterio que la ficha, Sprint 17)', () => {
       const sinTipoAcceso = new Vulnerabilidad('1', new IdentificadorCVE('CVE-2021-44228'), new CvssScore(9.8), 'Apache Log4j');
-      expect(obtenerValorCategorico(sinTipoAcceso, 'tipoAcceso')).toBe('Local');
+      expect(obtenerValorCategorico(sinTipoAcceso, 'tipoAcceso', EscalaDeClasificacion.CVSS)).toBe('Local');
     });
 
     test('estadoRemediacion devuelve el valor del value object (default "Pendiente")', () => {
-      expect(obtenerValorCategorico(vulnerabilidadDePrueba(), 'estadoRemediacion')).toBe('Pendiente');
+      expect(obtenerValorCategorico(vulnerabilidadDePrueba(), 'estadoRemediacion', EscalaDeClasificacion.CVSS)).toBe('Pendiente');
     });
 
-    test('severidad se recalcula en memoria a partir de cvssScore (no es un campo propio de la entidad)', () => {
+    test('severidad es el nivel de riesgo, calculado en memoria con la escala recibida (RF-28 / RF-69)', () => {
       const critica = vulnerabilidadDePrueba({ cvss: 9.8 });
       const baja = vulnerabilidadDePrueba({ cvss: 1.0 });
+      const ochoSiete = vulnerabilidadDePrueba({ cvss: 8.7 });
+      const propia = EscalaDeClasificacion.personalizada({ moderado: 4, alto: 7, critico: 8.5 });
 
-      expect(obtenerValorCategorico(critica, 'severidad')).toBe('Crítica');
-      expect(obtenerValorCategorico(baja, 'severidad')).toBe('Baja');
+      expect(obtenerValorCategorico(critica, 'severidad', EscalaDeClasificacion.CVSS)).toBe('Crítico');
+      expect(obtenerValorCategorico(baja, 'severidad', EscalaDeClasificacion.CVSS)).toBe('Bajo');
+      expect(obtenerValorCategorico(ochoSiete, 'severidad', EscalaDeClasificacion.CVSS)).toBe('Alto');
+      expect(obtenerValorCategorico(ochoSiete, 'severidad', propia)).toBe('Crítico');
     });
   });
 

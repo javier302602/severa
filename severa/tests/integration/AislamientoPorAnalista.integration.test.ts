@@ -203,7 +203,7 @@ describe('Multi-tenancy: aislamiento de datos por analista (Paso 5) — integrac
   // ------------------------------------------------------------------
   describe('Gráficos (GenerarGrafico — topSoftware)', () => {
     test('el top de software de B no incluye el software exclusivo de A', async () => {
-      const usecase = new GenerarGrafico(vulnerabilidadRepository, graficosOutputPortFalso());
+      const usecase = new GenerarGrafico(vulnerabilidadRepository, graficosOutputPortFalso(), new PostgresEscalaDeClasificacionRepository(pool));
 
       // formato 'json' para que envolver() devuelva el array crudo en vez de
       // envolverlo en { svg, interpretacion } (comportamiento del formato

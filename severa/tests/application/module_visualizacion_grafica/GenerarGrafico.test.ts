@@ -5,6 +5,8 @@ import { Vulnerabilidad } from '../../../src/domain/entities/Vulnerabilidad';
 import { IdentificadorCVE } from '../../../src/domain/shared/value-objects/IdentificadorCVE';
 import { CvssScore } from '../../../src/domain/shared/value-objects/CvssScore';
 import { TipoAccesoValue } from '../../../src/domain/shared/value-objects/TipoAcceso';
+import { EscalaDeClasificacionRepositoryEnMemoria } from '../../dobles/EscalaDeClasificacionRepositoryEnMemoria';
+import { EscalaDeClasificacion } from '../../../src/domain/shared/value-objects/EscalaDeClasificacion';
 
 function repoFalso(vulnerabilidades: Vulnerabilidad[]): VulnerabilidadRepository {
   return {
@@ -47,7 +49,7 @@ const dataset = [
 describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () => {
   test('formato svg (por defecto): envuelve el resultado del adapter con la interpretación real', async () => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+    const useCase = new GenerarGrafico(repoFalso(dataset), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     const resultado = await useCase.ejecutar('barrasSeveridad', 'analista-1');
 
@@ -60,7 +62,7 @@ describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () =
   test('formato json: sigue siendo el passthrough {tipo, datos} tal cual devuelve el adapter (comportamiento preexistente)', async () => {
     const port = graficosOutputPortFalso();
     port.renderizarBarras.mockResolvedValue({ tipo: 'barras', datos: [] });
-    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+    const useCase = new GenerarGrafico(repoFalso(dataset), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     const resultado = await useCase.ejecutar('barrasSeveridad', 'analista-1', { formato: 'json' });
 
@@ -71,17 +73,17 @@ describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () =
     const archivo = Buffer.from('archivo-binario');
     const port = graficosOutputPortFalso();
     port.renderizarBarras.mockResolvedValue(archivo);
-    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+    const useCase = new GenerarGrafico(repoFalso(dataset), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     const resultado = await useCase.ejecutar('barrasSeveridad', 'analista-1', { formato });
 
     expect(resultado).toBe(archivo);
-    expect(port.renderizarBarras).toHaveBeenCalledWith(expect.anything(), formato, expect.any(String), expect.any(String), expect.any(String));
+    expect(port.renderizarBarras).toHaveBeenCalledWith(expect.anything(), formato, expect.any(String), expect.any(String), expect.any(String), expect.any(String));
   });
 
   test('boxplotCvss: la interpretación usa el resumen de cinco números real, no un valor fijo', async () => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+    const useCase = new GenerarGrafico(repoFalso(dataset), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     const resultado = await useCase.ejecutar('boxplotCvss', 'analista-1');
 
@@ -90,7 +92,7 @@ describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () =
 
   test('dispersionCvssDias: sin diasParaParche en ninguna vulnerabilidad, la interpretación dice que no hay datos suficientes', async () => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+    const useCase = new GenerarGrafico(repoFalso(dataset), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     const resultado = await useCase.ejecutar('dispersionCvssDias', 'analista-1');
 
@@ -102,7 +104,7 @@ describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () =
 
   test('topSoftware: la interpretación nombra el software real más frecuente', async () => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+    const useCase = new GenerarGrafico(repoFalso(dataset), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     const resultado = await useCase.ejecutar('topSoftware', 'analista-1');
 
@@ -117,7 +119,7 @@ describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () =
   // histogramaDiasParche, topTipos, y el tipo no soportado.
   test('histogramaCvss: delega en renderizarHistograma con bins reales de los CVSS del dataset', async () => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+    const useCase = new GenerarGrafico(repoFalso(dataset), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     const resultado = await useCase.ejecutar('histogramaCvss', 'analista-1');
 
@@ -127,7 +129,7 @@ describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () =
 
   test('histogramaCvssAgrupado: delega en renderizarHistograma reutilizando generarTablaAgrupada (M-05)', async () => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+    const useCase = new GenerarGrafico(repoFalso(dataset), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     const resultado = await useCase.ejecutar('histogramaCvssAgrupado', 'analista-1');
 
@@ -137,7 +139,7 @@ describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () =
 
   test('pastelSeveridad: delega en renderizarPastel con el mismo conteo por severidad que barrasSeveridad', async () => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+    const useCase = new GenerarGrafico(repoFalso(dataset), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     const resultado = await useCase.ejecutar('pastelSeveridad', 'analista-1');
 
@@ -147,17 +149,17 @@ describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () =
 
   test('cvssPorAcceso: delega en renderizarBarras con el promedio de CVSS por tipo de acceso', async () => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+    const useCase = new GenerarGrafico(repoFalso(dataset), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     const resultado = await useCase.ejecutar('cvssPorAcceso', 'analista-1');
 
-    expect(port.renderizarBarras).toHaveBeenCalledWith(expect.any(Array), 'svg', 'CVSS por tipo de acceso', 'CVSS Score', 'Tipo de acceso');
+    expect(port.renderizarBarras).toHaveBeenCalledWith(expect.any(Array), 'svg', 'CVSS por tipo de acceso', 'CVSS Score', 'Tipo de acceso', undefined);
     expect(resultado).toEqual({ svg: '<svg>barras</svg>', interpretacion: expect.any(String) });
   });
 
   test('histogramaDiasParche: ninguna vulnerabilidad del dataset tiene diasParaParche registrado (degrada a 0, no rompe)', async () => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+    const useCase = new GenerarGrafico(repoFalso(dataset), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     const resultado = await useCase.ejecutar('histogramaDiasParche', 'analista-1');
 
@@ -170,7 +172,7 @@ describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () =
 
   test('histogramaDiasParche: dataset vacío responde "no hay vulnerabilidades" (bins realmente vacíos, no solo en 0)', async () => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso([]), port);
+    const useCase = new GenerarGrafico(repoFalso([]), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     const resultado = await useCase.ejecutar('histogramaDiasParche', 'analista-1');
 
@@ -182,7 +184,7 @@ describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () =
 
   test('topTipos: delega en renderizarBarrasHorizontales, excluyendo "Sin clasificar"/"N/A" del ranking', async () => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+    const useCase = new GenerarGrafico(repoFalso(dataset), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     const resultado = await useCase.ejecutar('topTipos', 'analista-1');
 
@@ -192,7 +194,7 @@ describe('GenerarGrafico — formato svg devuelve { svg, interpretacion }', () =
 
   test('tipo de gráfico no soportado lanza un error claro', async () => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+    const useCase = new GenerarGrafico(repoFalso(dataset), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     await expect(useCase.ejecutar('noExiste' as never, 'analista-1')).rejects.toThrow('Tipo de gráfico no soportado');
   });
@@ -211,7 +213,7 @@ describe('GenerarGrafico — M-07 retoma: variable configurable', () => {
 
   test('RETROCOMPATIBILIDAD: histogramaCvss sin variable da exactamente el título/etiqueta de siempre', async () => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+    const useCase = new GenerarGrafico(repoFalso(dataset), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     await useCase.ejecutar('histogramaCvss', 'analista-1');
 
@@ -220,7 +222,7 @@ describe('GenerarGrafico — M-07 retoma: variable configurable', () => {
 
   test('histogramaCvss con variable="diasParaParche" usa el título/etiqueta de esa variable', async () => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso(datasetConDias), port);
+    const useCase = new GenerarGrafico(repoFalso(datasetConDias), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     await useCase.ejecutar('histogramaCvss', 'analista-1', { variable: 'diasParaParche' });
 
@@ -229,7 +231,7 @@ describe('GenerarGrafico — M-07 retoma: variable configurable', () => {
 
   test('histogramaCvssAgrupado con variable="diasParaParche" reparte el rango real de los datos (no 0-10)', async () => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso(datasetConDias), port);
+    const useCase = new GenerarGrafico(repoFalso(datasetConDias), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     const resultado = await useCase.ejecutar('histogramaCvssAgrupado', 'analista-1', { variable: 'diasParaParche', formato: 'json' });
 
@@ -239,18 +241,60 @@ describe('GenerarGrafico — M-07 retoma: variable configurable', () => {
     expect(resultado).toBe('<svg>histograma</svg>');
   });
 
-  test('RETROCOMPATIBILIDAD: barrasSeveridad sin variable delega en el conteo por severidad de siempre', async () => {
+  test('RETROCOMPATIBILIDAD: barrasSeveridad sin variable cuenta por nivel de riesgo, rotulado así y con la escala escrita en el gráfico', async () => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+    const useCase = new GenerarGrafico(repoFalso(dataset), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     await useCase.ejecutar('barrasSeveridad', 'analista-1');
 
-    expect(port.renderizarBarras).toHaveBeenCalledWith(expect.anything(), 'svg', 'Barras por severidad', 'Cantidad', 'Severidad');
+    expect(port.renderizarBarras).toHaveBeenCalledWith(
+      [
+        { etiqueta: 'Bajo', valor: 0 },
+        { etiqueta: 'Moderado', valor: 1 },
+        { etiqueta: 'Alto', valor: 0 },
+        { etiqueta: 'Crítico', valor: 1 }
+      ],
+      'svg',
+      'Barras por nivel de riesgo',
+      'Cantidad',
+      'Nivel de riesgo',
+      'Niveles de riesgo según: Escala CVSS (por defecto)'
+    );
+  });
+
+  test('RF-28 / RF-69: barras y pastel por nivel usan la escala vigente del analista, y la nota la nombra (también en PNG y PDF)', async () => {
+    const ochoSiete = new Vulnerabilidad('3', new IdentificadorCVE('CVE-2021-08700'), new CvssScore(8.7), 'Router', new TipoAccesoValue('Sí'));
+    const escalas = new EscalaDeClasificacionRepositoryEnMemoria();
+    const propia = EscalaDeClasificacion.personalizada({ moderado: 4, alto: 7, critico: 8.5 });
+    await escalas.guardar('analista-1', propia);
+    const port = graficosOutputPortFalso();
+    const useCase = new GenerarGrafico(repoFalso([...dataset, ochoSiete]), port, escalas);
+
+    await useCase.ejecutar('barrasSeveridad', 'analista-1', { formato: 'png' });
+    await useCase.ejecutar('pastelSeveridad', 'analista-1', { formato: 'pdf' });
+
+    const conteo = [
+      { etiqueta: 'Bajo', valor: 0 },
+      { etiqueta: 'Moderado', valor: 1 },
+      { etiqueta: 'Alto', valor: 0 },
+      { etiqueta: 'Crítico', valor: 2 }
+    ];
+    expect(port.renderizarBarras).toHaveBeenCalledWith(conteo, 'png', 'Barras por nivel de riesgo', 'Cantidad', 'Nivel de riesgo', propia.leyenda());
+    expect(port.renderizarPastel).toHaveBeenCalledWith(conteo, 'pdf', 'Distribución por nivel de riesgo', propia.leyenda());
+  });
+
+  test('un gráfico que no depende del nivel de riesgo no lleva la nota de escala', async () => {
+    const port = graficosOutputPortFalso();
+    const useCase = new GenerarGrafico(repoFalso(dataset), port, new EscalaDeClasificacionRepositoryEnMemoria());
+
+    await useCase.ejecutar('barrasSeveridad', 'analista-1', { variable: 'tipoAcceso' });
+
+    expect(port.renderizarBarras.mock.calls[0][5]).toBeUndefined();
   });
 
   test('barrasSeveridad con variable="tipoAcceso" cuenta por Remoto/Local en vez de severidad', async () => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+    const useCase = new GenerarGrafico(repoFalso(dataset), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     await useCase.ejecutar('barrasSeveridad', 'analista-1', { variable: 'tipoAcceso' });
 
@@ -259,13 +303,14 @@ describe('GenerarGrafico — M-07 retoma: variable configurable', () => {
       'svg',
       'Barras por tipo de acceso',
       'Cantidad',
-      'Tipo de acceso'
+      'Tipo de acceso',
+      undefined
     );
   });
 
   test('pastelSeveridad con variable="estadoRemediacion" cuenta por las 3 categorías de estado', async () => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+    const useCase = new GenerarGrafico(repoFalso(dataset), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     await useCase.ejecutar('pastelSeveridad', 'analista-1', { variable: 'estadoRemediacion' });
 
@@ -276,22 +321,23 @@ describe('GenerarGrafico — M-07 retoma: variable configurable', () => {
         { etiqueta: 'Remediada', valor: 0 }
       ],
       'svg',
-      'Distribución por estado de remediación'
+      'Distribución por estado de remediación',
+      undefined
     );
   });
 
   test('RETROCOMPATIBILIDAD: cvssPorAcceso sin variableAgrupacion/variableValor da el título exacto de siempre', async () => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+    const useCase = new GenerarGrafico(repoFalso(dataset), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     await useCase.ejecutar('cvssPorAcceso', 'analista-1');
 
-    expect(port.renderizarBarras).toHaveBeenCalledWith(expect.any(Array), 'svg', 'CVSS por tipo de acceso', 'CVSS Score', 'Tipo de acceso');
+    expect(port.renderizarBarras).toHaveBeenCalledWith(expect.any(Array), 'svg', 'CVSS por tipo de acceso', 'CVSS Score', 'Tipo de acceso', undefined);
   });
 
   test('cvssPorAcceso con variableAgrupacion="estadoRemediacion" y variableValor="diasParaParche"', async () => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso(datasetConDias), port);
+    const useCase = new GenerarGrafico(repoFalso(datasetConDias), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     await useCase.ejecutar('cvssPorAcceso', 'analista-1', { variableAgrupacion: 'estadoRemediacion', variableValor: 'diasParaParche' });
 
@@ -300,7 +346,8 @@ describe('GenerarGrafico — M-07 retoma: variable configurable', () => {
       'svg',
       'Días para parche por estado de remediación',
       'Días para parche',
-      'Estado de remediación'
+      'Estado de remediación',
+      undefined
     );
   });
 
@@ -311,7 +358,7 @@ describe('GenerarGrafico — M-07 retoma: variable configurable', () => {
     ['cvssPorAcceso', { variableValor: 'noExiste' }]
   ])('%s con variable inválida tira VariableDeConsultaInvalidaError', async (tipo, opciones) => {
     const port = graficosOutputPortFalso();
-    const useCase = new GenerarGrafico(repoFalso(dataset), port);
+    const useCase = new GenerarGrafico(repoFalso(dataset), port, new EscalaDeClasificacionRepositoryEnMemoria());
 
     await expect(useCase.ejecutar(tipo as never, 'analista-1', opciones)).rejects.toThrow('no es una variable');
   });

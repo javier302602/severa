@@ -18,12 +18,13 @@ import { compararGrupos } from '../../../domain/services/inferential-statistics/
 import { generarRanking } from '../../../domain/services/classification/MotorDePriorizacion';
 import { generarInterpretacion } from '../../../domain/services/InterpretadorDeResultados';
 import { calcularCorrelacionPearson } from '../../../domain/services/descriptive-statistics/Correlacion';
+import { EscalaDeClasificacion } from '../../../domain/shared/value-objects/EscalaDeClasificacion';
 import { obtenerSeveridadPorDefecto } from '../../../domain/services/classification/VariablesVulnerabilidad';
 import {
   generarDatosHistogramaCvss,
   generarDatosHistogramaAgrupado,
   generarDatosHistogramaDiasParche,
-  contarPorSeveridad,
+  contarPorNivelDeRiesgo,
   generarTopN,
   generarTopTiposClasificados
 } from '../../../domain/services/graphs/GraficosEstadisticos';
@@ -178,8 +179,10 @@ export async function recopilarDatosDeInforme(
 
   const graficos = {
     histogramaCvss: generarDatosHistogramaCvss(scores),
-    barrasSeveridad: contarPorSeveridad(scores),
-    pastelSeveridad: contarPorSeveridad(scores),
+    // RF-28 / RF-69: el informe pasa a la escala del analista en la tanda (e)
+    // del Paso 2; hasta entonces clasifica con CVSS, explícito.
+    barrasSeveridad: contarPorNivelDeRiesgo(scores, EscalaDeClasificacion.CVSS),
+    pastelSeveridad: contarPorNivelDeRiesgo(scores, EscalaDeClasificacion.CVSS),
     boxplotCvss: calcularResumenCincoNumeros(scores),
     histogramaAgrupado: generarDatosHistogramaAgrupado(scores),
     boxplotPorAcceso: {

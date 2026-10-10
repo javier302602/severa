@@ -3,8 +3,8 @@ import { DatosInforme, DatosInformeDataset } from '../../../../application/ports
 import { MAPEO_PLANTILLA_UNIVERSAL_RF130, REFERENCIAS_DE_SECCION_RF130 } from '../../../../domain/services/reportes/MapeoPlantillaUniversalRF130';
 import {
   interpretarHistogramaCvss,
-  interpretarBarrasSeveridad,
-  interpretarPastelSeveridad,
+  interpretarBarrasNivelDeRiesgo,
+  interpretarPastelNivelDeRiesgo,
   interpretarBoxplotCvss,
   interpretarHistogramaAgrupado,
   interpretarDispersionCvssDias,
@@ -364,7 +364,7 @@ function construirDefinicionesGraficos(datos: DatosInforme): DefinicionGrafico[]
       fundamento: 'un gráfico de barras representa la frecuencia absoluta de una variable cualitativa ordinal.',
       relacion: `mismos conteos usados en ${REFERENCIAS_DE_SECCION_RF130.indicadoresDePriorizacion}.`,
       tablaDatos: tabla(['Severidad', 'Cantidad'], g.barrasSeveridad.map((item) => [item.etiqueta, String(item.valor)])),
-      analisis: interpretarBarrasSeveridad(g.barrasSeveridad)
+      analisis: interpretarBarrasNivelDeRiesgo(g.barrasSeveridad)
     },
     {
       numero: 3,
@@ -380,7 +380,7 @@ function construirDefinicionesGraficos(datos: DatosInforme): DefinicionGrafico[]
           return [item.etiqueta, String(item.valor), `${porcentaje.toFixed(1)}%`];
         })
       ),
-      analisis: interpretarPastelSeveridad()
+      analisis: interpretarPastelNivelDeRiesgo()
     },
     {
       numero: 4,

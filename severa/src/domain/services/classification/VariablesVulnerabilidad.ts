@@ -2,6 +2,7 @@ import { Vulnerabilidad } from '../../entities/Vulnerabilidad';
 import { CvssScore } from '../../shared/value-objects/CvssScore';
 import { NivelDeRiesgo } from '../../shared/value-objects/NivelDeRiesgo';
 import { clasificar } from './ClasificadorDeRiesgo';
+import { EscalaDeClasificacion } from '../../shared/value-objects/EscalaDeClasificacion';
 
 // RF-27/RF-28 (M-04, retoma): a diferencia de CriterioDeClasificacionValue
 // (M-09), que vive sobre RegistroDatasetGenerico — JSONB sin esquema, donde
@@ -85,17 +86,24 @@ const ETIQUETAS_SEVERIDAD_POR_DEFECTO: Record<NivelDeRiesgo, string> = {
   Crítico: 'Crítica'
 };
 
+// RF-28 / RF-69: esto es SOLO el valor que se escribe en la columna
+// `severidad` al importar (CVSS, con el vocabulario viejo). Lo que se muestra o
+// se filtra usa el nivel de riesgo con la escala del analista
+// (obtenerValorCategorico con 'severidad', EscalaDeClasificacion.clasificar).
 export function obtenerSeveridadPorDefecto(cvssScore: CvssScore): string {
   return ETIQUETAS_SEVERIDAD_POR_DEFECTO[clasificar(cvssScore).valor];
 }
 
-// tipoAcceso/estadoRemediacion son campos directos de la entidad; severidad
-// no lo es (ver nota más arriba) y se resuelve con obtenerSeveridadPorDefecto
-// a partir de cvssScore — mismo valor que ya tiene la columna denormalizada
-// para cualquier Vulnerabilidad que no haya configurado un criterio propio
-// (Modo B, diferido).
-export function obtenerValorCategorico(vulnerabilidad: Vulnerabilidad, variable: VariableCategoricaVulnerabilidad): string {
+// tipoAcceso/estadoRemediacion son campos directos de la entidad. 'severidad'
+// es el nivel de riesgo (Bajo, Moderado, Alto, Crítico) calculado con la escala
+// del analista (RF-28 / RF-69): la escala es obligatoria para que ningún
+// consumidor quede clasificando con CVSS sin querer.
+export function obtenerValorCategorico(
+  vulnerabilidad: Vulnerabilidad,
+  variable: VariableCategoricaVulnerabilidad,
+  escala: EscalaDeClasificacion
+): string {
   if (variable === 'tipoAcceso') return vulnerabilidad.tipoAcceso?.valor ?? 'Local';
   if (variable === 'estadoRemediacion') return vulnerabilidad.estadoRemediacion.valor;
-  return obtenerSeveridadPorDefecto(vulnerabilidad.cvssScore);
+  return escala.clasificar(vulnerabilidad.cvssScore.valor);
 }

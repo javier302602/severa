@@ -196,4 +196,53 @@ describe('SvgGraficosAdapter — dibuja de verdad, no un placeholder fijo', () =
     expect(await adapter.renderizarBarrasHorizontales([], 'json')).toEqual({ tipo: 'barrasHorizontales', datos: [] });
     expect(await adapter.renderizarHistograma({}, 'json')).toEqual({ tipo: 'histograma', datos: {} });
   });
+
+  // RF-28 / RF-69 + RF-61: los gráficos por nivel de riesgo llevan escrita la
+  // escala con la que se clasificó, también cuando salen como PNG o PDF.
+  describe('nota de escala dentro del gráfico', () => {
+    const niveles = [
+      { etiqueta: 'Bajo', valor: 1 },
+      { etiqueta: 'Moderado', valor: 2 },
+      { etiqueta: 'Alto', valor: 0 },
+      { etiqueta: 'Crítico', valor: 3 }
+    ];
+    const NOTA = 'Niveles de riesgo según: Escala personalizada: Moderado desde 4.0, Alto desde 7.0, Crítico desde 8.5';
+    const altoDeViewBox = (svg: string) => Number(/viewBox="0 0 [\d.]+ ([\d.]+)"/.exec(svg)?.[1]);
+    const altoDePagina = (pdf: Buffer) => Number(/\/MediaBox\s*\[\s*0\s+0\s+[\d.]+\s+([\d.]+)\s*\]/.exec(pdf.toString('latin1'))?.[1]);
+
+    test('SVG de barras y de pastel: la nota está escrita y el lienzo crece para no tapar nada', async () => {
+      const barrasSin = (await adapter.renderizarBarras(niveles, 'svg', 'Barras por nivel de riesgo')) as string;
+      const barrasCon = (await adapter.renderizarBarras(niveles, 'svg', 'Barras por nivel de riesgo', 'Cantidad', 'Nivel de riesgo', NOTA)) as string;
+      const pastelCon = (await adapter.renderizarPastel(niveles, 'svg', 'Distribución por nivel de riesgo', NOTA)) as string;
+
+      expect(barrasSin).not.toContain('Niveles de riesgo según');
+      expect(barrasCon).toContain(NOTA);
+      expect(pastelCon).toContain(NOTA);
+      expect(altoDeViewBox(barrasCon)).toBeGreaterThan(altoDeViewBox(barrasSin));
+    });
+
+    test('PNG: se rasteriza el mismo SVG con la nota (la imagen sale más alta)', async () => {
+      const sin = (await adapter.renderizarBarras(niveles, 'png', 'Barras')) as Buffer;
+      const con = (await adapter.renderizarBarras(niveles, 'png', 'Barras', 'Cantidad', 'Nivel de riesgo', NOTA)) as Buffer;
+
+      expect((await sharp(con).metadata()).height!).toBeGreaterThan((await sharp(sin).metadata()).height!);
+    });
+
+    test('PDF de barras y de pastel: la página crece para la línea de la nota', async () => {
+      const barrasSin = (await adapter.renderizarBarras(niveles, 'pdf', 'Barras')) as Buffer;
+      const barrasCon = (await adapter.renderizarBarras(niveles, 'pdf', 'Barras', 'Cantidad', 'Nivel de riesgo', NOTA)) as Buffer;
+      const pastelSin = (await adapter.renderizarPastel(niveles, 'pdf', 'Pastel')) as Buffer;
+      const pastelCon = (await adapter.renderizarPastel(niveles, 'pdf', 'Pastel', NOTA)) as Buffer;
+
+      expect(altoDePagina(barrasCon)).toBeGreaterThan(altoDePagina(barrasSin));
+      expect(altoDePagina(pastelCon)).toBeGreaterThan(altoDePagina(pastelSin));
+    });
+
+    test('los colores de los niveles se reconocen con los nombres nuevos', async () => {
+      const pastel = (await adapter.renderizarPastel(niveles, 'svg', 'Pastel')) as string;
+      expect(pastel).toContain('#8B0000');
+      expect(pastel).toContain('#ffd700');
+    });
+  });
 });
+

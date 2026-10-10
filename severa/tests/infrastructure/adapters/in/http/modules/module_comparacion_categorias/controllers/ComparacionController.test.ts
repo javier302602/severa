@@ -58,14 +58,16 @@ jest.mock('../../../../../../../../src/infrastructure/config/container', () => {
     eliminarTodas: jest.fn()
   };
 
+  const { EscalaDeClasificacionRepositoryEnMemoria } = require('../../../../../../../dobles/EscalaDeClasificacionRepositoryEnMemoria');
+
   return {
     container: {
       compararPorTipoAccesoUseCase: new CompararPorTipoAcceso(repository),
       compararPorSoftwareUseCase: new CompararPorSoftware(repository),
       compararPorTipoDeVulnerabilidadUseCase: new CompararPorTipoDeVulnerabilidad(repository),
       listarSoftwareDisponibleUseCase: new ListarSoftwareDisponible(repository),
-      compararPorCategoriaUseCase: new CompararPorCategoria(repository),
-      compararPorCategoriasCruzadasUseCase: new CompararPorCategoriasCruzadas(repository)
+      compararPorCategoriaUseCase: new CompararPorCategoria(repository, new EscalaDeClasificacionRepositoryEnMemoria()),
+      compararPorCategoriasCruzadasUseCase: new CompararPorCategoriasCruzadas(repository, new EscalaDeClasificacionRepositoryEnMemoria())
     }
   };
 });

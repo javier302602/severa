@@ -5,6 +5,20 @@ detectó y todavía no se resolvió; cada entrada dice en qué paso del plan se
 atiende. Al cerrar una, se borra de este archivo y el commit que la resuelve
 lo dice.
 
+## Paso 2 — Escala de clasificación (tanda d)
+
+- **El CVSS se clasifica al importar con un valor distinto del que queda
+  guardado.** Encontrado por Angel el 2026-10-10. `LectorExcelDataset` (y la
+  sincronización con NVD) crea el `CvssScore` con el número crudo del archivo,
+  pero `cvss_score` es `NUMERIC(3,1)` y PostgreSQL lo redondea: un 8.95 queda
+  guardado como 9.0 (Crítico en el catálogo), pero en memoria, durante la
+  importación, sigue siendo 8.95, así que `esVulnerabilidadCritica` no lo
+  detecta y el resumen de importación no lo cuenta. Hay que redondear a un
+  decimal al leer (archivo y NVD) con la misma regla que PostgreSQL (mitad
+  hacia arriba, sobre el valor decimal y no sobre el binario), con un test de
+  integración que compare lo que clasifica el dominio al importar con lo que
+  queda guardado para 3.95, 6.95 y 8.95.
+
 ## Paso 4 — Trazabilidad (RF que existen en el backend pero no en la interfaz)
 
 - **RF-139 / RF-69 / RF-70 en el camino genérico.** El criterio de

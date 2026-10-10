@@ -9,6 +9,9 @@ import { IdentificadorCVE } from '../../../../src/domain/shared/value-objects/Id
 import { CvssScore } from '../../../../src/domain/shared/value-objects/CvssScore';
 import { TipoAccesoValue } from '../../../../src/domain/shared/value-objects/TipoAcceso';
 import { VariableDeConsultaInvalidaError } from '../../../../src/domain/errors/VariableDeConsultaInvalidaError';
+import { EscalaDeClasificacion } from '../../../../src/domain/shared/value-objects/EscalaDeClasificacion';
+
+const CVSS = EscalaDeClasificacion.CVSS;
 
 function v(
   id: string,
@@ -65,7 +68,7 @@ describe('ComparacionPorCategoriasGenerico — M-08 (retoma, RF-62/63/64/65/67)'
 
     test('variable cerrada (tipoAcceso): siembra las 2 categorías conocidas, incluida una sin datos', () => {
       const soloRemoto = [dataset[0], dataset[1]];
-      const resultado = compararPorCategorias(soloRemoto, { tipo: 'cerrada', variable: 'tipoAcceso' });
+      const resultado = compararPorCategorias(soloRemoto, { tipo: 'cerrada', variable: 'tipoAcceso' }, CVSS);
 
       expect(resultado).toEqual([
         { categoria: 'Remoto', media: 9, desviacionEstandar: expect.any(Number), cantidad: 2 },
@@ -74,7 +77,7 @@ describe('ComparacionPorCategoriasGenerico — M-08 (retoma, RF-62/63/64/65/67)'
     });
 
     test('variable cerrada (estadoRemediacion): siembra las 3 categorías, todas en Pendiente por defecto', () => {
-      const resultado = compararPorCategorias(dataset, { tipo: 'cerrada', variable: 'estadoRemediacion' });
+      const resultado = compararPorCategorias(dataset, { tipo: 'cerrada', variable: 'estadoRemediacion' }, CVSS);
 
       expect(resultado).toEqual([
         { categoria: 'Pendiente', media: expect.any(Number), desviacionEstandar: expect.any(Number), cantidad: 3 },
@@ -84,7 +87,7 @@ describe('ComparacionPorCategoriasGenerico — M-08 (retoma, RF-62/63/64/65/67)'
     });
 
     test('variable abierta (software): descubre los valores reales, sin inventar categorías vacías', () => {
-      const resultado = compararPorCategorias(dataset, { tipo: 'abierta', variable: 'software' });
+      const resultado = compararPorCategorias(dataset, { tipo: 'abierta', variable: 'software' }, CVSS);
 
       expect(resultado).toEqual([
         { categoria: 'Apache Log4j', media: 9, desviacionEstandar: expect.any(Number), cantidad: 2 },
@@ -93,7 +96,7 @@ describe('ComparacionPorCategoriasGenerico — M-08 (retoma, RF-62/63/64/65/67)'
     });
 
     test('variable abierta (tipoVulnerabilidad): un valor por vulnerabilidad, 3 categorías reales', () => {
-      const resultado = compararPorCategorias(dataset, { tipo: 'abierta', variable: 'tipoVulnerabilidad' });
+      const resultado = compararPorCategorias(dataset, { tipo: 'abierta', variable: 'tipoVulnerabilidad' }, CVSS);
 
       expect(resultado.map((r) => r.categoria).sort()).toEqual(['DoS', 'Log4Shell', 'RCE']);
       expect(resultado.every((r) => r.cantidad === 1)).toBe(true);
@@ -104,7 +107,7 @@ describe('ComparacionPorCategoriasGenerico — M-08 (retoma, RF-62/63/64/65/67)'
         v('1', 9.0, 'Sí', 'A', 'X', 5),
         v('2', 8.0, 'Sí', 'A', 'X', undefined)
       ];
-      const resultado = compararPorCategorias(conYSinDias, { tipo: 'cerrada', variable: 'tipoAcceso' }, 'diasParaParche');
+      const resultado = compararPorCategorias(conYSinDias, { tipo: 'cerrada', variable: 'tipoAcceso' }, CVSS, 'diasParaParche');
 
       const remoto = resultado.find((r) => r.categoria === 'Remoto')!;
       expect(remoto.cantidad).toBe(2); // 2 registros, aunque solo 1 tenga diasParaParche
@@ -113,7 +116,7 @@ describe('ComparacionPorCategoriasGenerico — M-08 (retoma, RF-62/63/64/65/67)'
     });
 
     test('variableValor por defecto es cvssScore', () => {
-      const resultado = compararPorCategorias([dataset[2]], { tipo: 'cerrada', variable: 'tipoAcceso' });
+      const resultado = compararPorCategorias([dataset[2]], { tipo: 'cerrada', variable: 'tipoAcceso' }, CVSS);
       expect(resultado.find((r) => r.categoria === 'Local')?.media).toBe(2.0);
     });
   });
@@ -126,11 +129,7 @@ describe('ComparacionPorCategoriasGenerico — M-08 (retoma, RF-62/63/64/65/67)'
     ];
 
     test('cerrada x cerrada (tipoAcceso x estadoRemediacion): solo celdas observadas', () => {
-      const resultado = compararPorCategoriasCruzadas(
-        dataset,
-        { tipo: 'cerrada', variable: 'tipoAcceso' },
-        { tipo: 'cerrada', variable: 'estadoRemediacion' }
-      );
+      const resultado = compararPorCategoriasCruzadas(dataset, { tipo: 'cerrada', variable: 'tipoAcceso' }, { tipo: 'cerrada', variable: 'estadoRemediacion' }, CVSS);
 
       // 3 celdas observadas de las 6 posibles (2x3) — nunca un cartesiano completo.
       expect(resultado).toHaveLength(3);
@@ -144,22 +143,14 @@ describe('ComparacionPorCategoriasGenerico — M-08 (retoma, RF-62/63/64/65/67)'
     });
 
     test('cerrada x abierta (tipoAcceso x software)', () => {
-      const resultado = compararPorCategoriasCruzadas(
-        dataset,
-        { tipo: 'cerrada', variable: 'tipoAcceso' },
-        { tipo: 'abierta', variable: 'software' }
-      );
+      const resultado = compararPorCategoriasCruzadas(dataset, { tipo: 'cerrada', variable: 'tipoAcceso' }, { tipo: 'abierta', variable: 'software' }, CVSS);
 
       expect(resultado).toHaveLength(3);
       expect(resultado.some((c) => c.categoriaA === 'Remoto' && c.categoriaB === 'Apache Log4j')).toBe(true);
     });
 
     test('abierta x abierta (tipoVulnerabilidad x software): sin explotar en un cartesiano', () => {
-      const resultado = compararPorCategoriasCruzadas(
-        dataset,
-        { tipo: 'abierta', variable: 'tipoVulnerabilidad' },
-        { tipo: 'abierta', variable: 'software' }
-      );
+      const resultado = compararPorCategoriasCruzadas(dataset, { tipo: 'abierta', variable: 'tipoVulnerabilidad' }, { tipo: 'abierta', variable: 'software' }, CVSS);
 
       // Exactamente 3 combinaciones reales (una por vulnerabilidad, todas distintas) — no 3x3=9.
       expect(resultado).toHaveLength(3);
@@ -171,11 +162,7 @@ describe('ComparacionPorCategoriasGenerico — M-08 (retoma, RF-62/63/64/65/67)'
         v('2', 10.0, 'Sí', 'B', 'Y', undefined, 'Pendiente')
       ];
 
-      const resultado = compararPorCategoriasCruzadas(
-        dosEnLaMismaCelda,
-        { tipo: 'cerrada', variable: 'tipoAcceso' },
-        { tipo: 'cerrada', variable: 'estadoRemediacion' }
-      );
+      const resultado = compararPorCategoriasCruzadas(dosEnLaMismaCelda, { tipo: 'cerrada', variable: 'tipoAcceso' }, { tipo: 'cerrada', variable: 'estadoRemediacion' }, CVSS);
 
       expect(resultado).toHaveLength(1);
       expect(resultado[0]).toEqual({
@@ -189,27 +176,40 @@ describe('ComparacionPorCategoriasGenerico — M-08 (retoma, RF-62/63/64/65/67)'
 
     test('cruzar una variable contra sí misma tira VariableDeConsultaInvalidaError', () => {
       expect(() =>
-        compararPorCategoriasCruzadas(dataset, { tipo: 'cerrada', variable: 'tipoAcceso' }, { tipo: 'cerrada', variable: 'tipoAcceso' })
+        compararPorCategoriasCruzadas(dataset, { tipo: 'cerrada', variable: 'tipoAcceso' }, { tipo: 'cerrada', variable: 'tipoAcceso' }, CVSS)
       ).toThrow(VariableDeConsultaInvalidaError);
     });
 
     test('la misma variable ABIERTA contra sí misma también se rechaza', () => {
       expect(() =>
-        compararPorCategoriasCruzadas(dataset, { tipo: 'abierta', variable: 'software' }, { tipo: 'abierta', variable: 'software' })
+        compararPorCategoriasCruzadas(dataset, { tipo: 'abierta', variable: 'software' }, { tipo: 'abierta', variable: 'software' }, CVSS)
       ).toThrow(VariableDeConsultaInvalidaError);
     });
 
     test('celda con un solo registro: media real, desviaciónEstandar null (necesita al menos 2 valores)', () => {
-      const resultado = compararPorCategoriasCruzadas(
-        dataset,
-        { tipo: 'cerrada', variable: 'tipoAcceso' },
-        { tipo: 'cerrada', variable: 'estadoRemediacion' }
-      );
+      const resultado = compararPorCategoriasCruzadas(dataset, { tipo: 'cerrada', variable: 'tipoAcceso' }, { tipo: 'cerrada', variable: 'estadoRemediacion' }, CVSS);
 
       const celda = resultado.find((c) => c.categoriaA === 'Local' && c.categoriaB === 'Pendiente')!;
       expect(celda.media).toBe(2.0);
       expect(celda.desviacionEstandar).toBeNull();
       expect(celda.cantidad).toBe(1);
+    });
+  });
+
+  describe('agrupar por nivel de riesgo (RF-28 / RF-69)', () => {
+    const dataset = [
+      v('1', 9.5, 'Sí', 'A', 'X', undefined, 'Pendiente'),
+      v('2', 8.7, 'Sí', 'B', 'Y', undefined, 'Pendiente'),
+      v('3', 2.0, 'No', 'C', 'Z', undefined, 'Pendiente')
+    ];
+
+    test('usa el vocabulario unificado y la escala recibida: con "Crítico desde 8.5" el 8.7 cuenta como Crítico', () => {
+      const porNivel = { tipo: 'cerrada' as const, variable: 'severidad' as const };
+      const conCvss = compararPorCategorias(dataset, porNivel, CVSS);
+      const conPropia = compararPorCategorias(dataset, porNivel, EscalaDeClasificacion.personalizada({ moderado: 4, alto: 7, critico: 8.5 }));
+
+      expect(conCvss.map((c) => [c.categoria, c.cantidad])).toEqual([['Bajo', 1], ['Moderado', 0], ['Alto', 1], ['Crítico', 1]]);
+      expect(conPropia.map((c) => [c.categoria, c.cantidad])).toEqual([['Bajo', 1], ['Moderado', 0], ['Alto', 0], ['Crítico', 2]]);
     });
   });
 });
