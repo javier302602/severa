@@ -2,6 +2,9 @@
   "name": "siade",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "main": "dist/infrastructure/config/server.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/infrastructure/config/server.ts",

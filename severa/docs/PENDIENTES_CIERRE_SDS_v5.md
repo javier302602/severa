@@ -74,4 +74,8 @@ lo dice.
 - **`ExportadorExcelAgrupado.test.ts` supera su tiempo límite si la suite
   del backend corre al mismo tiempo que la del frontend** (78 s contra 26 s
   en serie). En serie pasa. Las verificaciones se corren una después de la
-  otra.
+  otra. En Node 22.22.0 (la versión del proyecto desde la lectura de CSV)
+  falla también con la suite del backend sola: el caso de 343.441 filas tarda
+  46 s solo y 86-88 s dentro de la suite en paralelo, contra un límite de
+  60 s. Hay que decidir si se le sube el límite o se corre aparte
+  (`--runInBand` o un proyecto de jest propio).

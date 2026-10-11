@@ -1,3 +1,5 @@
+import { esCodigoConCerosALaIzquierda, tieneLecturaAmbigua } from './LecturaDeNumerosEnTexto';
+
 // Mejora 4 (Análisis de Datos General) — Fase 2. Módulo NUEVO y separado del
 // resto de SEVERA: no reutiliza ni modifica nada de los 13 módulos de
 // vulnerabilidades. Infiere el tipo de una columna a partir de sus propios
@@ -58,7 +60,10 @@ export const MAPEO_A_TIPO_LEGADO: Record<TipoColumnaDetallado, TipoColumna> = {
 // un umbral de mayoría, esas celdas quedan como "valores inconsistentes"
 // reportados por CalidadDeDatosGenerico.ts, no como motivo para no detectar
 // el tipo real de la columna.
-const UMBRAL_MAYORIA = 0.8;
+// Exportado para que la lectura de CSV (LecturaDeTextoDelimitado) decida con
+// el mismo criterio si una columna es numérica antes de elegir su convención
+// decimal, en vez de inventar otro umbral.
+export const UMBRAL_MAYORIA = 0.8;
 
 // Si los valores únicos son una proporción baja del total, se interpreta
 // como un conjunto acotado de categorías (ej. "Ciudad") en vez de texto
@@ -118,14 +123,32 @@ export function esVacio(valor: unknown): boolean {
   return valor === null || valor === undefined || (typeof valor === 'string' && valor.trim() === '');
 }
 
+// Un texto con cero a la izquierda ("07001", "00123") es un código, no un
+// número: leerlo con Number() le borra los ceros. Lo mismo decide la lectura
+// de CSV (LecturaDeNumerosEnTexto), que lo deja como texto.
 export function esNumerico(valor: unknown): boolean {
   if (typeof valor === 'number') return Number.isFinite(valor);
   if (typeof valor === 'string') {
     const texto = valor.trim();
-    if (texto === '') return false;
+    if (texto === '' || esCodigoConCerosALaIzquierda(texto)) return false;
     return Number.isFinite(Number(texto));
   }
   return false;
+}
+
+// Una columna cuyos números están todos escritos como texto y todos admiten
+// dos lecturas que dan números distintos ("196.627": ¿ciento noventa y seis
+// mil o ciento noventa y seis coma seis?) no es numérica: Number() elegiría
+// el punto decimal sin que nadie lo decidiera. La lectura de CSV deja esas
+// columnas como texto y lo avisa; el detector tiene que coincidir. Basta un
+// valor que desempate ("12.5", o un número de verdad) para que deje de serlo.
+function esColumnaDeNumerosAmbiguos(noVacios: unknown[]): boolean {
+  const comoTexto = noVacios.filter((valor): valor is string => typeof valor === 'string' && esNumerico(valor));
+  return (
+    comoTexto.length > 0 &&
+    !noVacios.some((valor) => typeof valor === 'number') &&
+    comoTexto.every(tieneLecturaAmbigua)
+  );
 }
 
 // Los valores Date reales (xlsx con celdas de fecha, ver LectorDatasetGenerico.ts
@@ -309,7 +332,7 @@ export function inferirTipoColumnaDetallado(valores: unknown[]): TipoColumnaDeta
   const proporcion = (predicado: (valor: unknown) => boolean) =>
     noVacios.filter(predicado).length / noVacios.length;
 
-  if (proporcion(esNumerico) >= UMBRAL_MAYORIA) return clasificarNumerica(noVacios);
+  if (!esColumnaDeNumerosAmbiguos(noVacios) && proporcion(esNumerico) >= UMBRAL_MAYORIA) return clasificarNumerica(noVacios);
   if (proporcion(esFecha) >= UMBRAL_MAYORIA) return clasificarFecha(noVacios);
 
   const valoresUnicos = new Set(noVacios.map((valor) => String(valor).trim().toLowerCase())).size;

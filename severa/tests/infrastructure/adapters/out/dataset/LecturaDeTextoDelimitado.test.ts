@@ -139,7 +139,8 @@ describe('Números: regla propia por columna, sin cambiar magnitudes en silencio
     expect(decidirReglaDeColumna(['1,234', '2,5'])).toEqual({ regla: 'coma decimal' });
     expect(decidirReglaDeColumna(['1,234', '2.5'])).toEqual({ regla: 'punto decimal' });
     expect(decidirReglaDeColumna(['12', '7'])).toEqual({ regla: 'entero' });
-    expect(decidirReglaDeColumna(['12.5', 'n/d'])).toEqual({ regla: 'texto' });
+    // Menos de la mayoría parece número: columna de texto, cada celda se decide sola.
+    expect(decidirReglaDeColumna(['12.5', 'n/d'])).toEqual({ regla: 'por celda' });
   });
 
   test('una celda vacía no decide nada y llega como el valor vacío pedido', () => {

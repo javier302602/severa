@@ -5,6 +5,10 @@
 # real (en local todo compiló bien porque la máquina de desarrollo corre
 # Node 24). Se usa 22-alpine (LTS activo) en vez de forzar 20.
 #
+# La versión de Node del proyecto se fija en .nvmrc y en "engines" de los dos
+# package.json; tests/VersionDeNode.test.ts falla si esta imagen no usa la
+# misma versión mayor.
+#
 # ---- Etapa de build: compila TypeScript, incluye devDependencies ----
 FROM node:22-alpine AS build
 WORKDIR /app

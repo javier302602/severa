@@ -379,3 +379,33 @@ describe('aFechaGenerica — conversión única de valor crudo a fecha', () => {
     });
   });
 });
+
+// La lectura de CSV deja como texto los códigos con ceros a la izquierda y las
+// columnas de números ambiguos; el detector no puede volver a leerlos como
+// números por su cuenta (antes "07001" daba 7001 y "196.627" daba 196,627 en
+// las estadísticas, aunque la pantalla avisara lo contrario).
+describe('DetectorDeTipoDeColumna — coincide con la lectura de CSV', () => {
+  test('un texto con cero a la izquierda no es un número; "0", "0.5" y "-0,5" no son códigos', () => {
+    expect(esNumerico('07001')).toBe(false);
+    expect(esNumerico('00123')).toBe(false);
+    expect(esNumerico(' -007 ')).toBe(false);
+    expect(esNumerico('0')).toBe(true);
+    expect(esNumerico('0.5')).toBe(true);
+    expect(esNumerico(7001)).toBe(true);
+  });
+
+  test('una columna de códigos con ceros a la izquierda no es numérica', () => {
+    expect(inferirTipoColumna(['07001', '00123', '150101', '150102', '080101'])).toBe('texto');
+  });
+
+  test('una columna de números en texto todos ambiguos no es numérica', () => {
+    expect(inferirTipoColumna(['196.627', '208.237', '240.013'])).not.toBe('numerica');
+  });
+
+  test('basta un valor que desempate para que sí lo sea', () => {
+    expect(inferirTipoColumna(['196.627', '208.237', '12.5'])).toBe('numerica');
+    expect(inferirTipoColumna(['196.627', '208.237', 240])).toBe('numerica');
+    // Números de verdad (un .xlsx con celdas numéricas) nunca son ambiguos.
+    expect(inferirTipoColumna([196.627, 208.237, 240.013])).toBe('numerica');
+  });
+});

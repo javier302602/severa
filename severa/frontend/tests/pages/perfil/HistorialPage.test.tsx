@@ -84,7 +84,9 @@ describe('HistorialPage — RF-11', () => {
     const filas = await screen.findAllByRole('row');
     expect(filas).toHaveLength(3);
     const primera = within(filas[1]);
-    expect(primera.getByText(new Date('2026-10-08T15:00:00.000Z').toLocaleString())).toBeInTheDocument();
+    // testing-library normaliza los espacios del texto en pantalla, no los del
+    // esperado: el ICU de Node 22 pone un espacio duro en "a. m.".
+    expect(primera.getByText(new Date('2026-10-08T15:00:00.000Z').toLocaleString().replace(/\s+/g, ' '))).toBeInTheDocument();
     expect(primera.getByText('encuesta.csv')).toBeInTheDocument();
     expect(primera.getByText('(versión 2)')).toBeInTheDocument();
     expect(primera.getByText('Informe completo')).toBeInTheDocument();
