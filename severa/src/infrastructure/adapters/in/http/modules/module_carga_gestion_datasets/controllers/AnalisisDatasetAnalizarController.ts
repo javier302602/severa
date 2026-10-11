@@ -43,6 +43,9 @@ const MIME_TYPES_PERMITIDOS = new Set([
 const EXTENSIONES_PERMITIDAS = new Set(['.xlsx', '.xls', '.csv', '.tsv', '.json']);
 
 const upload = multer({
+  // El navegador manda el nombre del archivo en UTF-8; sin esto multer lo
+  // decodifica como latin-1 ("Población.csv" → "PoblaciÃ³n.csv").
+  defParamCharset: 'utf8',
   storage: multer.diskStorage({
     destination: os.tmpdir(),
     filename: (_req, file, cb) => cb(null, `severa-analisis-${randomUUID()}${path.extname(file.originalname)}`)
@@ -103,12 +106,14 @@ analisisDatasetAnalizarRouter.post('/analisis-datos/analizar', manejarSubida, as
     // ampliación del endpoint existente, no una ruta nueva (el reporte
     // consolidado queda "generado automáticamente tras la carga", tal como
     // pide el RF, en vez de requerir una segunda llamada aparte).
-    const { diagnostico, perfilVariables, sesionId, datasetId } = await container.analizarDatasetGenericoUseCase.ejecutar(
+    const { diagnostico, perfilVariables, sesionId, datasetId, lectura } = await container.analizarDatasetGenericoUseCase.ejecutar(
       req.file.path,
       analistaId,
       nombreArchivoOriginal
     );
-    res.json({ ...diagnostico, perfilVariables, sesionId, datasetId });
+    // `lectura`: cómo se leyó un CSV/TSV (codificación, separador, decimales)
+    // y las columnas que quedaron como texto por ambiguas, para mostrarlo.
+    res.json({ ...diagnostico, perfilVariables, sesionId, datasetId, lectura });
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : 'Error desconocido' });
   } finally {

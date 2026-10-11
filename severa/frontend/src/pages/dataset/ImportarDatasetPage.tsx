@@ -2,6 +2,7 @@ import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { useDetectarColumnas, useImportarDataset, useImportarDatasetDesdeUrl, useReiniciarDataset } from '../../hooks/useDataset';
 import { MensajeError } from '../../components/ui/MensajeError';
 import { Spinner } from '../../components/ui/Spinner';
+import { ComoSeLeyoElArchivo } from '../../components/ui/ComoSeLeyoElArchivo';
 import { ConfirmModal } from '../../components/ui/ConfirmModal';
 import { mensajeDeError } from '../../utils/mensajeDeError';
 import { descargarArchivo } from '../../utils/descargarArchivo';
@@ -73,26 +74,29 @@ function claseDePestana(activa: boolean): string {
 
 function ResumenDeImportacion({ resumen }: { resumen: ResumenImportacion }) {
   return (
-    <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900/50 dark:bg-green-950/30">
-      <p className="font-medium text-green-800 dark:text-green-300">
-        Importación completa: {resumen.importados} importados, {resumen.rechazados} rechazados.
-      </p>
-      {resumen.errores.length > 0 && (
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-green-900 dark:text-green-400">
-          {resumen.errores.map((error, indice) => (
-            <li key={indice}>{error}</li>
-          ))}
-        </ul>
-      )}
-      {resumen.excelDescartadosBase64 && (
-        <button
-          type="button"
-          onClick={() => descargarArchivo(new Blob([base64AArrayBuffer(resumen.excelDescartadosBase64 as string)], { type: MIME_XLSX }), 'filas-descartadas.xlsx')}
-          className="mt-3 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-green-800 ring-1 ring-green-300 hover:bg-green-100 dark:bg-slate-800 dark:text-green-300 dark:ring-green-800 dark:hover:bg-slate-700"
-        >
-          Descargar filas rechazadas
-        </button>
-      )}
+    <div className="space-y-3">
+      {resumen.lectura && <ComoSeLeyoElArchivo lectura={resumen.lectura} />}
+      <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900/50 dark:bg-green-950/30">
+        <p className="font-medium text-green-800 dark:text-green-300">
+          Importación completa: {resumen.importados} importados, {resumen.rechazados} rechazados.
+        </p>
+        {resumen.errores.length > 0 && (
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-green-900 dark:text-green-400">
+            {resumen.errores.map((error, indice) => (
+              <li key={indice}>{error}</li>
+            ))}
+          </ul>
+        )}
+        {resumen.excelDescartadosBase64 && (
+          <button
+            type="button"
+            onClick={() => descargarArchivo(new Blob([base64AArrayBuffer(resumen.excelDescartadosBase64 as string)], { type: MIME_XLSX }), 'filas-descartadas.xlsx')}
+            className="mt-3 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-green-800 ring-1 ring-green-300 hover:bg-green-100 dark:bg-slate-800 dark:text-green-300 dark:ring-green-800 dark:hover:bg-slate-700"
+          >
+            Descargar filas rechazadas
+          </button>
+        )}
+      </div>
     </div>
   );
 }

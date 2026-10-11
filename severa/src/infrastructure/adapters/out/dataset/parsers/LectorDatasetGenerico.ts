@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import * as XLSX from 'xlsx';
 import { DatasetInvalidoError } from '../../../../../domain/errors/DatasetInvalidoError';
+import { InformacionDeLectura, leerTextoDelimitado } from './LecturaDeTextoDelimitado';
 
 // Mejora 4 — Fase 2. A diferencia de LectorExcelDataset.ts (que asume
 // columnas fijas de vulnerabilidades), este lector no sabe nada de antemano
@@ -10,13 +11,13 @@ import { DatasetInvalidoError } from '../../../../../domain/errors/DatasetInvali
 // genérico (no menciona vulnerabilidades) — no hace falta un error nuevo
 // para el mismo problema (archivo corrupto / sin hojas / sin filas).
 //
-// M-14 (RF-105): 4 formatos, 2 caminos de lectura reales.
-//   - .xlsx/.xls/.csv: SheetJS (paquete "xlsx"), misma XLSX.readFile de
-//     siempre — detecta el formato por extensión/contenido internamente.
-//   - .tsv: SheetJS también, pero SIN confiar en que readFile reconozca la
-//     extensión .tsv (a diferencia de .csv, no hay garantía de que esté en
-//     su tabla interna de extensiones conocidas) — se lee el archivo como
-//     texto y se fuerza el separador de campo explícitamente (FS: '\t').
+// M-14 (RF-105): 4 formatos, 3 caminos de lectura reales.
+//   - .xlsx/.xls: SheetJS (paquete "xlsx"), misma XLSX.readFile de siempre.
+//   - .csv/.tsv: LecturaDeTextoDelimitado — codificación decidida sobre los
+//     bytes (BOM, UTF-8 estricto o Windows-1252), separador detectado (en .tsv,
+//     tabulación) y números convertidos por columna con coma o punto decimal.
+//     Antes pasaban por SheetJS, que leía como latin-1 los CSV en UTF-8 sin BOM
+//     y convertía "25,5" en 255 sin avisar (CSV de Excel en español).
 //   - .json: SheetJS no tiene ningún modo de "leer JSON como planilla" (
 //     XLSX.utils.json_to_sheet sirve para ESCRIBIR, no para leer) — camino
 //     totalmente aparte, JSON.parse + validación de que sea un array de
@@ -24,6 +25,9 @@ import { DatasetInvalidoError } from '../../../../../domain/errors/DatasetInvali
 export interface ResultadoLecturaGenerica {
   columnas: string[];
   filas: Array<Record<string, unknown>>;
+  // Solo en .csv/.tsv: cómo se leyó (codificación, separador, convención
+  // decimal) y qué columnas quedaron como texto por ambiguas.
+  lectura?: InformacionDeLectura;
 }
 
 export class LectorDatasetGenerico {
@@ -37,8 +41,28 @@ export class LectorDatasetGenerico {
     if (extension === '.json') {
       return this.leerJson(filePath);
     }
+    if (extension === '.csv' || extension === '.tsv') {
+      return this.leerTextoDelimitado(filePath, extension);
+    }
 
     return this.leerConSheetJs(filePath, extension);
+  }
+
+  private leerTextoDelimitado(filePath: string, extension: string): ResultadoLecturaGenerica {
+    let lectura;
+    try {
+      // defval null (igual que el camino de SheetJS): una celda vacía tiene
+      // que distinguirse de un valor real para el diagnóstico de calidad.
+      lectura = leerTextoDelimitado(fs.readFileSync(filePath), { separador: extension === '.tsv' ? '\t' : undefined, valorVacio: null });
+    } catch (error) {
+      throw new DatasetInvalidoError(
+        `El archivo está corrupto o no es un CSV/TSV válido: ${error instanceof Error ? error.message : 'error desconocido'}`
+      );
+    }
+    if (lectura.filas.length === 0) {
+      throw new DatasetInvalidoError('El archivo no contiene filas de datos');
+    }
+    return { columnas: lectura.columnas, filas: lectura.filas, lectura: lectura.informacion };
   }
 
   private leerConSheetJs(filePath: string, extension: string): ResultadoLecturaGenerica {

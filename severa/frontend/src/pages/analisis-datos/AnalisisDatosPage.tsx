@@ -26,6 +26,8 @@ import type {
 } from '../../api/analisisDatosService';
 import { nombreDeArchivoDeInforme, type OpcionesDescargaDeInforme } from '../../api/formatosDeInforme';
 import { DescargaDeInforme } from '../../components/ui/DescargaDeInforme';
+import { ComoSeLeyoElArchivo } from '../../components/ui/ComoSeLeyoElArchivo';
+import type { LecturaDelArchivo } from '../../api/datasetService';
 import { nombreDeVersion } from '../../constants/tiposDeVariable';
 import { CLASE_AVISO_DE_EXITO, CLASE_TARJETA } from './estilos';
 import { leerSolicitudDeReapertura, type PestanaDeAnalisis } from './reaperturaDesdeHistorial';
@@ -62,6 +64,9 @@ interface DatasetEnPantalla {
   version: number;
   versionBase: number | null;
   diagnostico: DiagnosticoDeCalidad;
+  // Solo recién cargado un .csv/.tsv: cómo se leyó. Al reabrir un dataset
+  // guardado ya no aplica (se lee de la base, no del archivo).
+  lectura: LecturaDelArchivo | null;
 }
 
 function desdeDatasetAbierto(abierto: DatasetAbierto): DatasetEnPantalla {
@@ -71,7 +76,8 @@ function desdeDatasetAbierto(abierto: DatasetAbierto): DatasetEnPantalla {
     nombreArchivo: abierto.nombreArchivo,
     version: abierto.version,
     versionBase: abierto.versionBase,
-    diagnostico: abierto.diagnostico
+    diagnostico: abierto.diagnostico,
+    lectura: null
   };
 }
 
@@ -128,7 +134,8 @@ export function AnalisisDatosPage() {
           // Un archivo recién cargado es siempre el original de su familia.
           version: 0,
           versionBase: null,
-          diagnostico: { totalFilas: resultado.totalFilas, filasDuplicadas: resultado.filasDuplicadas, columnas: resultado.columnas }
+          diagnostico: { totalFilas: resultado.totalFilas, filasDuplicadas: resultado.filasDuplicadas, columnas: resultado.columnas },
+          lectura: resultado.lectura ?? null
         });
       }
     });
@@ -255,6 +262,8 @@ export function AnalisisDatosPage() {
               Cerrar y elegir otro
             </button>
           </div>
+
+          {abierto.lectura && <ComoSeLeyoElArchivo lectura={abierto.lectura} />}
 
           {aviso && (
             <p className={CLASE_AVISO_DE_EXITO} role="status">

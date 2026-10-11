@@ -9,6 +9,19 @@ export interface ResumenImportacion {
   // rechazo"), en base64 — null si no hubo ninguna. Ver
   // construirExcelDeRechazadas (backend, LectorExcelDataset.ts).
   excelDescartadosBase64: string | null;
+  // Solo al importar un .csv/.tsv: cómo se leyó.
+  lectura?: LecturaDelArchivo;
+}
+
+// Cómo leyó el backend un .csv/.tsv (LecturaDeTextoDelimitado): codificación,
+// separador y convención decimal, ya en palabras, y las columnas que quedaron
+// como texto por ambiguas.
+export interface LecturaDelArchivo {
+  codificacion: string;
+  separador: string;
+  convencionDecimal: string;
+  descripcion: string;
+  avisos: string[];
 }
 
 // Mapeo flexible de columnas: espejo de MapeoColumnas (LectorExcelDataset.ts,

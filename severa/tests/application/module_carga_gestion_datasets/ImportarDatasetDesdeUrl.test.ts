@@ -84,8 +84,11 @@ function mockLeerCsvEnStreaming(filas: FilaProcesada[]): jest.Mock {
     for (const fila of filas) {
       await onFila(fila);
     }
+    return LECTURA_CSV;
   });
 }
+
+const LECTURA_CSV = { codificacion: 'UTF-8', separador: ';', convencionDecimal: 'coma decimal', avisos: [] };
 
 describe('ImportarDatasetDesdeUrl', () => {
   test('una URL malformada o con esquema no-https se sigue rechazando (esto NO cambió con la eliminación de la allowlist)', async () => {
@@ -307,6 +310,14 @@ describe('ImportarDatasetDesdeUrl', () => {
     expect(resultado.importados).toBe(2);
     expect(resultado.rechazados).toBe(1);
     expect(resultado.errores).toEqual(['CVSS fuera de rango']);
+    // Cómo se leyó el CSV viaja en la respuesta, en palabras para la pantalla.
+    expect(resultado.lectura).toEqual({
+      codificacion: 'UTF-8',
+      separador: 'punto y coma',
+      convencionDecimal: 'coma decimal',
+      descripcion: 'UTF-8, separado por punto y coma, con coma decimal',
+      avisos: []
+    });
 
     // Inserción por lotes: las 2 filas importables en UN solo guardarLote(),
     // cada una ya con analistaId asignado.

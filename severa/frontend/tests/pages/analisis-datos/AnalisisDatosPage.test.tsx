@@ -104,6 +104,47 @@ describe('AnalisisDatosPage', () => {
     expect(screen.getByLabelText('Tipo de edad')).toBeEnabled();
   });
 
+  test('un CSV recién cargado dice cómo se leyó y qué columnas quedaron como texto', async () => {
+    vi.mocked(analisisDatosService.analizar).mockResolvedValue({
+      sesionId: 'sesion-1',
+      datasetId: 'dataset-1',
+      totalFilas: 10,
+      filasDuplicadas: 0,
+      columnas: [columna('edad', 2)],
+      lectura: {
+        codificacion: 'Windows-1252',
+        separador: 'punto y coma',
+        convencionDecimal: 'coma decimal',
+        descripcion: 'Windows-1252, separado por punto y coma, con coma decimal',
+        avisos: ['La columna "monto" quedó como texto: ambigua.']
+      }
+    });
+    render(<AnalisisDatosPage />, { wrapper: EnvoltorioQueryConRutas });
+
+    await subirArchivo();
+
+    const lectura = await screen.findByRole('status', { name: 'Cómo se leyó el archivo' });
+    expect(lectura).toHaveTextContent('Windows-1252, separado por punto y coma, con coma decimal.');
+    expect(lectura).toHaveTextContent('La columna "monto" quedó como texto: ambigua.');
+  });
+
+  test('un .xlsx (lectura null) no muestra el recuadro', async () => {
+    vi.mocked(analisisDatosService.analizar).mockResolvedValue({
+      sesionId: 'sesion-1',
+      datasetId: 'dataset-1',
+      totalFilas: 10,
+      filasDuplicadas: 0,
+      columnas: [columna('edad', 2)],
+      lectura: null
+    });
+    render(<AnalisisDatosPage />, { wrapper: EnvoltorioQueryConRutas });
+
+    await subirArchivo();
+    await screen.findByTestId('version-abierta');
+
+    expect(screen.queryByRole('status', { name: 'Cómo se leyó el archivo' })).not.toBeInTheDocument();
+  });
+
   test('acepta los cinco formatos que lee el backend (RF-105)', () => {
     render(<AnalisisDatosPage />, { wrapper: EnvoltorioQueryConRutas });
 

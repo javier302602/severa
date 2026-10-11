@@ -31,7 +31,7 @@ const FILAS: Array<[string, string]> = [
 
 function escribirCsv(): string {
   const ruta = path.join(os.tmpdir(), `redondeo-cvss-${Date.now()}.csv`);
-  const lineas = ['CVE,CVSS Score,Software,Acceso Remoto', ...FILAS.map(([cve, cvss]) => `${cve},${cvss},Prueba,No`)];
+  const lineas = ['CVE,CVSS Score,Software,Acceso Remoto', ...FILAS.map(([cve, cvss]) => `${cve},${cvss},Prueba,Sí`)];
   fs.writeFileSync(ruta, lineas.join('\n'));
   return ruta;
 }

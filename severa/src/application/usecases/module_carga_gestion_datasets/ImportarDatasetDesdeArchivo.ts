@@ -1,6 +1,7 @@
 import { LectorExcelDataset, MapeoColumnas } from '../../../infrastructure/adapters/out/dataset/parsers/LectorExcelDataset';
 import { ImportarDatasetDesdeArchivoUseCase } from '../../ports/in/module_carga_gestion_datasets/ImportarDatasetDesdeArchivoUseCase';
 import { ResumenImportacion } from '../../ports/in/module_carga_gestion_datasets/ImportarDatasetUseCase';
+import { resumirLectura } from '../../../infrastructure/adapters/out/dataset/parsers/LecturaDeTextoDelimitado';
 import { ImportarDatasetConAuditoria } from '../module_seguridad_auditoria/decoradores/ImportarDatasetConAuditoria';
 
 // RF-17: primera ruta HTTP que permite importar el dataset manualmente (antes
@@ -25,6 +26,7 @@ export class ImportarDatasetDesdeArchivo implements ImportarDatasetDesdeArchivoU
     nombreArchivoOriginal?: string
   ): Promise<ResumenImportacion> {
     const resultado = await this.lectorExcel.leerArchivo(rutaArchivo, mapeoColumnas);
-    return this.importarDatasetUseCase.ejecutar(resultado, analistaId, nombreArchivoOriginal);
+    const resumen = await this.importarDatasetUseCase.ejecutar(resultado, analistaId, nombreArchivoOriginal);
+    return resultado.lectura ? { ...resumen, lectura: resumirLectura(resultado.lectura) } : resumen;
   }
 }

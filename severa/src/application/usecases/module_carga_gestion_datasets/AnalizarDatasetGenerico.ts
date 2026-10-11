@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { LectorDatasetGenerico } from '../../../infrastructure/adapters/out/dataset/parsers/LectorDatasetGenerico';
+import { resumirLectura } from '../../../infrastructure/adapters/out/dataset/parsers/LecturaDeTextoDelimitado';
 import { AnalizarDatasetGenericoUseCase, ResultadoAnalisisDataset } from '../../ports/in/module_carga_gestion_datasets/AnalizarDatasetGenericoUseCase';
 import { analizarDataset } from '../../../domain/services/data-cleaning/CalidadDeDatosGenerico';
 import { calcularEstadisticasDescriptivas } from '../../../domain/services/descriptive-statistics/EstadisticasDescriptivasGenerico';
@@ -33,7 +34,7 @@ export class AnalizarDatasetGenerico implements AnalizarDatasetGenericoUseCase {
     // el controller solo borra rutaArchivo en su finally, después de que este
     // método termina, así que el archivo sigue existiendo en disco acá.
     const hashOriginalSha256 = await calcularHashSha256Archivo(rutaArchivo);
-    const { columnas, filas } = this.lectorDatasetGenerico.leerArchivo(rutaArchivo);
+    const { columnas, filas, lectura } = this.lectorDatasetGenerico.leerArchivo(rutaArchivo);
     const diagnostico = analizarDataset(columnas, filas);
     // RF-112: mismo cálculo que ya corría GET /estadisticas-descriptivas, acá
     // se hace con las mismas columnas/filas ya en memoria (sin releer nada)
@@ -63,6 +64,12 @@ export class AnalizarDatasetGenerico implements AnalizarDatasetGenericoUseCase {
     // Ronda 2).
     const sesionId = this.sesionAnalisisStore.crear(analistaId, { columnas, filas, datasetId });
 
-    return { diagnostico, perfilVariables, sesionId, datasetId };
+    return {
+      diagnostico,
+      perfilVariables,
+      sesionId,
+      datasetId,
+      lectura: lectura ? resumirLectura(lectura) : null
+    };
   }
 }

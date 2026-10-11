@@ -34,6 +34,11 @@ lo dice.
   el frontend no lo ofrece. En el Paso 2 la alerta pasa a usar el corte de
   Crítico de la escala cuando el analista no fijó un umbral propio.
 
+- **La pantalla de Priorización no explica el orden dentro de cada nivel.**
+  Dentro de un nivel el ranking pondera 70 % CVSS y 30 % días para parche
+  (RF-73, z-scores dentro del nivel), así que un 8.6 puede quedar por encima de
+  un 8.9 y parece un error. La pantalla tiene que decirlo.
+
 ## Paso 5 — RNF
 
 - **`POST /auth/login` sin cuerpo devuelve el mensaje crudo de la base.**
@@ -57,12 +62,12 @@ lo dice.
   (dos personas en el mismo navegador). Incluye ahora la lista de plantillas
   (`['plantillas-analisis']`).
 
-- **Un CSV con tildes se lee como latin-1 en la importación de archivo.**
-  Encontrado el 2026-10-10 escribiendo el test del redondeo del CVSS:
-  `LectorExcelDataset.leerArchivo` sobre un CSV UTF-8 sin BOM lee "Sí" como
-  "SÃ­" y rechaza la fila ("Tipo de acceso inválido"). Revisar con un CSV real
-  exportado de Excel (con y sin BOM) y con la lectura en streaming, que usa
-  otro camino (csv-parse).
+- ~~**Un CSV con tildes se lee como latin-1 en la importación de archivo.**~~
+  Resuelto el 2026-10-10 en su propio commit (lectura de CSV, antes de la
+  tanda e): `LecturaDeTextoDelimitado` decide codificación, separador y regla
+  numérica por columna para los dos lectores (también en streaming). En el
+  camino se encontró y corrigió lo mismo en el nombre del archivo subido
+  (multer lo decodificaba como latin-1).
 
 ## Entorno de pruebas
 

@@ -53,3 +53,34 @@ describe('ImportarDatasetPage — "Restablecer mis datos" (disponible para cualq
     expect(datasetService.reiniciar).not.toHaveBeenCalled();
   });
 });
+
+// Lectura de CSV: al importar un CSV por link, la pantalla dice cómo se leyó
+// (codificación, separador, decimales) y qué columnas quedaron como texto.
+describe('ImportarDatasetPage — cómo se leyó el CSV', () => {
+  afterEach(() => vi.clearAllMocks());
+
+  test('muestra la lectura y los avisos que devuelve el backend', async () => {
+    vi.mocked(datasetService.importarDesdeUrl).mockResolvedValue({
+      importados: 2,
+      rechazados: 0,
+      errores: [],
+      excelDescartadosBase64: null,
+      lectura: {
+        codificacion: 'UTF-8',
+        separador: 'punto y coma',
+        convencionDecimal: 'coma decimal',
+        descripcion: 'UTF-8, separado por punto y coma, con coma decimal',
+        avisos: ['La columna "Código" quedó como texto: ambigua.']
+      }
+    });
+    render(<ImportarDatasetPage />, { wrapper: EnvoltorioQuery });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Importar desde link' }));
+    fireEvent.change(screen.getByLabelText('Link del dataset'), { target: { value: 'https://datos.example/catalogo.csv' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Importar desde link' }).at(-1) as HTMLElement);
+
+    const lectura = await screen.findByRole('status', { name: 'Cómo se leyó el archivo' });
+    expect(lectura).toHaveTextContent('Cómo se leyó el archivo: UTF-8, separado por punto y coma, con coma decimal.');
+    expect(lectura).toHaveTextContent('La columna "Código" quedó como texto: ambigua.');
+  });
+});

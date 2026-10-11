@@ -20,6 +20,9 @@ const MIME_TYPES_PERMITIDOS = new Set([
 ]);
 
 const upload = multer({
+  // El navegador manda el nombre del archivo en UTF-8; sin esto multer lo
+  // decodifica como latin-1 ("Población.csv" → "PoblaciÃ³n.csv").
+  defParamCharset: 'utf8',
   storage: multer.diskStorage({
     destination: os.tmpdir(),
     filename: (_req, file, cb) => cb(null, `severa-import-${randomUUID()}${path.extname(file.originalname)}`)

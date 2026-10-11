@@ -1,4 +1,5 @@
 import { FilaImportable, FilaRechazada } from '../../../../infrastructure/adapters/out/dataset/parsers/LectorExcelDataset';
+import { LecturaDelArchivo } from './AnalizarDatasetGenericoUseCase';
 
 export interface ResumenImportacion {
   importados: number;
@@ -12,6 +13,9 @@ export interface ResumenImportacion {
   // el Excel es una muestra representativa, no necesariamente completa —
   // `rechazados` siempre es el conteo real.
   excelDescartadosBase64: string | null;
+  // Solo al importar un .csv/.tsv: codificación, separador y convención
+  // decimal con que se leyó, y las columnas que quedaron como texto.
+  lectura?: LecturaDelArchivo;
 }
 
 export interface ImportarDatasetUseCase {

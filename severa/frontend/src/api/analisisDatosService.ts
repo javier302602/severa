@@ -1,4 +1,5 @@
 import { httpClient } from './httpClient';
+import type { LecturaDelArchivo } from './datasetService';
 import { parametrosDeInforme, type OpcionesDescargaDeInforme } from './formatosDeInforme';
 
 // Mejora 4 (Análisis de Datos General). Contrato verificado contra
@@ -51,6 +52,8 @@ export interface DiagnosticoDataset extends DiagnosticoDeCalidad {
   // El dataset guardado al que pertenece la sesión (el original recién
   // cargado). Con él se corrigen tipos, se limpia y se versiona.
   datasetId?: string;
+  // Cómo se leyó un .csv/.tsv; null en .xlsx/.xls/.json.
+  lectura?: LecturaDelArchivo | null;
 }
 
 // RF-110: lo que el analista decidió sobre la variable objetivo. El sistema

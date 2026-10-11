@@ -1,8 +1,20 @@
 import { DiagnosticoDataset } from '../../../../domain/services/data-cleaning/CalidadDeDatosGenerico';
 import { ResumenColumna } from '../../../../domain/services/descriptive-statistics/EstadisticasDescriptivasGenerico';
 
+// Cómo se leyó un .csv/.tsv: codificación, separador y convención decimal,
+// en palabras para el analista, más las columnas que quedaron como texto por
+// ambiguas. null en .xlsx/.xls/.json (no hay nada que decidir).
+export interface LecturaDelArchivo {
+  codificacion: string;
+  separador: string;
+  convencionDecimal: string;
+  descripcion: string;
+  avisos: string[];
+}
+
 export interface ResultadoAnalisisDataset {
   diagnostico: DiagnosticoDataset;
+  lectura: LecturaDelArchivo | null;
   // RF-112 (M-14): reporte de perfilado consolidado por variable — mismo
   // cálculo que ya usaba GET /analisis-datos/:sesionId/estadisticas-descriptivas
   // (Fase 3), pero acá disponible de una sola vez, en el mismo momento en

@@ -1,6 +1,7 @@
 import fs from 'fs';
+import path from 'path';
 import * as XLSX from 'xlsx';
-import { parse } from 'csv-parse';
+import { InformacionDeLectura, abrirTextoDelimitadoEnStreaming, leerTextoDelimitado } from './LecturaDeTextoDelimitado';
 import { Vulnerabilidad } from '../../../../../domain/entities/Vulnerabilidad';
 import { CvssScore } from '../../../../../domain/shared/value-objects/CvssScore';
 import { IdentificadorCVE } from '../../../../../domain/shared/value-objects/IdentificadorCVE';
@@ -76,6 +77,8 @@ export interface FilaRechazada {
 export interface ResultadoLecturaExcel {
   importables: FilaImportable[];
   rechazadas: FilaRechazada[];
+  // Solo en .csv/.tsv: cómo se leyó (ver LecturaDeTextoDelimitado).
+  lectura?: InformacionDeLectura;
 }
 
 // Resultado de clasificar UNA fila — usado tanto por leerArchivo (arma un
@@ -224,9 +227,30 @@ export class LectorExcelDataset {
   // (leerArchivoCsvEnStreaming) es el único formato con streaming real de
   // punta a punta hoy. Ver informe: si hace falta soportar .xlsx grandes de
   // verdad, la migración natural es a exceljs (ExcelJS.stream.xlsx.WorkbookReader).
-  private leerFilas(filePath: string): Array<Record<string, unknown>> {
+  //
+  // .csv/.tsv ya no pasan por SheetJS (leía como latin-1 el UTF-8 sin BOM y
+  // convertía "7,5" en 75): van por LecturaDeTextoDelimitado, igual que en el
+  // camino genérico.
+  private leerFilas(filePath: string): { rows: Array<Record<string, unknown>>; lectura?: InformacionDeLectura } {
     if (!fs.existsSync(filePath)) {
       throw new Error(`No existe el archivo de Excel: ${filePath}`);
+    }
+
+    const extension = path.extname(filePath).toLowerCase();
+    if (extension === '.csv' || extension === '.tsv') {
+      let lectura;
+      try {
+        // valorVacio '' como el defval de SheetJS de abajo (ver primerValorPresente).
+        lectura = leerTextoDelimitado(fs.readFileSync(filePath), { separador: extension === '.tsv' ? '\t' : undefined, valorVacio: '' });
+      } catch (error) {
+        throw new DatasetInvalidoError(
+          `El archivo está corrupto o no es un CSV válido: ${error instanceof Error ? error.message : 'error desconocido'}`
+        );
+      }
+      if (lectura.filas.length === 0) {
+        throw new DatasetInvalidoError('El archivo CSV no contiene filas de datos');
+      }
+      return { rows: lectura.filas, lectura: lectura.informacion };
     }
 
     let workbook: XLSX.WorkBook;
@@ -250,19 +274,19 @@ export class LectorExcelDataset {
       throw new DatasetInvalidoError('El archivo Excel no contiene filas de datos');
     }
 
-    return rows;
+    return { rows };
   }
 
   // Mejora "mapeo flexible de columnas": el frontend llama a esto apenas el
   // usuario elige el archivo, ANTES de importar nada, para mostrarle el
   // selector de mapeo con los nombres de columna reales de su archivo.
   async detectarColumnas(filePath: string): Promise<string[]> {
-    const rows = this.leerFilas(filePath);
+    const { rows } = this.leerFilas(filePath);
     return Object.keys(rows[0]);
   }
 
   async leerArchivo(filePath: string, mapeoColumnas?: MapeoColumnas): Promise<ResultadoLecturaExcel> {
-    const rows = this.leerFilas(filePath);
+    const { rows, lectura } = this.leerFilas(filePath);
     const columnasPresentes = new Set(Object.keys(rows[0]));
     const columnas = resolverColumnas(columnasPresentes, mapeoColumnas);
 
@@ -280,7 +304,7 @@ export class LectorExcelDataset {
       }
     });
 
-    return { importables, rechazadas };
+    return lectura ? { importables, rechazadas, lectura } : { importables, rechazadas };
   }
 
   // Streaming real de punta a punta para CSV (2026-07-17, datasets públicos
@@ -295,18 +319,22 @@ export class LectorExcelDataset {
     filePath: string,
     mapeoColumnas: MapeoColumnas | undefined,
     onFila: (fila: FilaProcesada) => Promise<void>
-  ): Promise<void> {
+  ): Promise<InformacionDeLectura> {
     if (!fs.existsSync(filePath)) {
       throw new Error(`No existe el archivo CSV: ${filePath}`);
     }
 
-    const parser = fs.createReadStream(filePath).pipe(parse({ columns: true, skip_empty_lines: true, trim: true, bom: true }));
-
+    // Codificación, separador y regla numérica de cada columna: los decide
+    // LecturaDeTextoDelimitado con el comienzo del archivo (ver
+    // abrirTextoDelimitadoEnStreaming). Se devuelve cómo se leyó.
     let indice = 0;
     let columnas: ColumnasResueltas | undefined;
+    let informacion: InformacionDeLectura;
 
     try {
-      for await (const row of parser as AsyncIterable<Record<string, unknown>>) {
+      const lectura = await abrirTextoDelimitadoEnStreaming(filePath, { valorVacio: '' });
+      informacion = lectura.informacion;
+      for await (const row of lectura.filas) {
         if (!columnas) {
           const columnasPresentes = new Set(Object.keys(row));
           columnas = resolverColumnas(columnasPresentes, mapeoColumnas);
@@ -328,5 +356,6 @@ export class LectorExcelDataset {
     if (indice === 0) {
       throw new DatasetInvalidoError('El archivo CSV no contiene filas de datos');
     }
+    return informacion;
   }
 }

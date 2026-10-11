@@ -15,6 +15,7 @@ import {
   MAX_FILAS_RECHAZADAS_PARA_EXCEL
 } from '../../../infrastructure/adapters/out/dataset/parsers/LectorExcelDataset';
 import { ImportarDatasetConAuditoria } from '../module_seguridad_auditoria/decoradores/ImportarDatasetConAuditoria';
+import { resumirLectura } from '../../../infrastructure/adapters/out/dataset/parsers/LecturaDeTextoDelimitado';
 import { esVulnerabilidadCritica } from '../../../domain/services/DetectorDeEventosNotificables';
 
 // Tamaño de lote del camino streaming (CSV) — mismo criterio que
@@ -82,7 +83,8 @@ export class ImportarDatasetDesdeUrl implements ImportarDatasetDesdeUrlUseCase {
       }
 
       const resultadoLectura = await this.lectorExcel.leerArchivo(archivo.rutaArchivo, mapeoColumnas);
-      return await this.importarDatasetUseCase.ejecutar(resultadoLectura, analistaId, undefined, origenLink);
+      const resumen = await this.importarDatasetUseCase.ejecutar(resultadoLectura, analistaId, undefined, origenLink);
+      return resultadoLectura.lectura ? { ...resumen, lectura: resumirLectura(resultadoLectura.lectura) } : resumen;
     } finally {
       fs.unlink(archivo.rutaArchivo, () => {});
     }
@@ -111,7 +113,7 @@ export class ImportarDatasetDesdeUrl implements ImportarDatasetDesdeUrlUseCase {
     // `rechazados` (el conteo) SIEMPRE refleja el total real.
     const muestraDeRechazadas: FilaRechazada[] = [];
 
-    await this.lectorExcel.leerArchivoCsvEnStreaming(rutaArchivo, mapeoColumnas, async (fila) => {
+    const lectura = await this.lectorExcel.leerArchivoCsvEnStreaming(rutaArchivo, mapeoColumnas, async (fila) => {
       if (fila.tipo === 'rechazada') {
         rechazados++;
         if (muestraDeRechazadas.length < MAX_FILAS_RECHAZADAS_PARA_EXCEL) {
@@ -146,7 +148,8 @@ export class ImportarDatasetDesdeUrl implements ImportarDatasetDesdeUrlUseCase {
       rechazados,
       errores: muestraDeRechazadas.map((r) => r.error),
       excelDescartadosBase64:
-        muestraDeRechazadas.length > 0 ? construirExcelDeRechazadas(muestraDeRechazadas).toString('base64') : null
+        muestraDeRechazadas.length > 0 ? construirExcelDeRechazadas(muestraDeRechazadas).toString('base64') : null,
+      lectura: resumirLectura(lectura)
     };
     await this.importarDatasetUseCase.registrarImportacionPorLink(resumen, analistaId, origenLink, criticas, criterio);
 
